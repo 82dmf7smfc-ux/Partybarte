@@ -6,6 +6,9 @@
 # Generated report files.
 output/
 
+# Packaged zip artifacts (rebuildable).
+dist/
+
 # Python cache and test cache.
 __pycache__/
 *.pyc
