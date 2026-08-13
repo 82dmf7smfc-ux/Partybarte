@@ -1,0 +1,49 @@
+name: Release
+
+# Builds the two zip packages and publishes them as a GitHub Release. This runs
+# when you push a version tag like v1.0.0. The zips become download links on the
+# Releases page, so binaries never live in the git history.
+#
+# To cut a release:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  # The job needs to create a release and attach files to it.
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the tests before releasing
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pytest -q
+
+      - name: Build the zips
+        run: python tools/build_zips.py
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/alarm_pareto_browser.zip \
+            dist/alarm_pareto_python.zip \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes

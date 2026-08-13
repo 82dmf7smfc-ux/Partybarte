@@ -163,3 +163,21 @@ a test fail, the change altered the analysis. That is the safety net.
 ```
 .venv\Scripts\python.exe -m pytest -q
 ```
+
+The same tests run automatically on GitHub for every push and pull request. See
+`.github/workflows/ci.yml`.
+
+## Project documents
+
+| File | What it is for |
+|---|---|
+| `CONTRIBUTING.md` | How to set up, test, branch, and cut a release. |
+| `ROADMAP.md` | Ideas and future improvements, so they are not lost. |
+| `CHANGELOG.md` | A dated record of what changed in each version. |
+| `tools/build_zips.py` | Rebuilds the two download packages the same way every time. |
+
+## Downloads
+
+Packaged versions of both tools are published on the GitHub Releases page. Each
+release has two zip files. One holds the browser tool. One holds the Python
+tool. To build them yourself, run `python tools/build_zips.py`.
