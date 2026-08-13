@@ -1,0 +1,37 @@
+name: CI
+
+# Runs the Python test suite on every push and every pull request. This is the
+# real check that the analysis math still gives the right answers. The browser
+# tool has no build step, so there is nothing to compile for it here.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      # numpy 1.26.4 and pandas 2.2.2 support Python 3.11 and 3.12. We test both.
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run the tests
+        run: pytest -q
+
+      - name: Build the distributable zips
+        run: python tools/build_zips.py
