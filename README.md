@@ -2,8 +2,57 @@
 
 This tool reads an alarm log from a semiconductor tool. It looks at the last 30
 days of faults. It ranks the faults two ways. First by how often each one
-happens. Second by how much downtime each one causes. It writes the results to
-an Excel workbook and a PowerPoint deck.
+happens. Second by how much downtime each one causes.
+
+There are two versions in this project. Pick the one that fits you.
+
+## Which version should I use?
+
+**1. The browser tool: `alarm_pareto.html` (recommended, zero install).**
+Double-click the file. It opens in Edge or Chrome. Click a button to pick one or
+more elog files. It shows the most frequent faults and the biggest downtime,
+with Pareto charts, right in the page. It needs no Python, no packages, and no
+IT approval. It runs fully offline. Nothing you load ever leaves your computer.
+Use this for day-to-day work on the bench. See "Browser tool" below.
+
+**2. The Python tool: the `alarm_pareto` package.**
+Run it from the command line. It writes an Excel workbook with real, clickable
+Excel charts, plus a PowerPoint deck. Use this when you need those exact file
+formats, or when you want to run the analysis in a script or on a schedule. It
+needs Python and a few packages. See "Python tool" below.
+
+Both versions use the same math, including the careful downtime handling.
+
+Both run fully offline. Neither makes a network call.
+
+---
+
+## Browser tool
+
+Open `alarm_pareto.html` in a browser. There is nothing to install.
+
+1. Click "Choose Files" and pick one or more elog files from the same tool.
+   CSV and delimited text files work. Or click "Load built-in sample" to try it.
+2. The tool guesses which column is the timestamp, the fault code, and so on.
+   Fix any guess that is wrong using the drop-downs. Only the timestamp and the
+   fault code are required.
+3. Tell it how downtime is stored. Three choices. A duration column. Or separate
+   set and clear rows that it should pair. Or none, in which case it ranks by
+   count only.
+4. Set the window length, the top-N cutoff, and the downtime method. Click
+   "Analyze".
+5. Read the summary and the Pareto charts. Switch grouping level with the tabs.
+   Download a CSV summary, or use "Print / Save as PDF" to make a report.
+
+Because it runs in the browser, it does not write native Excel chart files. If
+you need those, use the Python tool.
+
+---
+
+## Python tool
+
+This version reads the same kind of log. It looks at the last 30 days of faults.
+It writes the results to an Excel workbook and a PowerPoint deck.
 
 The tool runs fully offline. It never makes a network call.
 

@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alarm Log Pareto</title>
+<style>
+  :root {
+    --ink: #1b1f24;
+    --muted: #5b6570;
+    --line: #d7dce2;
+    --bar: #305496;
+    --bar2: #5b9bd5;
+    --accent: #c00000;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --ok: #2e7d32;
+    --warn: #b26a00;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Segoe UI, Tahoma, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  header {
+    background: var(--bar);
+    color: #fff;
+    padding: 16px 22px;
+  }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; opacity: 0.9; font-size: 13px; }
+  main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+  }
+  .card h2 { margin: 0 0 10px; font-size: 15px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 2px 0 12px; }
+  button {
+    font: inherit;
+    background: var(--bar);
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  button.secondary { background: #eef1f5; color: var(--ink); border: 1px solid var(--line); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  input[type=number], select {
+    font: inherit;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 3px; }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: right; }
+  th { background: #eef1f5; }
+  th:first-child, td:first-child, td.txt, th.txt { text-align: left; }
+  .cards { display: flex; flex-wrap: wrap; gap: 14px; }
+  .stat {
+    flex: 1 1 160px;
+    background: #eef4fb;
+    border: 1px solid #d3e0ef;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .stat .n { font-size: 22px; font-weight: 700; }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs button { background: #eef1f5; color: var(--ink); border: 1px solid var(--line); }
+  .tabs button.active { background: var(--bar); color: #fff; border-color: var(--bar); }
+  .msg { padding: 10px 12px; border-radius: 6px; margin: 10px 0; font-size: 13px; }
+  .msg.warn { background: #fff5e6; border: 1px solid #f0d3a0; color: var(--warn); }
+  .msg.err  { background: #fdecec; border: 1px solid #f2b8b8; color: var(--accent); }
+  .msg.ok   { background: #eaf5eb; border: 1px solid #b9dcbb; color: var(--ok); }
+  .mapgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .chartwrap { overflow-x: auto; }
+  svg { max-width: 100%; height: auto; display: block; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+  .foot { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+  @media print {
+    header, #importCard, #mapCard, #controlsCard, .noprint { display: none !important; }
+    body { background: #fff; }
+    .card { break-inside: avoid; border: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Alarm Log Pareto</h1>
+  <p>Import one or more elog files for a tool. See the most frequent faults and the biggest downtime. Runs fully offline in your browser.</p>
+</header>
+
+<main>
+  <div class="card" id="importCard">
+    <h2>1. Import elog files</h2>
+    <p class="hint">Select one or more CSV or delimited text files from the same tool. Nothing leaves your computer. No internet is used.</p>
+    <div class="row">
+      <input type="file" id="fileInput" multiple accept=".csv,.txt,.log,.tsv,.tab,text/plain">
+      <button class="secondary" id="loadSample" type="button">Load built-in sample</button>
+    </div>
+    <div id="importMsg"></div>
+  </div>
+
+  <div class="card" id="mapCard" style="display:none">
+    <h2>2. Tell the tool which column is which</h2>
+    <p class="hint">The tool guessed the columns from their names. Fix any that are wrong. Only Timestamp and Fault code are required.</p>
+    <div class="mapgrid" id="mapGrid"></div>
+
+    <div style="margin-top:14px">
+      <label>How is downtime stored?</label>
+      <select id="downMode">
+        <option value="none">No downtime column (rank by count only)</option>
+        <option value="duration">A duration column (each row has its own downtime)</option>
+        <option value="events">Set and clear are separate rows (pair them)</option>
+      </select>
+    </div>
+
+    <div id="durationOpts" style="display:none; margin-top:12px" class="row">
+      <div class="field">
+        <label>Duration column</label>
+        <select id="durCol"></select>
+      </div>
+      <div class="field">
+        <label>Duration unit</label>
+        <select id="durUnit">
+          <option value="1">seconds</option>
+          <option value="60">minutes</option>
+          <option value="3600">hours</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="eventOpts" style="display:none; margin-top:12px" class="row">
+      <div class="field">
+        <label>State column (holds set or clear)</label>
+        <select id="stateCol"></select>
+      </div>
+      <div class="field">
+        <label>Text that means "set"</label>
+        <input type="text" id="setVal" value="SET" size="8">
+      </div>
+      <div class="field">
+        <label>Text that means "clear"</label>
+        <input type="text" id="clearVal" value="CLEAR" size="8">
+      </div>
+    </div>
+    <div id="mapMsg"></div>
+  </div>
+
+  <div class="card" id="controlsCard" style="display:none">
+    <h2>3. Settings</h2>
+    <div class="row">
+      <div class="field">
+        <label>Trailing window (days)</label>
+        <input type="number" id="windowDays" value="30" min="1" step="1" style="width:90px">
+      </div>
+      <div class="field">
+        <label>Top rows before "Other"</label>
+        <input type="number" id="topN" value="15" min="1" step="1" style="width:90px">
+      </div>
+      <div class="field">
+        <label>Downtime ranking method</label>
+        <select id="method">
+          <option value="attributed">Attributed (each fault its full duration)</option>
+          <option value="wallclock">True wall clock (overlaps merged)</option>
+        </select>
+      </div>
+      <div class="field">
+        <button id="runBtn" type="button">Analyze</button>
+      </div>
+    </div>
+    <p class="hint">The window ends at the latest timestamp found in your files, not today's date.</p>
+  </div>
+
+  <div id="results" style="display:none">
+    <div class="card">
+      <h2>Summary</h2>
+      <div id="summaryMsg"></div>
+      <div class="cards" id="statCards"></div>
+      <div class="foot" id="rangeFoot"></div>
+      <div style="margin-top:12px" class="noprint">
+        <button class="secondary" id="csvBtn" type="button">Download summary (CSV)</button>
+        <button class="secondary" id="printBtn" type="button">Print / Save as PDF</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pareto</h2>
+      <div class="tabs" id="levelTabs"></div>
+      <div class="split">
+        <div>
+          <h3 style="font-size:13px;margin:0 0 6px">Ranked by occurrence count</h3>
+          <div class="chartwrap"><div id="countChart"></div></div>
+        </div>
+        <div>
+          <h3 style="font-size:13px;margin:0 0 6px" id="dtTitle">Ranked by downtime</h3>
+          <div class="chartwrap"><div id="downChart"></div></div>
+        </div>
+      </div>
+      <div style="margin-top:16px" class="chartwrap">
+        <table id="resultTable"></table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// State. We keep the parsed rows and the current column mapping here so the
+// buttons can all reach them.
+// ---------------------------------------------------------------------------
+var STATE = {
+  headers: [],       // column names from the files
+  rows: [],          // array of objects, one per data row
+  fileCount: 0,
+  lastResult: null,  // the most recent analysis, used by the CSV export
+  activeLevel: "fault_code"
+};
+
+var LEVELS = [
+  { key: "fault_code",  nice: "Fault code" },
+  { key: "description", nice: "Description" },
+  { key: "equipment",   nice: "Equipment" }
+];
+
+// ---------------------------------------------------------------------------
+// File reading. Everything happens in the browser. No network.
+// ---------------------------------------------------------------------------
+document.getElementById("fileInput").addEventListener("change", function (e) {
+  var files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  readFiles(files);
+});
+
+document.getElementById("loadSample").addEventListener("click", function () {
+  // A small built-in sample so you can try the tool with no file.
+  parseAllTexts([SAMPLE_CSV], 1);
+  setMsg("importMsg", "ok", "Loaded the built-in sample (15 rows).");
+});
+
+function readFiles(files) {
+  var texts = [];
+  var pending = files.length;
+  files.forEach(function (file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      texts.push(String(reader.result));
+      pending -= 1;
+      if (pending === 0) parseAllTexts(texts, files.length);
+    };
+    reader.onerror = function () {
+      setMsg("importMsg", "err", "Could not read file: " + file.name);
+    };
+    reader.readAsText(file);
+  });
+}
+
+// Combine every file into one table. We use the first file's headers. Rows from
+// other files are matched to those headers by name.
+function parseAllTexts(texts, fileCount) {
+  var all = null;
+  var warnings = [];
+  texts.forEach(function (text, i) {
+    var parsed = parseDelimited(text);
+    if (!parsed.headers.length) return;
+    if (all === null) {
+      all = { headers: parsed.headers, rows: parsed.rows.slice() };
+    } else {
+      // Different files should share headers. If they do not, warn but keep the
+      // rows whose columns match.
+      if (parsed.headers.join("|") !== all.headers.join("|")) {
+        warnings.push("File " + (i + 1) + " has different column names. Rows were matched by name where possible.");
+      }
+      parsed.rows.forEach(function (r) { all.rows.push(r); });
+    }
+  });
+
+  if (!all || !all.rows.length) {
+    setMsg("importMsg", "err", "No data rows were found. Check the file format.");
+    return;
+  }
+
+  STATE.headers = all.headers;
+  STATE.rows = all.rows;
+  STATE.fileCount = fileCount;
+
+  var extra = warnings.length ? " " + warnings.join(" ") : "";
+  setMsg("importMsg", warnings.length ? "warn" : "ok",
+    "Loaded " + all.rows.length + " rows from " + fileCount + " file(s)." + extra);
+
+  buildMappingUI();
+}
+
+// ---------------------------------------------------------------------------
+// Delimited text parsing. Handles quoted fields that contain the delimiter.
+// ---------------------------------------------------------------------------
+function sniffDelimiter(headerLine) {
+  var candidates = [",", "\t", ";", "|"];
+  var best = ",", bestCount = -1;
+  candidates.forEach(function (d) {
+    var count = headerLine.split(d).length;
+    if (count > bestCount) { bestCount = count; best = d; }
+  });
+  return best;
+}
+
+function parseDelimited(text) {
+  // Drop a byte order mark if present, and split into lines.
+  text = text.replace(/^﻿/, "");
+  var lines = text.split(/\r\n|\n|\r/).filter(function (l) { return l.length > 0; });
+  if (!lines.length) return { headers: [], rows: [] };
+
+  var delim = sniffDelimiter(lines[0]);
+  var headers = splitLine(lines[0], delim).map(function (h) { return h.trim(); });
+
+  var rows = [];
+  for (var i = 1; i < lines.length; i++) {
+    var cells = splitLine(lines[i], delim);
+    if (cells.length === 1 && cells[0].trim() === "") continue;
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = (cells[j] === undefined ? "" : cells[j]).trim();
+    }
+    rows.push(obj);
+  }
+  return { headers: headers, rows: rows };
+}
+
+// Split one line on the delimiter, respecting double quotes.
+function splitLine(line, delim) {
+  var out = [];
+  var cur = "";
+  var inQuotes = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (ch === delim && !inQuotes) {
+      out.push(cur); cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Column mapping UI. We guess each role from the header text, then let the user
+// fix it. This is how the tool handles logs from different vendors.
+// ---------------------------------------------------------------------------
+var ROLE_FIELDS = [
+  { key: "ts_set",      label: "Timestamp",        required: true,  keywords: ["time", "date", "stamp", "when"] },
+  { key: "fault_code",  label: "Fault code",       required: true,  keywords: ["code", "id", "alarm", "fault", "error", "event"] },
+  { key: "description", label: "Description",      required: false, keywords: ["desc", "text", "message", "msg", "name", "detail"] },
+  { key: "equipment",   label: "Equipment/module", required: false, keywords: ["chamber", "module", "equip", "tool", "unit", "station", "eqp"] }
+];
+
+function guessColumn(keywords) {
+  var lowerHeaders = STATE.headers.map(function (h) { return h.toLowerCase(); });
+  for (var k = 0; k < keywords.length; k++) {
+    for (var h = 0; h < lowerHeaders.length; h++) {
+      if (lowerHeaders[h].indexOf(keywords[k]) !== -1) return STATE.headers[h];
+    }
+  }
+  return "";
+}
+
+function buildMappingUI() {
+  var grid = document.getElementById("mapGrid");
+  grid.innerHTML = "";
+  ROLE_FIELDS.forEach(function (role) {
+    var wrap = document.createElement("div");
+    wrap.className = "field";
+    var lab = document.createElement("label");
+    lab.textContent = role.label + (role.required ? " *" : " (optional)");
+    var sel = document.createElement("select");
+    sel.id = "map_" + role.key;
+    sel.appendChild(optionEl("", role.required ? "-- choose --" : "-- none --"));
+    STATE.headers.forEach(function (h) { sel.appendChild(optionEl(h, h)); });
+    sel.value = guessColumn(role.keywords);
+    wrap.appendChild(lab);
+    wrap.appendChild(sel);
+    grid.appendChild(wrap);
+  });
+
+  // Fill the duration and state column pickers.
+  fillColumnSelect("durCol");
+  fillColumnSelect("stateCol");
+  document.getElementById("durCol").value = guessColumn(["dur", "down", "second", "elapsed", "minutes"]);
+
+  document.getElementById("mapCard").style.display = "";
+  document.getElementById("controlsCard").style.display = "";
+}
+
+function fillColumnSelect(id) {
+  var sel = document.getElementById(id);
+  sel.innerHTML = "";
+  sel.appendChild(optionEl("", "-- choose --"));
+  STATE.headers.forEach(function (h) { sel.appendChild(optionEl(h, h)); });
+}
+
+function optionEl(value, text) {
+  var o = document.createElement("option");
+  o.value = value; o.textContent = text;
+  return o;
+}
+
+document.getElementById("downMode").addEventListener("change", function () {
+  var mode = this.value;
+  document.getElementById("durationOpts").style.display = (mode === "duration") ? "" : "none";
+  document.getElementById("eventOpts").style.display = (mode === "events") ? "" : "none";
+});
+
+// ---------------------------------------------------------------------------
+// Date parsing. Browsers parse many formats. We add a couple of common ones
+// that they do not handle so logs parse the same everywhere.
+// ---------------------------------------------------------------------------
+function parseDate(s) {
+  if (!s) return null;
+  s = s.trim();
+
+  // Try "YYYY-MM-DD HH:MM:SS" and "YYYY/MM/DD HH:MM:SS".
+  var m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+
+  // Try "MM/DD/YYYY HH:MM:SS" (United States style).
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[1] - 1, +m[2], +m[4], +m[5], +(m[6] || 0));
+
+  // Date only, no time.
+  m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+
+  // Fall back to the browser. This handles ISO strings and many others.
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ---------------------------------------------------------------------------
+// Build one record per alarm occurrence, with a start, an end, and a duration.
+// This mirrors the three downtime shapes the desktop tool supports.
+// ---------------------------------------------------------------------------
+function readMapping() {
+  var map = {};
+  ROLE_FIELDS.forEach(function (r) { map[r.key] = document.getElementById("map_" + r.key).value; });
+  map.downMode = document.getElementById("downMode").value;
+  map.durCol = document.getElementById("durCol").value;
+  map.durScale = +document.getElementById("durUnit").value;
+  map.stateCol = document.getElementById("stateCol").value;
+  map.setVal = document.getElementById("setVal").value.trim().toUpperCase();
+  map.clearVal = document.getElementById("clearVal").value.trim().toUpperCase();
+  return map;
+}
+
+function buildOccurrences(rows, map) {
+  var problems = [];
+  var occ = [];
+
+  function baseRec(r) {
+    return {
+      fault_code: map.fault_code ? (r[map.fault_code] || "(blank)") : "(blank)",
+      description: map.description ? (r[map.description] || "(blank)") : "(blank)",
+      equipment: map.equipment ? (r[map.equipment] || "(blank)") : "(blank)"
+    };
+  }
+
+  if (map.downMode === "events") {
+    // Pair set and clear rows. A clear matches the most recent open set that
+    // shares the same equipment and fault code.
+    var withTime = [];
+    rows.forEach(function (r) {
+      var t = parseDate(r[map.ts_set]);
+      if (t) withTime.push({ r: r, t: t });
+    });
+    withTime.sort(function (a, b) { return a.t - b.t; });
+
+    var open = {}; // key -> stack of open sets
+    withTime.forEach(function (item) {
+      var r = item.r;
+      var rec = baseRec(r);
+      var key = rec.equipment + "||" + rec.fault_code;
+      var state = String(r[map.stateCol] || "").trim().toUpperCase();
+      if (state === map.setVal) {
+        (open[key] = open[key] || []).push({ rec: rec, start: item.t });
+      } else if (state === map.clearVal) {
+        var stack = open[key];
+        if (stack && stack.length) {
+          var s = stack.pop();
+          occ.push(makeOcc(s.rec, s.start, item.t));
+        }
+      }
+    });
+    // Sets that never cleared: keep them, zero duration.
+    Object.keys(open).forEach(function (key) {
+      open[key].forEach(function (s) { occ.push(makeOcc(s.rec, s.start, null)); });
+    });
+
+  } else {
+    // Duration mode or count-only mode. Each row is one occurrence.
+    rows.forEach(function (r) {
+      var t = parseDate(r[map.ts_set]);
+      if (!t) { problems.push(1); return; }
+      var rec = baseRec(r);
+      var durSec = 0;
+      if (map.downMode === "duration") {
+        var raw = parseFloat(String(r[map.durCol]).replace(/[^0-9.\-]/g, ""));
+        if (!isNaN(raw) && raw > 0) durSec = raw * map.durScale;
+      }
+      occ.push(makeOcc(rec, t, durSec > 0 ? new Date(t.getTime() + durSec * 1000) : t, durSec));
+    });
+  }
+
+  return { occ: occ, unparsed: problems.length };
+}
+
+function makeOcc(rec, start, end, durSec) {
+  if (durSec === undefined) {
+    durSec = (end && end > start) ? (end - start) / 1000 : 0;
+  }
+  return {
+    fault_code: rec.fault_code,
+    description: rec.description,
+    equipment: rec.equipment,
+    start: start,
+    end: (end && end > start) ? end : start,
+    durSec: durSec
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Window filter and the two downtime numbers.
+// ---------------------------------------------------------------------------
+function applyWindow(occ, windowDays) {
+  if (!occ.length) return { kept: [], start: null, end: null };
+  var end = occ[0].start;
+  occ.forEach(function (o) { if (o.start > end) end = o.start; });
+  var start = new Date(end.getTime() - windowDays * 86400 * 1000);
+  var kept = occ.filter(function (o) { return o.start >= start && o.start <= end; });
+  return { kept: kept, start: start, end: end };
+}
+
+// Merge overlapping intervals and return the total seconds covered once.
+function mergedSeconds(intervals) {
+  var clean = intervals.filter(function (p) { return p[1] > p[0]; });
+  if (!clean.length) return 0;
+  clean.sort(function (a, b) { return a[0] - b[0]; });
+  var total = 0;
+  var cs = clean[0][0], ce = clean[0][1];
+  for (var i = 1; i < clean.length; i++) {
+    var s = clean[i][0], e = clean[i][1];
+    if (s <= ce) { if (e > ce) ce = e; }
+    else { total += (ce - cs); cs = s; ce = e; }
+  }
+  total += (ce - cs);
+  return total / 1000;
+}
+
+// ---------------------------------------------------------------------------
+// Ranking for one grouping level. Returns rows sorted by count and by downtime,
+// each with a cumulative percent and an "Other" bucket past top N.
+// ---------------------------------------------------------------------------
+function rankLevel(occ, levelKey, method, topN) {
+  var groups = {};
+  occ.forEach(function (o) {
+    var key = o[levelKey];
+    if (!groups[key]) groups[key] = { key: key, count: 0, attrib: 0, intervals: [] };
+    var g = groups[key];
+    g.count += 1;
+    g.attrib += o.durSec;
+    g.intervals.push([o.start, o.end]);
+  });
+
+  var arr = Object.keys(groups).map(function (k) {
+    var g = groups[k];
+    return {
+      key: g.key,
+      count: g.count,
+      attributed_s: g.attrib,
+      wallclock_s: mergedSeconds(g.intervals)
+    };
+  });
+
+  var byCount = collapse(arr.slice().sort(function (a, b) { return b.count - a.count; }), topN, "count");
+  var metric = (method === "attributed") ? "attributed_s" : "wallclock_s";
+  var byDown = collapse(arr.slice().sort(function (a, b) { return b[metric] - a[metric]; }), topN, metric);
+  return { byCount: byCount, byDown: byDown, metric: metric };
+}
+
+function collapse(sorted, topN, sortField) {
+  var rows;
+  if (sorted.length > topN) {
+    var head = sorted.slice(0, topN);
+    var tail = sorted.slice(topN);
+    var other = { key: "Other", count: 0, attributed_s: 0, wallclock_s: 0 };
+    tail.forEach(function (r) {
+      other.count += r.count;
+      other.attributed_s += r.attributed_s;
+      other.wallclock_s += r.wallclock_s;
+    });
+    rows = head.concat([other]);
+  } else {
+    rows = sorted.slice();
+  }
+  var total = rows.reduce(function (s, r) { return s + r[sortField]; }, 0) || 1;
+  var run = 0;
+  rows.forEach(function (r, i) {
+    r.rank = i + 1;
+    r.pct = r[sortField] / total * 100;
+    run += r.pct;
+    r.cum = run;
+  });
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Run the whole analysis.
+// ---------------------------------------------------------------------------
+document.getElementById("runBtn").addEventListener("click", runAnalysis);
+
+function runAnalysis() {
+  var map = readMapping();
+  if (!map.ts_set) { setMsg("mapMsg", "err", "Please choose the Timestamp column."); return; }
+  if (!map.fault_code) { setMsg("mapMsg", "err", "Please choose the Fault code column."); return; }
+  if (map.downMode === "duration" && !map.durCol) { setMsg("mapMsg", "err", "Please choose the duration column."); return; }
+  if (map.downMode === "events" && !map.stateCol) { setMsg("mapMsg", "err", "Please choose the state column."); return; }
+  setMsg("mapMsg", "", "");
+
+  var built = buildOccurrences(STATE.rows, map);
+  if (!built.occ.length) { setMsg("summaryMsg", "err", "No rows had a readable timestamp. Check the Timestamp column."); document.getElementById("results").style.display = ""; return; }
+
+  var windowDays = Math.max(1, parseInt(document.getElementById("windowDays").value, 10) || 30);
+  var topN = Math.max(1, parseInt(document.getElementById("topN").value, 10) || 15);
+  var method = document.getElementById("method").value;
+
+  var win = applyWindow(built.occ, windowDays);
+  if (!win.kept.length) { setMsg("summaryMsg", "err", "No rows fall inside the " + windowDays + " day window."); document.getElementById("results").style.display = ""; return; }
+
+  var grandAttrib = win.kept.reduce(function (s, o) { return s + o.durSec; }, 0);
+  var grandWall = mergedSeconds(win.kept.map(function (o) { return [o.start, o.end]; }));
+
+  var levels = {};
+  LEVELS.forEach(function (lv) { levels[lv.key] = rankLevel(win.kept, lv.key, method, topN); });
+
+  STATE.lastResult = {
+    map: map, method: method, windowDays: windowDays, topN: topN,
+    windowStart: win.start, windowEnd: win.end,
+    totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
+    hasDowntime: (map.downMode !== "none"), levels: levels,
+    unparsed: built.unparsed, kept: win.kept
+  };
+
+  renderResults();
+}
+
+function renderResults() {
+  var R = STATE.lastResult;
+  document.getElementById("results").style.display = "";
+
+  var notes = [];
+  if (R.unparsed) notes.push(R.unparsed + " row(s) had no readable timestamp and were skipped.");
+  if (!R.hasDowntime) notes.push("No downtime column was mapped, so downtime is shown as zero. Ranking is by count.");
+  setMsg("summaryMsg", notes.length ? "warn" : "ok", notes.length ? notes.join(" ") : "Analysis complete.");
+
+  var methodLabel = (R.method === "attributed")
+    ? "Attributed (each fault credited its full duration)"
+    : "True wall clock (overlaps merged, counted once)";
+
+  document.getElementById("statCards").innerHTML =
+    stat(R.totalFaults, "Total faults in window") +
+    stat(hours(R.grandAttrib), "Attributed downtime (h)") +
+    stat(hours(R.grandWall), "True wall-clock downtime (h)") +
+    stat(R.windowDays, "Window length (days)");
+
+  document.getElementById("rangeFoot").innerHTML =
+    "Date range: <b>" + fmt(R.windowStart) + "</b> to <b>" + fmt(R.windowEnd) + "</b>. " +
+    "Downtime ranking method: <b>" + methodLabel + "</b>. " +
+    "The two downtime numbers answer different questions and are never mixed.";
+
+  // Level tabs.
+  var tabs = document.getElementById("levelTabs");
+  tabs.innerHTML = "";
+  LEVELS.forEach(function (lv) {
+    var b = document.createElement("button");
+    b.textContent = lv.nice;
+    b.className = (lv.key === STATE.activeLevel) ? "active" : "";
+    b.addEventListener("click", function () { STATE.activeLevel = lv.key; renderLevel(); });
+    tabs.appendChild(b);
+  });
+
+  document.getElementById("dtTitle").textContent = "Ranked by downtime (" + R.method + ")";
+  renderLevel();
+}
+
+function renderLevel() {
+  var R = STATE.lastResult;
+  var lv = LEVELS.filter(function (x) { return x.key === STATE.activeLevel; })[0];
+  Array.from(document.getElementById("levelTabs").children).forEach(function (b) {
+    b.className = (b.textContent === lv.nice) ? "active" : "";
+  });
+
+  var data = R.levels[lv.key];
+  drawPareto("countChart", data.byCount, "count", "Count", lv.nice);
+  var downLabel = R.hasDowntime ? "Downtime (hours)" : "Downtime (none)";
+  drawPareto("downChart", data.byDown, data.metric, downLabel, lv.nice, R.hasDowntime);
+  drawTable(data, lv);
+}
+
+// ---------------------------------------------------------------------------
+// SVG Pareto chart. Bars, a cumulative percent line on the right, and a dashed
+// 80 percent guide line.
+// ---------------------------------------------------------------------------
+function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueIsHours) {
+  var W = 520, H = 360;
+  var padL = 52, padR = 46, padT = 20, padB = 96;
+  var plotW = W - padL - padR, plotH = H - padT - padB;
+
+  var vals = rows.map(function (r) {
+    return (valueField === "count") ? r.count : (valueIsHours === false ? 0 : r[valueField] / 3600);
+  });
+  var maxVal = Math.max.apply(null, vals.concat([1]));
+  var n = rows.length;
+  var bw = n ? Math.max(4, plotW / n * 0.72) : 4;
+  var step = n ? plotW / n : plotW;
+
+  var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Pareto by ' + esc(levelNice) + '">'];
+
+  // Left axis grid and labels (value).
+  for (var g = 0; g <= 4; g++) {
+    var yy = padT + plotH - (plotH * g / 4);
+    var lvVal = (maxVal * g / 4);
+    svg.push(line(padL, yy, padL + plotW, yy, "#eef1f5", 1));
+    svg.push(text(padL - 6, yy + 3, fmtNum(lvVal), 10, "end", "#5b6570"));
+  }
+  // Right axis labels (percent 0..100).
+  for (var p = 0; p <= 4; p++) {
+    var yp = padT + plotH - (plotH * p / 4);
+    svg.push(text(padL + plotW + 6, yp + 3, (p * 25) + "%", 10, "start", "#5b6570"));
+  }
+  // 80 percent guide line.
+  var y80 = padT + plotH - plotH * 0.8;
+  svg.push(line(padL, y80, padL + plotW, y80, "#c00000", 1, "4,3"));
+  svg.push(text(padL + plotW, y80 - 4, "80%", 10, "end", "#c00000"));
+
+  // Bars.
+  rows.forEach(function (r, i) {
+    var v = vals[i];
+    var h = (v / maxVal) * plotH;
+    var x = padL + step * i + (step - bw) / 2;
+    var y = padT + plotH - h;
+    svg.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(String(r.key)) + ": " + fmtNum(v) + '</title></rect>');
+    // x labels, rotated.
+    var lx = padL + step * i + step / 2;
+    svg.push('<text x="' + lx.toFixed(1) + '" y="' + (padT + plotH + 12) + '" font-size="9" fill="#1b1f24" transform="rotate(45 ' + lx.toFixed(1) + ' ' + (padT + plotH + 12) + ')">' + esc(clip(String(r.key), 16)) + '</text>');
+  });
+
+  // Cumulative line.
+  var pts = rows.map(function (r, i) {
+    var cx = padL + step * i + step / 2;
+    var cy = padT + plotH - (r.cum / 100) * plotH;
+    return [cx, cy];
+  });
+  if (pts.length) {
+    svg.push('<polyline fill="none" stroke="#c00000" stroke-width="2" points="' +
+      pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") + '"/>');
+    pts.forEach(function (p, i) {
+      svg.push('<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.5" fill="#c00000"><title>Cumulative ' + rows[i].cum.toFixed(1) + '%</title></circle>');
+    });
+  }
+
+  // Axis titles.
+  svg.push(text(padL, padT - 6, valueLabel, 11, "start", "#1b1f24"));
+  svg.push('</svg>');
+  document.getElementById(containerId).innerHTML = svg.join("");
+}
+
+function drawTable(data, lv) {
+  var R = STATE.lastResult;
+  var rows = data.byCount; // one row per group; we show both measures side by side
+  // Build a lookup of downtime rank order for context.
+  var head =
+    "<tr><th>#</th><th class='txt'>" + esc(lv.nice) + "</th>" +
+    "<th>Count</th><th>Count %</th><th>Cum %</th>" +
+    "<th>Attributed (h)</th><th>Wall clock (h)</th></tr>";
+  var body = rows.map(function (r) {
+    return "<tr>" +
+      "<td>" + r.rank + "</td>" +
+      "<td class='txt'>" + esc(String(r.key)) + "</td>" +
+      "<td>" + r.count + "</td>" +
+      "<td>" + r.pct.toFixed(1) + "</td>" +
+      "<td>" + r.cum.toFixed(1) + "</td>" +
+      "<td>" + hours(r.attributed_s) + "</td>" +
+      "<td>" + hours(r.wallclock_s) + "</td>" +
+      "</tr>";
+  }).join("");
+  document.getElementById("resultTable").innerHTML = head + body;
+}
+
+// ---------------------------------------------------------------------------
+// CSV export of the summary. Downloads a file. No network.
+// ---------------------------------------------------------------------------
+document.getElementById("csvBtn").addEventListener("click", exportCsv);
+document.getElementById("printBtn").addEventListener("click", function () { window.print(); });
+
+function exportCsv() {
+  var R = STATE.lastResult;
+  if (!R) return;
+  var out = [];
+  out.push(["Alarm Pareto summary"]);
+  out.push(["Window start", fmt(R.windowStart)]);
+  out.push(["Window end", fmt(R.windowEnd)]);
+  out.push(["Window days", R.windowDays]);
+  out.push(["Total faults", R.totalFaults]);
+  out.push(["Attributed downtime (h)", hours(R.grandAttrib)]);
+  out.push(["True wall-clock downtime (h)", hours(R.grandWall)]);
+  out.push(["Downtime method", R.method]);
+  out.push([]);
+
+  LEVELS.forEach(function (lv) {
+    out.push(["Level: " + lv.nice]);
+    out.push(["Rank", lv.nice, "Count", "Count %", "Cum %", "Attributed (h)", "Wall clock (h)"]);
+    R.levels[lv.key].byCount.forEach(function (r) {
+      out.push([r.rank, r.key, r.count, r.pct.toFixed(1), r.cum.toFixed(1), hours(r.attributed_s), hours(r.wallclock_s)]);
+    });
+    out.push([]);
+  });
+
+  var csv = out.map(function (row) {
+    return row.map(function (c) {
+      var s = String(c === undefined || c === null ? "" : c);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(",");
+  }).join("\n");
+
+  var blob = new Blob([csv], { type: "text/csv" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "alarm_pareto_summary.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ---------------------------------------------------------------------------
+// Small helpers.
+// ---------------------------------------------------------------------------
+function hours(sec) { return (sec / 3600).toFixed(2); }
+function fmtNum(v) { return (Math.abs(v) >= 100 || v === Math.round(v)) ? String(Math.round(v)) : v.toFixed(1); }
+function fmt(d) {
+  if (!d) return "n/a";
+  function pad(x) { return (x < 10 ? "0" : "") + x; }
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " +
+    pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+function clip(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+function line(x1, y1, x2, y2, color, w, dash) {
+  return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + color + '" stroke-width="' + w + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : "") + '/>';
+}
+function text(x, y, s, size, anchor, color) {
+  return '<text x="' + x + '" y="' + y + '" font-size="' + size + '" text-anchor="' + anchor + '" fill="' + color + '">' + esc(s) + '</text>';
+}
+function stat(n, k) { return '<div class="stat"><div class="n">' + esc(String(n)) + '</div><div class="k">' + esc(k) + '</div></div>'; }
+function setMsg(id, cls, text) {
+  var el = document.getElementById(id);
+  if (!text) { el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="msg ' + cls + '">' + esc(text) + '</div>';
+}
+
+// Built-in sample. Same rows as the desktop tool's test file, including one
+// overlapping alarm pair and one row outside the 30 day window.
+var SAMPLE_CSV =
+"EventTime,AlarmID,AlarmText,ChamberID,DownSeconds\n" +
+"2026-01-05 10:00:00,E101,Chamber over temperature,CH-A,3600\n" +
+"2026-02-10 10:00:00,E101,Chamber over temperature,CH-A,14400\n" +
+"2026-02-10 12:00:00,E101,Chamber over temperature,CH-A,10800\n" +
+"2026-02-11 06:00:00,E202,Gas flow deviation,CH-B,1800\n" +
+"2026-02-12 08:00:00,E101,Chamber over temperature,CH-B,3600\n" +
+"2026-02-13 11:00:00,E303,RF power fault,CH-C,7200\n" +
+"2026-02-14 13:00:00,E202,Gas flow deviation,CH-B,1800\n" +
+"2026-02-15 09:00:00,E101,Chamber over temperature,CH-A,3600\n" +
+"2026-02-16 11:00:00,E303,RF power fault,CH-A,3600\n" +
+"2026-02-17 11:00:00,E303,RF power fault,CH-B,3600\n" +
+"2026-02-18 15:00:00,E202,Gas flow deviation,CH-C,3600\n" +
+"2026-02-19 15:00:00,E202,Gas flow deviation,CH-A,1800\n" +
+"2026-02-20 22:00:00,E101,Chamber over temperature,CH-C,7200\n" +
+"2026-02-21 03:00:00,E404,Vacuum pump warning,CH-C,1800\n" +
+"2026-02-21 20:00:00,E404,Vacuum pump warning,CH-A,1800\n";
+</script>
+</body>
+</html>
