@@ -7,14 +7,12 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
-- Project scaffolding for continuous build and clear history.
-- GitHub Actions CI that runs the test suite on every push and pull request,
-  across Python 3.11 and 3.12.
-- GitHub Actions release workflow that builds the zip packages and publishes
-  them as a GitHub Release when a version tag is pushed.
-- `tools/build_zips.py`, a standard-library script that builds both zip
-  packages the same way every time.
-- `ROADMAP.md`, `CONTRIBUTING.md`, and this changelog.
+- Manual dispatch trigger for the release workflow, so a release can be cut from
+  the Actions tab when a tag cannot be pushed directly.
+
+### Changed
+- The release publish step is now idempotent. A re-run uploads the zips and
+  overwrites old copies instead of failing.
 
 ## [1.0.0] - 2026-08-13
 
@@ -32,3 +30,7 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   supports print to PDF.
 - Golden-file test suite with a hand-built sample log, including an overlapping
   alarm pair to exercise the downtime logic.
+- Project scaffolding: GitHub Actions CI that runs the test suite on every push
+  and pull request across Python 3.11 and 3.12, a tag-triggered release
+  workflow, `tools/build_zips.py`, `ROADMAP.md`, `CONTRIBUTING.md`, and this
+  changelog.
