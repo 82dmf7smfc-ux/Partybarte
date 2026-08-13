@@ -181,3 +181,10 @@ The same tests run automatically on GitHub for every push and pull request. See
 Packaged versions of both tools are published on the GitHub Releases page. Each
 release has two zip files. One holds the browser tool. One holds the Python
 tool. To build them yourself, run `python tools/build_zips.py`.
+
+## License
+
+This project is proprietary. All rights are reserved. No use, copying,
+modification, distribution, or commercial use is permitted without the prior
+written permission of the copyright holder. See the `LICENSE` file for the full
+terms.

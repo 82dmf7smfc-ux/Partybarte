@@ -10,6 +10,10 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - Manual dispatch trigger for the release workflow, so a release can be cut from
   the Actions tab when a tag cannot be pushed directly.
 
+### Added
+- Proprietary `LICENSE` (all rights reserved). The license is now included in
+  both zip packages.
+
 ### Changed
 - The release publish step is now idempotent. A re-run uploads the zips and
   overwrites old copies instead of failing.

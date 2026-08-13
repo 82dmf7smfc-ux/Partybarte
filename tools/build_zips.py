@@ -55,6 +55,7 @@ def build_browser_zip():
         _add_file(zf, ROOT / "alarm_pareto.html", f"{top}/alarm_pareto.html")
         _add_file(zf, ROOT / "tests" / "data" / "sample_alarm_log.csv", f"{top}/sample_alarm_log.csv")
         _add_file(zf, ROOT / "packaging" / "browser_READ_ME_FIRST.txt", f"{top}/READ_ME_FIRST.txt")
+        _add_file(zf, ROOT / "LICENSE", f"{top}/LICENSE")
         # The screenshot is a nice-to-have. Include it only if it exists.
         shot = ROOT / "docs" / "screenshot.png"
         if shot.exists():
@@ -69,7 +70,7 @@ def build_python_zip():
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
         _add_tree(zf, ROOT / "alarm_pareto", f"{top}/alarm_pareto")
         _add_tree(zf, ROOT / "tests", f"{top}/tests")
-        for name in ["requirements.txt", "setup_venv.bat", "conftest.py", "README.md"]:
+        for name in ["requirements.txt", "setup_venv.bat", "conftest.py", "README.md", "LICENSE"]:
             _add_file(zf, ROOT / name, f"{top}/{name}")
     return target
 
