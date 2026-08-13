@@ -1,10 +1,13 @@
 name: Release
 
-# Builds the two zip packages and publishes them as a GitHub Release. This runs
-# when you push a version tag like v1.0.0. The zips become download links on the
-# Releases page, so binaries never live in the git history.
+# Builds the two zip packages and publishes them as a GitHub Release.
 #
-# To cut a release:
+# Two ways to start it:
+#   1. Push a version tag like v1.0.0.
+#   2. Run it by hand from the Actions tab (workflow_dispatch) and type the
+#      version. This is handy when you cannot push a tag from your machine.
+#
+# To cut a release by tag:
 #   git tag v1.0.0
 #   git push origin v1.0.0
 
@@ -12,6 +15,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to create, for example v1.0.0"
+        required: true
+        default: "v1.0.0"
 
 permissions:
   # The job needs to create a release and attach files to it.
@@ -41,9 +50,23 @@ jobs:
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          # When started by a tag push, github.ref_name is the tag. When started
+          # by hand, we use the version typed into the form.
+          VERSION: ${{ github.event.inputs.version || github.ref_name }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
-            dist/alarm_pareto_browser.zip \
-            dist/alarm_pareto_python.zip \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes
+          # Create the release if it does not exist yet. If it already exists,
+          # just upload the zips and overwrite any old copies. This makes a
+          # re-run safe.
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            gh release upload "${VERSION}" \
+              dist/alarm_pareto_browser.zip \
+              dist/alarm_pareto_python.zip \
+              --clobber
+          else
+            gh release create "${VERSION}" \
+              --target main \
+              dist/alarm_pareto_browser.zip \
+              dist/alarm_pareto_python.zip \
+              --title "${VERSION}" \
+              --generate-notes
+          fi
