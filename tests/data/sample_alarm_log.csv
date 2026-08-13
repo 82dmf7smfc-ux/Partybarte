@@ -1,0 +1,16 @@
+EventTime,AlarmID,AlarmText,ChamberID,DownSeconds
+2026-01-05 10:00:00,E101,Chamber over temperature,CH-A,3600
+2026-02-10 10:00:00,E101,Chamber over temperature,CH-A,14400
+2026-02-10 12:00:00,E101,Chamber over temperature,CH-A,10800
+2026-02-11 06:00:00,E202,Gas flow deviation,CH-B,1800
+2026-02-12 08:00:00,E101,Chamber over temperature,CH-B,3600
+2026-02-13 11:00:00,E303,RF power fault,CH-C,7200
+2026-02-14 13:00:00,E202,Gas flow deviation,CH-B,1800
+2026-02-15 09:00:00,E101,Chamber over temperature,CH-A,3600
+2026-02-16 11:00:00,E303,RF power fault,CH-A,3600
+2026-02-17 11:00:00,E303,RF power fault,CH-B,3600
+2026-02-18 15:00:00,E202,Gas flow deviation,CH-C,3600
+2026-02-19 15:00:00,E202,Gas flow deviation,CH-A,1800
+2026-02-20 22:00:00,E101,Chamber over temperature,CH-C,7200
+2026-02-21 03:00:00,E404,Vacuum pump warning,CH-C,1800
+2026-02-21 20:00:00,E404,Vacuum pump warning,CH-A,1800

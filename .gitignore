@@ -1,0 +1,12 @@
+# The virtual environment is built on your machine by setup_venv.bat. It is
+# specific to your operating system and Python version, so it is not stored in
+# git. Rebuild it any time with setup_venv.bat.
+.venv/
+
+# Generated report files.
+output/
+
+# Python cache and test cache.
+__pycache__/
+*.pyc
+.pytest_cache/

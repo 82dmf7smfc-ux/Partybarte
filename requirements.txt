@@ -1,0 +1,13 @@
+# Exact pinned versions. Not ranges. This tool must build the same way in
+# eighteen months. If IT gives you wheel files with different versions, edit
+# the numbers here to match those wheels, then keep this file with the project.
+#
+# Install from local wheels like this (offline):
+#   pip install --no-index --find-links C:\path\to\wheels -r requirements.txt
+#
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.5
+python-pptx==1.0.2
+matplotlib==3.9.2
+pytest==8.3.2

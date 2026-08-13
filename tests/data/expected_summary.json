@@ -1,0 +1,35 @@
+{
+  "_note": "Golden values for sample_alarm_log.csv. All downtime is in seconds. These numbers were worked out by hand. If a code change makes a test fail here, the change altered the analysis. That is the point. Confirm the new numbers are correct before updating this file.",
+
+  "window": {
+    "window_days": 30,
+    "window_start": "2026-01-22 20:00:00",
+    "window_end": "2026-02-21 20:00:00",
+    "windowed_row_count": 14,
+    "raw_row_count": 15
+  },
+
+  "grand": {
+    "total_faults": 14,
+    "attributed_downtime_s": 66600,
+    "wallclock_downtime_s": 59400
+  },
+
+  "fault_code": {
+    "count": {"E101": 5, "E202": 4, "E303": 3, "E404": 2},
+    "attributed_s": {"E101": 39600, "E202": 9000, "E303": 14400, "E404": 3600},
+    "wallclock_s": {"E101": 32400, "E202": 9000, "E303": 14400, "E404": 3600}
+  },
+
+  "description": {
+    "count": {"Chamber over temperature": 5, "Gas flow deviation": 4, "RF power fault": 3, "Vacuum pump warning": 2},
+    "attributed_s": {"Chamber over temperature": 39600, "Gas flow deviation": 9000, "RF power fault": 14400, "Vacuum pump warning": 3600},
+    "wallclock_s": {"Chamber over temperature": 32400, "Gas flow deviation": 9000, "RF power fault": 14400, "Vacuum pump warning": 3600}
+  },
+
+  "equipment": {
+    "count": {"CH-A": 6, "CH-B": 4, "CH-C": 4},
+    "attributed_s": {"CH-A": 36000, "CH-B": 10800, "CH-C": 19800},
+    "wallclock_s": {"CH-A": 28800, "CH-B": 10800, "CH-C": 19800}
+  }
+}

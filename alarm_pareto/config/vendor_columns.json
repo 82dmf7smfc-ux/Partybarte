@@ -1,0 +1,45 @@
+{
+  "_comment_top": "One block per tool vendor. To add a vendor, copy a block and edit the values. You do not need to touch any Python file. The keys on the left of 'columns' are the standard internal names. The values on the right are the exact column headers in that vendor's log file. Only include the internal names your log actually has.",
+
+  "_internal_names_help": {
+    "ts_set": "Alarm onset timestamp. Required.",
+    "ts_clear": "Alarm clear timestamp. Include only if each row holds a full interval.",
+    "event_type": "Marker that says 'set' or 'clear'. Include only if set and clear are separate rows.",
+    "fault_code": "Vendor fault or alarm code. Required.",
+    "description": "Human readable fault text. Required.",
+    "equipment": "Equipment or module identifier. Required.",
+    "duration_s": "Downtime for the row. Include only if the log already has a duration column."
+  },
+
+  "amat": {
+    "description": "Applied Materials alarm log. Placeholder column names. Edit these to match your real file headers.",
+    "delimiter": ",",
+    "timestamp_format": null,
+    "duration_unit": "seconds",
+    "pairing_keys": ["equipment", "fault_code"],
+    "event_values": {"set": "SET", "clear": "CLEAR"},
+    "columns": {
+      "ts_set": "EventTime",
+      "fault_code": "AlarmID",
+      "description": "AlarmText",
+      "equipment": "ChamberID",
+      "duration_s": "DownSeconds"
+    }
+  },
+
+  "amat_setclear_example": {
+    "description": "Example of the same vendor when set and clear are separate rows. Kept as a template you can copy.",
+    "delimiter": ",",
+    "timestamp_format": null,
+    "duration_unit": "seconds",
+    "pairing_keys": ["equipment", "fault_code"],
+    "event_values": {"set": "SET", "clear": "CLEAR"},
+    "columns": {
+      "ts_set": "EventTime",
+      "event_type": "EventState",
+      "fault_code": "AlarmID",
+      "description": "AlarmText",
+      "equipment": "ChamberID"
+    }
+  }
+}
