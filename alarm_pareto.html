@@ -286,6 +286,22 @@
       </div>
     </div>
 
+    <div class="card" id="insightsCard" style="display:none">
+      <h2>Insights</h2>
+      <div class="cards" id="insightCards"></div>
+      <div class="split" style="margin-top:14px">
+        <div>
+          <h3 style="font-size:13px;margin:0 0 6px">Events per day</h3>
+          <div class="chartwrap"><div id="perDayChart"></div></div>
+        </div>
+        <div>
+          <h3 style="font-size:13px;margin:0 0 6px">By chamber / module</h3>
+          <div class="chartwrap"><table id="chamberTable"></table></div>
+        </div>
+      </div>
+      <div class="foot" id="insightsFoot"></div>
+    </div>
+
     <div class="card">
       <h2>Pareto</h2>
       <div class="tabs" id="levelTabs"></div>
@@ -1673,6 +1689,76 @@ function collapse(sorted, topN, sortField) {
 // ---------------------------------------------------------------------------
 document.getElementById("runBtn").addEventListener("click", runAnalysis);
 
+// ---------------------------------------------------------------------------
+// Analytics. These read the windowed occurrences and give back plain numbers
+// for the Insights card: how often events happen, how they concentrate, and
+// how they split by chamber. All pure, so the test harness can check them.
+// ---------------------------------------------------------------------------
+function dayKey(d) {
+  function p(x) { return (x < 10 ? "0" : "") + x; }
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+// How concentrated are the events under one grouping key? Returns how many
+// groups make up 80 percent of events, the share of the top group, and so on.
+function concentrationOf(occ, key) {
+  var counts = {};
+  occ.forEach(function (o) { var k = o[key] || "(blank)"; counts[k] = (counts[k] || 0) + 1; });
+  var arr = Object.keys(counts).map(function (k) { return { key: k, count: counts[k] }; })
+    .sort(function (a, b) { return b.count - a.count; });
+  var total = occ.length || 1;
+  var cum = 0, top80 = 0;
+  for (var i = 0; i < arr.length; i++) { cum += arr[i].count; top80 = i + 1; if (cum / total >= 0.8) break; }
+  var top3 = arr.slice(0, 3).reduce(function (s, r) { return s + r.count; }, 0);
+  return {
+    top80: top80, top3Share: top3 / total, groups: arr.length,
+    topKey: arr.length ? arr[0].key : "", topShare: arr.length ? arr[0].count / total : 0
+  };
+}
+
+function analyzeStats(occ, start, end) {
+  if (!occ.length) return null;
+  var times = occ.map(function (o) { return o.start; }).sort(function (a, b) { return a - b; });
+  var first = times[0], last = times[times.length - 1];
+  var spanSec = Math.max(1, (last - first) / 1000);
+  var spanDays = Math.max(1 / 24, spanSec / 86400);
+  var total = occ.length;
+
+  var dayCounts = {};
+  occ.forEach(function (o) { var k = dayKey(o.start); dayCounts[k] = (dayCounts[k] || 0) + 1; });
+  var byDay = Object.keys(dayCounts).sort().map(function (k) { return { day: k, count: dayCounts[k] }; });
+  var busiestDay = byDay.reduce(function (m, d) { return d.count > m.count ? d : m; }, { day: "", count: 0 });
+
+  var byHour = []; for (var h = 0; h < 24; h++) byHour.push(0);
+  occ.forEach(function (o) { byHour[o.start.getHours()] += 1; });
+  var busiestHour = { hour: 0, count: 0 };
+  byHour.forEach(function (c, hh) { if (c > busiestHour.count) busiestHour = { hour: hh, count: c }; });
+
+  var perDay = total / spanDays;
+  var mtbfSec = total > 1 ? spanSec / (total - 1) : spanSec;
+
+  var byEq = {};
+  occ.forEach(function (o) {
+    var k = o.equipment || "(blank)";
+    if (!byEq[k]) byEq[k] = { times: [], downSec: 0 };
+    byEq[k].times.push(o.start); byEq[k].downSec += o.durSec || 0;
+  });
+  var perChamber = Object.keys(byEq).map(function (k) {
+    var g = byEq[k]; g.times.sort(function (a, b) { return a - b; });
+    var n = g.times.length;
+    var sp = n > 1 ? (g.times[n - 1] - g.times[0]) / 1000 : spanSec;
+    return { key: k, count: n, share: n / total, mtbfSec: n > 1 ? sp / (n - 1) : sp, downSec: g.downSec };
+  }).sort(function (a, b) { return b.count - a.count; });
+
+  return {
+    total: total, first: first, last: last, spanDays: spanDays, perDay: perDay, mtbfSec: mtbfSec,
+    byDay: byDay, busiestDay: busiestDay, byHour: byHour, busiestHour: busiestHour,
+    burstFactor: perDay > 0 ? busiestDay.count / perDay : 0,
+    concentration: { fault_code: concentrationOf(occ, "fault_code"), category: concentrationOf(occ, "category") },
+    perChamber: perChamber
+  };
+}
+
 function runAnalysis() {
   var map = readMapping();
   if (!map.tsCol && !map.dateCol) { setMsg("mapMsg", "err", "Tag a Timestamp column, or a Date column (plus a Time column)."); return; }
@@ -1751,7 +1837,8 @@ function runAnalysis() {
     totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
     hasDowntime: (map.downMode !== "none"), levels: levels,
     unparsed: built.unparsed, kept: win.kept, sevNote: sevNote,
-    isDerived: (map.downMode === "derive"), derived: derived
+    isDerived: (map.downMode === "derive"), derived: derived,
+    stats: analyzeStats(win.kept, win.start, win.end)
   };
 
   renderResults();
@@ -1799,6 +1886,7 @@ function renderResults() {
     "The two per-item downtime numbers answer different questions and are never mixed." + derivedNote;
 
   renderValidation();
+  renderInsights();
 
   // Level tabs.
   var tabs = document.getElementById("levelTabs");
@@ -1814,6 +1902,75 @@ function renderResults() {
   document.getElementById("dtTitle").textContent =
     (R.isDerived ? "Ranked by estimated downtime (" : "Ranked by downtime (") + R.method + ")";
   renderLevel();
+}
+
+// Fill the Insights card from the computed stats: headline tiles, an
+// events-per-day bar chart, and a per-chamber table.
+function renderInsights() {
+  var R = STATE.lastResult;
+  var S = R.stats;
+  var card = document.getElementById("insightsCard");
+  if (!S) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  // Use the category concentration when categories vary, else fault codes.
+  var useCat = S.concentration.category.groups > 1;
+  var conc = useCat ? S.concentration.category : S.concentration.fault_code;
+  var concWord = useCat ? "categories" : "fault codes";
+
+  document.getElementById("insightCards").innerHTML =
+    stat(fmtNum(S.perDay), "Events per day (avg)") +
+    stat(S.busiestDay.count, "Busiest day (" + S.busiestDay.day + ")") +
+    stat(hours(S.mtbfSec), "Mean gap between events (h)") +
+    stat(Math.round(conc.topShare * 100) + "%", "Top group share (" + clip(String(conc.topKey), 18) + ")") +
+    stat(conc.top80, "Top " + concWord + " = 80% of events");
+
+  drawDayBars("perDayChart", S.byDay);
+
+  var head = "<tr><th class='txt'>Chamber / module</th><th>Events</th><th>Share</th><th>Mean gap (h)</th><th>Downtime (h)</th></tr>";
+  var body = S.perChamber.slice(0, 15).map(function (c) {
+    return "<tr><td class='txt'>" + esc(c.key) + "</td><td>" + c.count + "</td><td>" +
+      Math.round(c.share * 100) + "%</td><td>" + hours(c.mtbfSec) + "</td><td>" + hours(c.downSec) + "</td></tr>";
+  }).join("");
+  document.getElementById("chamberTable").innerHTML = head + body;
+
+  var burstNote = S.burstFactor >= 3
+    ? " The busiest day had " + S.busiestDay.count + " events, " + fmtNum(S.burstFactor) + "x the daily average, which looks like a burst."
+    : "";
+  document.getElementById("insightsFoot").innerHTML =
+    "Span: <b>" + fmt(S.first) + "</b> to <b>" + fmt(S.last) + "</b> (" + fmtNum(S.spanDays) + " days). " +
+    "Busiest hour of day: <b>" + S.busiestHour.hour + ":00</b> (" + S.busiestHour.count + " events)." + burstNote;
+}
+
+// A small bar chart of events per calendar day. Plain SVG, no libraries.
+function drawDayBars(containerId, byDay) {
+  var W = 520, H = 200, padL = 36, padR = 10, padT = 12, padB = 44;
+  var plotW = W - padL - padR, plotH = H - padT - padB;
+  var n = byDay.length;
+  var maxV = Math.max.apply(null, byDay.map(function (d) { return d.count; }).concat([1]));
+  var step = n ? plotW / n : plotW;
+  var bw = Math.max(2, step * 0.7);
+  var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Events per day">'];
+  for (var g = 0; g <= 2; g++) {
+    var yy = padT + plotH - (plotH * g / 2);
+    svg.push(line(padL, yy, padL + plotW, yy, "#eef1f5", 1));
+    svg.push(text(padL - 6, yy + 3, String(Math.round(maxV * g / 2)), 10, "end", "#5b6570"));
+  }
+  var everyNth = n > 15 ? Math.ceil(n / 12) : 1;
+  byDay.forEach(function (d, i) {
+    var h = (d.count / maxV) * plotH;
+    var x = padL + step * i + (step - bw) / 2;
+    var y = padT + plotH - h;
+    svg.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) +
+      '" height="' + Math.max(0, h).toFixed(1) + '" fill="#305496"><title>' + esc(d.day) + ": " + d.count + '</title></rect>');
+    if (i % everyNth === 0) {
+      var lx = padL + step * i + step / 2;
+      svg.push('<text x="' + lx.toFixed(1) + '" y="' + (padT + plotH + 12) + '" font-size="8" fill="#1b1f24" transform="rotate(45 ' +
+        lx.toFixed(1) + ' ' + (padT + plotH + 12) + ')">' + esc(d.day.slice(5)) + '</text>');
+    }
+  });
+  svg.push('</svg>');
+  document.getElementById(containerId).innerHTML = svg.join("");
 }
 
 // Show the paired down/up intervals so they can be checked by eye. Only used in
@@ -2124,6 +2281,10 @@ window.AP = {
   categorize: categorize,
   normCategory: normCategory,
   parseCatRules: parseCatRules,
+  // Analytics.
+  analyzeStats: analyzeStats,
+  concentrationOf: concentrationOf,
+  dayKey: dayKey,
   // Occurrence building, windowing, and ranking.
   buildOccurrences: buildOccurrences,
   makeOcc: makeOcc,

@@ -7,6 +7,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: an Insights card with analytics beyond the Paretos. Headline
+  tiles show events per day, the busiest day, the mean gap between events, the
+  top group's share, and how many groups make up 80 percent of the events. An
+  events-per-day bar chart shows the trend, and a per-chamber table shows each
+  chamber's event count, share, mean gap between events, and downtime. A footer
+  notes the busiest hour of day and flags a burst when one day runs well above
+  the daily average.
 - Browser tool: message categories. Templated messages that differ only by a
   chamber tag or a number are grouped under one category, so a new "Category"
   Pareto reads cleanly. Built-in rules cover the common P5000 messages, and you

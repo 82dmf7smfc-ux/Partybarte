@@ -69,7 +69,11 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    the levels by hand. The default is faults and warnings, so routine trace and
    prompt lines are left out. Set the window length and the top-N cutoff. Click
    "Analyze".
-6. Read the summary and the Pareto charts. The fault chart labels each bar with
+6. Read the Insights card for the numbers behind the charts: events per day, the
+   busiest day and hour, the mean gap between events, how concentrated the events
+   are (how many groups make up 80 percent), and a per-chamber breakdown with each
+   chamber's share and mean gap. A burst on any one day is flagged.
+7. Read the summary and the Pareto charts. The fault chart labels each bar with
    the message ID and its most common text, for example
    "810 - Chamber 2 unable to start recipe". Switch grouping level with the tabs
    (Fault, Category, Module, Message text). Download a CSV summary, or use

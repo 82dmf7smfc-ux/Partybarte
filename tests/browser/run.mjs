@@ -175,6 +175,43 @@ async function main() {
   check("Category top is PM trigger reached", lvl.topKey === "PM trigger reached", lvl);
   eq("Category top count (5 PM warnings kept)", lvl.topCount, 5);
 
+  // 6d. Analytics: analyzeStats on a deterministic fixture.
+  // 10 events over Jan 1-5 2026: 6 on day 1 (a burst), 1 each on days 2-5.
+  // Chambers A (7) and B (3); categories PM (6) and Gas (4).
+  var st = await ev("(function(){"
+    + "function mk(da,ho,eq,cat){return {start:new Date(2026,0,da,ho,0,0),equipment:eq,category:cat,fault_code:cat,severity:'FAULT',durSec:0};}"
+    + "var occ=[mk(1,0,'A','PM'),mk(1,1,'A','PM'),mk(1,2,'A','PM'),mk(1,3,'A','PM'),mk(1,4,'B','Gas'),mk(1,5,'B','Gas'),mk(2,0,'A','PM'),mk(3,0,'A','Gas'),mk(4,0,'B','Gas'),mk(5,0,'A','PM')];"
+    + "var S=AP.analyzeStats(occ,new Date(2026,0,1),new Date(2026,0,5));"
+    + "return {total:S.total,perDay:S.perDay,busyDay:S.busiestDay.day,busyCount:S.busiestDay.count,mtbf:S.mtbfSec,burst:S.burstFactor,catTop80:S.concentration.category.top80,catTopKey:S.concentration.category.topKey,catTopShare:S.concentration.category.topShare,eq0:S.perChamber[0].key,eq0n:S.perChamber[0].count,eq0share:S.perChamber[0].share,days:S.byDay.length};"
+    + "})()");
+  eq("stats: total", st.total, 10);
+  eq("stats: events per day", st.perDay, 2.5);
+  eq("stats: busiest day", st.busyDay, "2026-01-01");
+  eq("stats: busiest day count", st.busyCount, 6);
+  eq("stats: mean gap seconds", st.mtbf, 38400);
+  check("stats: burst factor ~2.4", Math.abs(st.burst - 2.4) < 1e-9, st.burst);
+  eq("stats: category top-80 count", st.catTop80, 2);
+  eq("stats: top category key", st.catTopKey, "PM");
+  check("stats: top category share 0.6", Math.abs(st.catTopShare - 0.6) < 1e-9, st.catTopShare);
+  eq("stats: top chamber key", st.eq0, "A");
+  eq("stats: top chamber count", st.eq0n, 7);
+  eq("stats: byDay length", st.days, 5);
+
+  // 6e. Insights card renders on the P5000 sample.
+  var ins = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';runAnalysis();"
+    + "var vis=document.getElementById('insightsCard').style.display!=='none';"
+    + "var tiles=document.querySelectorAll('#insightCards .stat').length;"
+    + "var bars=document.querySelectorAll('#perDayChart svg rect').length;"
+    + "var chamberRows=document.querySelectorAll('#chamberTable tr').length;"
+    + "return {vis:vis,tiles:tiles,bars:bars,chamberRows:chamberRows,hasStats:!!STATE.lastResult.stats};"
+    + "})()");
+  check("insights: card visible", ins.vis, ins);
+  check("insights: stat tiles rendered", ins.tiles >= 4, ins);
+  check("insights: day bars rendered", ins.bars >= 1, ins);
+  check("insights: chamber table has rows", ins.chamberRows >= 2, ins);
+
   // 7. Regression: the delimited path still works.
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([SAMPLE_CSV],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: built-in CSV rows", reg.rows, 15);
