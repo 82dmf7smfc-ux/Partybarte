@@ -7,6 +7,11 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: more chart types. A "Chart" picker on the Pareto card switches
+  between the Pareto (bars plus the cumulative line), horizontal bars that read
+  well when the labels are long, and a heatmap of events by hour of day and
+  weekday. A "Log scale" toggle helps when a few groups dwarf the rest. All are
+  plain SVG, so the tool stays a single offline file.
 - Browser tool: more filters in Settings, on top of the severity filter. Narrow
   the events by chamber/module and by category (checkboxes built from the data),
   by an explicit date range, and by a message search (plain text, or a /regex/).

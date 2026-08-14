@@ -329,9 +329,25 @@
     <div class="card">
       <h2>Pareto</h2>
       <div class="tabs" id="levelTabs"></div>
+      <div class="row" style="margin-bottom:10px">
+        <div class="field">
+          <label>Chart</label>
+          <select id="chartType">
+            <option value="pareto">Pareto (bars + cumulative line)</option>
+            <option value="hbar">Horizontal bars (good for long labels)</option>
+            <option value="heatmap">Heatmap (hour of day x weekday)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label style="visibility:hidden">x</label>
+          <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
+            <input type="checkbox" id="logScale"> Log scale
+          </label>
+        </div>
+      </div>
       <div class="split">
         <div>
-          <h3 style="font-size:13px;margin:0 0 6px">Ranked by occurrence count</h3>
+          <h3 style="font-size:13px;margin:0 0 6px" id="countTitle">Ranked by occurrence count</h3>
           <div class="chartwrap"><div id="countChart"></div></div>
         </div>
         <div>
@@ -2157,17 +2173,41 @@ function renderLevel() {
   });
 
   var data = R.levels[lv.key];
-  drawPareto("countChart", data.byCount, "count", "Count", lv.nice);
+  var type = document.getElementById("chartType").value;
+  var log = document.getElementById("logScale").checked;
+  var countTitle = document.getElementById("countTitle");
+  var dtTitle = document.getElementById("dtTitle");
   var downLabel = R.hasDowntime ? (R.isDerived ? "Est. downtime (hours)" : "Downtime (hours)") : "Downtime (none)";
-  drawPareto("downChart", data.byDown, data.metric, downLabel, lv.nice, R.hasDowntime);
+
+  if (type === "heatmap") {
+    // The heatmap is about timing, not a ranking, so it spans one panel.
+    countTitle.textContent = "Events by hour of day and weekday";
+    dtTitle.textContent = "";
+    drawHeatmap("countChart", R.kept);
+    document.getElementById("downChart").innerHTML = "";
+  } else {
+    var dtText = (R.isDerived ? "Ranked by estimated downtime (" : "Ranked by downtime (") + R.method + ")";
+    countTitle.textContent = "Ranked by occurrence count";
+    dtTitle.textContent = dtText;
+    var draw = (type === "hbar") ? drawHBars : drawPareto;
+    draw("countChart", data.byCount, "count", "Count", lv.nice, true, log);
+    draw("downChart", data.byDown, data.metric, downLabel, lv.nice, R.hasDowntime, log);
+  }
   drawTable(data, lv);
 }
+
+document.getElementById("chartType").addEventListener("change", function () {
+  if (STATE.lastResult) renderLevel();
+});
+document.getElementById("logScale").addEventListener("change", function () {
+  if (STATE.lastResult) renderLevel();
+});
 
 // ---------------------------------------------------------------------------
 // SVG Pareto chart. Bars, a cumulative percent line on the right, and a dashed
 // 80 percent guide line.
 // ---------------------------------------------------------------------------
-function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueIsHours) {
+function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueIsHours, logScale) {
   var W = 520, H = 360;
   var padL = 52, padR = 46, padT = 20, padB = 96;
   var plotW = W - padL - padR, plotH = H - padT - padB;
@@ -2176,16 +2216,20 @@ function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueI
     return (valueField === "count") ? r.count : (valueIsHours === false ? 0 : r[valueField] / 3600);
   });
   var maxVal = Math.max.apply(null, vals.concat([1]));
+  // On a log scale we plot log10(value + 1), so a value of zero sits at the axis.
+  function sv(v) { return logScale ? Math.log10(v + 1) : v; }
+  var maxScaled = sv(maxVal) || 1;
   var n = rows.length;
   var bw = n ? Math.max(4, plotW / n * 0.72) : 4;
   var step = n ? plotW / n : plotW;
 
   var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Pareto by ' + esc(levelNice) + '">'];
 
-  // Left axis grid and labels (value).
+  // Left axis grid and labels (value). On a log scale the tick values are the
+  // inverse of the evenly spaced positions.
   for (var g = 0; g <= 4; g++) {
     var yy = padT + plotH - (plotH * g / 4);
-    var lvVal = (maxVal * g / 4);
+    var lvVal = logScale ? (Math.pow(10, (g / 4) * maxScaled) - 1) : (maxVal * g / 4);
     svg.push(line(padL, yy, padL + plotW, yy, "#eef1f5", 1));
     svg.push(text(padL - 6, yy + 3, fmtNum(lvVal), 10, "end", "#5b6570"));
   }
@@ -2202,7 +2246,7 @@ function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueI
   // Bars.
   rows.forEach(function (r, i) {
     var v = vals[i];
-    var h = (v / maxVal) * plotH;
+    var h = (sv(v) / maxScaled) * plotH;
     var x = padL + step * i + (step - bw) / 2;
     var y = padT + plotH - h;
     var lab = String(r.label || r.key);
@@ -2228,6 +2272,80 @@ function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueI
 
   // Axis titles.
   svg.push(text(padL, padT - 6, valueLabel, 11, "start", "#1b1f24"));
+  svg.push('</svg>');
+  document.getElementById(containerId).innerHTML = svg.join("");
+}
+
+// Horizontal bar chart of the same ranked rows. Labels sit to the left at full
+// width, which reads better than rotated labels when they are long.
+function drawHBars(containerId, rows, valueField, valueLabel, levelNice, valueIsHours, logScale) {
+  var rowH = 22, padL = 150, padR = 40, padT = 24, padB = 10;
+  var n = rows.length;
+  var W = 520, plotW = W - padL - padR;
+  var H = padT + padB + Math.max(1, n) * rowH;
+
+  var vals = rows.map(function (r) {
+    return (valueField === "count") ? r.count : (valueIsHours === false ? 0 : r[valueField] / 3600);
+  });
+  var maxVal = Math.max.apply(null, vals.concat([1]));
+  function sv(v) { return logScale ? Math.log10(v + 1) : v; }
+  var maxScaled = sv(maxVal) || 1;
+
+  var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(valueLabel) + ' by ' + esc(levelNice) + '">'];
+  svg.push(text(padL, padT - 10, valueLabel, 11, "start", "#1b1f24"));
+  rows.forEach(function (r, i) {
+    var v = vals[i];
+    var w = (sv(v) / maxScaled) * plotW;
+    var y = padT + i * rowH;
+    var lab = String(r.label || r.key);
+    svg.push('<text x="' + (padL - 6) + '" y="' + (y + rowH / 2 + 3) + '" font-size="10" text-anchor="end" fill="#1b1f24">' + esc(clip(lab, 26)) + '</text>');
+    svg.push('<rect x="' + padL + '" y="' + (y + 3) + '" width="' + Math.max(0, w).toFixed(1) + '" height="' + (rowH - 6) +
+      '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(lab) + ": " + fmtNum(v) + '</title></rect>');
+    svg.push('<text x="' + (padL + Math.max(0, w) + 4) + '" y="' + (y + rowH / 2 + 3) + '" font-size="10" fill="#5b6570">' + fmtNum(v) + '</text>');
+  });
+  svg.push('</svg>');
+  document.getElementById(containerId).innerHTML = svg.join("");
+}
+
+// Bin occurrences into a 7 by 24 grid: weekday (0 = Sunday) by hour of day.
+// Pure, so the harness can check the counts.
+function heatmapBins(occ) {
+  var matrix = [];
+  for (var d = 0; d < 7; d++) { var row = []; for (var h = 0; h < 24; h++) row.push(0); matrix.push(row); }
+  var max = 0, total = 0;
+  occ.forEach(function (o) {
+    var wd = o.start.getDay(), hr = o.start.getHours();
+    matrix[wd][hr] += 1; total += 1;
+    if (matrix[wd][hr] > max) max = matrix[wd][hr];
+  });
+  return { matrix: matrix, max: max, total: total };
+}
+
+// Heatmap of when events happen: weekday down the side, hour across the top,
+// each cell shaded by how many events fell in that hour.
+function drawHeatmap(containerId, occ) {
+  var bins = heatmapBins(occ);
+  var days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var cell = 18, padL = 40, padT = 24, gap = 2;
+  var W = padL + 24 * (cell + gap) + 10;
+  var H = padT + 7 * (cell + gap) + 10;
+  var max = bins.max || 1;
+
+  var svg = ['<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Events by hour and weekday">'];
+  for (var h = 0; h < 24; h += 3) {
+    svg.push(text(padL + h * (cell + gap) + cell / 2, padT - 8, String(h), 9, "middle", "#5b6570"));
+  }
+  for (var d = 0; d < 7; d++) {
+    svg.push(text(padL - 6, padT + d * (cell + gap) + cell / 2 + 3, days[d], 9, "end", "#5b6570"));
+    for (var hh = 0; hh < 24; hh++) {
+      var c = bins.matrix[d][hh];
+      // White to blue by intensity. Zero cells stay a very light grey.
+      var t = c / max;
+      var fill = c === 0 ? "#f4f6f8" : "rgb(" + Math.round(219 - 171 * t) + "," + Math.round(230 - 121 * t) + "," + Math.round(245 - 95 * t) + ")";
+      var x = padL + hh * (cell + gap), y = padT + d * (cell + gap);
+      svg.push('<rect x="' + x + '" y="' + y + '" width="' + cell + '" height="' + cell + '" fill="' + fill + '" stroke="#e3e8ee" stroke-width="0.5"><title>' + days[d] + " " + hh + ":00 — " + c + ' events</title></rect>');
+    }
+  }
   svg.push('</svg>');
   document.getElementById(containerId).innerHTML = svg.join("");
 }
@@ -2422,6 +2540,8 @@ window.AP = {
   parseCatRules: parseCatRules,
   // Filtering.
   applyFilters: applyFilters,
+  // Charts (pure part).
+  heatmapBins: heatmapBins,
   // Analytics.
   analyzeStats: analyzeStats,
   concentrationOf: concentrationOf,
