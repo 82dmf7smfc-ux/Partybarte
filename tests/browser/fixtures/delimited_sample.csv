@@ -1,0 +1,5 @@
+EventTime,AlarmID,AlarmText,ChamberID,DownSeconds
+2026-02-10 10:00:00,E101,Chamber over temperature,CH-A,3600
+2026-02-10 12:00:00,E101,Chamber over temperature,CH-A,10800
+2026-02-11 06:00:00,E202,Gas flow deviation,CH-B,1800
+2026-02-13 11:00:00,E303,RF power fault,CH-C,7200

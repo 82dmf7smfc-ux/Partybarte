@@ -1,0 +1,25 @@
+System Constants III Utility
+File Extracted from:
+   SCIII+ Event Data File:  E:\Backups\dep1\Data\ELOG.DAT
+   ELog.dat file:  C:\Syscon\P5000_Etch_4.70.el3
+Extraction performed on:  06/05/00
+
+System type:  P5000
+Process type: Etch
+Software version:  E4.70
+
+Date  Time  Event Number  Event Type  Description
+08/07/26  12:50:16  494           WARNING     chamber <S4EXT> chamber abcd optset rf2 power usage has reached the pm trigger time
+08/07/26  12:51:16  494           WARNING     chamber <S4EXT> chamber abcd optset rf2 power usage has reached the pm trigger time
+08/07/26  12:52:16  494           WARNING     chamber <S4EXT> chamber abcd optset rf2 power usage has reached the pm trigger time
+08/07/26  15:38:52  494           WARNING     chamber <S4EXT>  total number= <L1>   log wafer count.
+08/07/26  15:45:18  801           TRACE       processing complete for wafer <S1> of lot <S3>
+08/07/26  16:04:07  1191          TRACE       chamber <S4EXT> chamber name table process step <L2> has ended and summary data was saved
+08/07/26  16:18:52  807           FAULT       chamber <S4EXT> chamber minimum gas flow error
+08/07/26  16:29:22  570           PROMPT      port <S1EXT> wafer not sensed by vacuum on pick up from storage elevator
+08/07/26  16:44:06  050           TRACE       front panel func_char+dquote func_append caps load func_append+dquote depressed
+08/08/26  01:14:42  494           WARNING     chamber <S1EXT> chamber abcd optset rf2 power usage has reached the pm trigger time
+08/08/26  02:14:42  494           WARNING     chamber <S1EXT> chamber abcd optset rf2 power usage has reached the pm trigger time
+08/08/26  bad_time_here  494  WARNING  this row is broken
+08/08/26  05:20:21  736           FAULT       chamber <S4EXT> wafer position sensor calibration is not done
+    still part of the calibration note, wrapped by the editor
