@@ -31,10 +31,16 @@ Both run fully offline. Neither makes a network call.
 
 Open `alarm_pareto.html` in a browser. There is nothing to install.
 
-1. Click "Choose Files" and pick one or more elog files from the same tool.
-   CSV and delimited text files work. So do P5000 Etch elogs, which have a text
-   preamble and columns separated by spaces. The Format drop-down is set to "Auto
-   detect", or you can force CSV or P5000.
+1. Click "Choose Files" and pick one or more elog files. CSV and delimited text
+   files work. So do P5000 Etch elogs, which have a text preamble and columns
+   separated by spaces. The Format drop-down is set to "Auto detect", or you can
+   force CSV or P5000.
+   - For P5000 elogs the tool reads the tool name from the backup path in the
+     preamble (for example `E:\Backups\etch4\Data\ELOG.DAT` reads as "etch4") and
+     classifies a "dep..." or "etch..." name as a dep or etch tool. The import
+     message names the tool. Every row is tagged with a "Tool" column, so you can
+     load a dep log and an etch log together, rank by the "Tool" Pareto level, and
+     tick which tools to include in the Tool filter to compare them.
 2. Point the tool at your data. Set "First data row" to the line where the data
    begins, so any preamble lines above it are skipped. The tool reads from that
    row down until the first blank line. Older rows outside the window are dropped
@@ -42,7 +48,7 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 3. Click "Auto-map columns". The tool shows one row per column with a few sample
    values and guesses what each column holds from those values. Fix any guess
    that is wrong using the drop-downs. The roles are: Date, Time, Timestamp
-   (date and time in one column), Severity, Module / equipment, Message ID,
+   (date and time in one column), Severity, Module / equipment, Tool, Message ID,
    Description, Duration, Alarm state, or Ignore. You need a Timestamp, or a Date
    (plus a Time), and a Message ID. Files with no header row work fine; columns
    show as "Column 1", "Column 2", and so on.
@@ -67,8 +73,8 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    preset buttons "Faults only", "Warnings only", or "Faults + warnings", or tick
    the levels by hand. The default is faults and warnings, so routine trace and
    prompt lines are left out. You can also narrow the events further: tick which
-   chambers and categories to include, set a From/To date range, search the
-   message text (plain, or a /regex/), and hide groups smaller than a chosen size.
+   chambers, categories, and tools to include, set a From/To date range, search
+   the message text (plain, or a /regex/), and hide groups smaller than a size.
    Set the window length and the top-N cutoff. Click "Analyze".
 6. Read the Insights card for the numbers behind the charts: events per day, the
    busiest day and hour, the mean gap between events, how concentrated the events
@@ -77,7 +83,8 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 7. Read the summary and the Pareto charts. The fault chart labels each bar with
    the message ID and its most common text, for example
    "810 - Chamber 2 unable to start recipe". The Pareto opens on the Category
-   level; switch grouping with the tabs (Fault, Category, Module, Message text).
+   level; switch grouping with the tabs (Fault, Category, Module, Tool, Message
+   text). The "Tool" level ranks events per tool when a batch mixes tools.
    The Category table has a "Matched by" column that says how each category was
    decided (a built-in rule, your rule, or the auto label from the message shape).
    Use the "Chart" picker to switch between the Pareto, horizontal bars (better
