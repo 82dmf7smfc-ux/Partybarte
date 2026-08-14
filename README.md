@@ -72,8 +72,14 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 6. Read the summary and the Pareto charts. The fault chart labels each bar with
    the message ID and its most common text, for example
    "810 - Chamber 2 unable to start recipe". Switch grouping level with the tabs
-   (Fault, Module, Message text). Download a CSV summary, or use
+   (Fault, Category, Module, Message text). Download a CSV summary, or use
    "Print / Save as PDF" to make a report.
+   - The "Category" level groups messages that differ only by a chamber tag or a
+     number, so repeated template messages fall under one name. Built-in rules
+     cover the common cases. Add your own under "Message categories" in step 2, as
+     `pattern => Label`, one per line. Your rules are saved in the browser and run
+     first. Anything left uncategorized shows up in the debug log so you can see
+     what rule to add.
 
 If a file does not read the way you expect, press "Show debug log". It lists
 short codes for how each file was parsed, such as the detected format, skipped

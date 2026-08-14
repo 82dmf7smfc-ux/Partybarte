@@ -238,6 +238,13 @@
         </div>
       </div>
     </div>
+
+    <div style="margin-top:14px">
+      <label>Message categories (optional)</label>
+      <p class="hint" style="margin:2px 0 6px">Group similar messages under one name for the Category Pareto. Built-in rules run automatically. Add your own here, one per line, as <code>pattern =&gt; Label</code>. The pattern is a regular expression, matched without case, and your rules run first. Saved in this browser.</p>
+      <textarea id="catRules" rows="3" placeholder="gas flow error =&gt; Gas flow error" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
+    </div>
+
     <div id="mapMsg"></div>
   </div>
 
@@ -395,9 +402,71 @@ var DERIVE_DEFAULTS = {
 
 var LEVELS = [
   { key: "fault_code",  nice: "Fault (ID + text)" },
+  { key: "category",    nice: "Category" },
   { key: "equipment",   nice: "Module" },
   { key: "description", nice: "Message text" }
 ];
+
+// ---------------------------------------------------------------------------
+// Message categories. Templated messages repeat with small changes, like a
+// chamber tag or a number, so a plain message Pareto is noisy. We collapse
+// similar messages to a category. A message is matched against the user rules
+// first, then these built-in rules. A message that matches nothing falls back
+// to its normalized shape, so unmatched messages still group by their pattern.
+// ---------------------------------------------------------------------------
+var BUILTIN_CAT_RULES = [
+  { re: /reached the pm trigger time/i,               label: "PM trigger reached" },
+  { re: /minimum gas flow|gas flow error/i,           label: "Gas flow error" },
+  { re: /has ended and summary data was saved/i,      label: "Process step complete" },
+  { re: /processing complete for wafer/i,             label: "Wafer processing complete" },
+  { re: /calibration is not done/i,                   label: "Calibration not done" },
+  { re: /invalid rfu.*power|invalid.*power or mode/i, label: "Invalid RF power or mode" },
+  { re: /wafer not sensed/i,                          label: "Wafer not sensed" },
+  { re: /completed pumpdown/i,                        label: "Pumpdown complete" }
+];
+
+// Collapse the varying parts of a message so similar lines group together.
+// Angle-bracket tags become <*> and runs of digits become #.
+function normCategory(desc) {
+  return String(desc == null ? "" : desc)
+    .toLowerCase()
+    .replace(/<[^>]*>/g, "<*>")
+    .replace(/\d+/g, "#")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Return the category for one message. User rules are tried first, then the
+// built-in rules. "matched" is false when nothing matched, so the caller can
+// record it. The fallback category is the normalized shape of the message.
+function categorize(desc, userRules) {
+  var text = String(desc == null ? "" : desc);
+  var rules = userRules || [];
+  for (var i = 0; i < rules.length; i++) {
+    if (rules[i].re.test(text)) return { category: rules[i].label, matched: true };
+  }
+  for (var j = 0; j < BUILTIN_CAT_RULES.length; j++) {
+    if (BUILTIN_CAT_RULES[j].re.test(text)) return { category: BUILTIN_CAT_RULES[j].label, matched: true };
+  }
+  var norm = normCategory(text);
+  return { category: norm || "(blank)", matched: false };
+}
+
+// Turn user rule lines ("pattern => Label") into {re, label}. A bad regex is
+// skipped and recorded, so one typo does not stop the analysis.
+function parseCatRules(lines) {
+  var rules = [];
+  lines.forEach(function (ln) {
+    var idx = ln.indexOf("=>");
+    if (idx === -1) return;
+    var pat = ln.slice(0, idx).trim();
+    var label = ln.slice(idx + 2).trim();
+    if (!pat || !label) return;
+    try { rules.push({ re: new RegExp(pat, "i"), label: label }); }
+    catch (e) { dbg("CAT-BADRULE", "rule: " + ln); }
+  });
+  return rules;
+}
 
 // ---------------------------------------------------------------------------
 // Debug log. Each parse records short codes here. The codes are hidden until
@@ -416,7 +485,9 @@ var DEBUG_CODES = {
   "TS-Y2K":       { level: "info",  meaning: "Rows used a 2-digit year, expanded with the 1969 pivot." },
   "TS-BADDATE":   { level: "warn",  meaning: "A timestamp could not be read, so the row was skipped." },
   "EQ-NOCHAMBER": { level: "info",  meaning: "No chamber tag was found in a description." },
-  "FMT-EMPTY":    { level: "error", meaning: "A file was detected but produced no data rows." }
+  "FMT-EMPTY":    { level: "error", meaning: "A file was detected but produced no data rows." },
+  "CAT-UNMATCHED":{ level: "info",  meaning: "A message matched no category rule and was grouped by its shape." },
+  "CAT-BADRULE":  { level: "warn",  meaning: "A category rule had an invalid pattern and was skipped." }
 };
 
 var DEBUG = { codes: {}, order: [] };
@@ -1111,6 +1182,16 @@ function optionEl(value, text) {
 
 document.getElementById("downMode").addEventListener("change", syncDownModeUI);
 
+// Remember the user's category rules in this browser, so they survive a reload.
+(function () {
+  var ta = document.getElementById("catRules");
+  if (!ta) return;
+  try { var saved = localStorage.getItem("ap_cat_rules"); if (saved != null) ta.value = saved; } catch (e) {}
+  ta.addEventListener("input", function () {
+    try { localStorage.setItem("ap_cat_rules", ta.value); } catch (e) {}
+  });
+})();
+
 // Show the option panel that matches the chosen downtime mode. The derive
 // panel is filled with the default phrase and name lists the first time it is
 // shown, so the user has something to edit.
@@ -1218,6 +1299,9 @@ function readMapping() {
   map.chamberNames.sort(function (a, b) { return b.length - a.length; });
   map.faultAsDown = document.getElementById("faultAsDown").checked;
   map.capHours = Math.max(1, parseFloat(document.getElementById("capHours").value) || 8);
+
+  // Category rules the user typed. Tried before the built-in rules.
+  map.catRules = parseCatRules(readLines("catRules"));
   return map;
 }
 
@@ -1287,11 +1371,15 @@ function buildOccurrences(rows, map) {
   var occ = [];
 
   function baseRec(r) {
+    var desc = rowDescription(r, map);
+    var cat = categorize(desc, map.catRules);
+    if (!cat.matched && desc && desc !== "(blank)") dbg("CAT-UNMATCHED", desc);
     return {
       fault_code: map.fault_code ? (r[map.fault_code] || "(blank)") : "(blank)",
-      description: rowDescription(r, map),
+      description: desc,
       equipment: map.equipment ? (r[map.equipment] || "(blank)") : "(blank)",
-      severity: map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : ""
+      severity: map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : "",
+      category: cat.category
     };
   }
 
@@ -1418,6 +1506,7 @@ function makeOcc(rec, start, end, durSec) {
     description: rec.description,
     equipment: rec.equipment,
     severity: rec.severity,
+    category: rec.category,
     start: start,
     end: (end && end > start) ? end : start,
     durSec: durSec
@@ -1595,7 +1684,7 @@ function runAnalysis() {
   setMsg("mapMsg", "", "");
 
   // Drop analysis codes from a previous run so they do not double count.
-  clearCodes(["TS-BADDATE"]);
+  clearCodes(["TS-BADDATE", "CAT-UNMATCHED", "CAT-BADRULE"]);
   var built = buildOccurrences(STATE.rows, map);
   if (!built.occ.length) {
     var emptyMsg = (map.downMode === "derive")
@@ -2031,6 +2120,10 @@ window.AP = {
   matchesAny: matchesAny,
   rowTimestamp: rowTimestamp,
   rowDescription: rowDescription,
+  // Message categorization.
+  categorize: categorize,
+  normCategory: normCategory,
+  parseCatRules: parseCatRules,
   // Occurrence building, windowing, and ranking.
   buildOccurrences: buildOccurrences,
   makeOcc: makeOcc,
