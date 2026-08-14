@@ -6,6 +6,11 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+- Browser tool: the "Show debug log" button moved to the bottom of the page, below
+  the results, with a note that says to run Analyze first (the category metrics and
+  the uncategorized event ID worklist are only built during analysis).
+
 ### Fixed
 - Browser tool: the uncategorized event-ID worklist no longer claims "every event
   matched a category rule" before an analysis has run. The worklist is built during
