@@ -745,12 +745,22 @@ function debugVerboseOn() {
   return !!(v && v.checked);
 }
 
+// Fill the debug box. In verbose the box grows to fit the whole report, with no
+// inner scroll, so a single screenshot or scroll captures everything. Otherwise
+// it stays a compact scroll pane.
+function paintDebug(verbose) {
+  var pre = document.getElementById("debugPre");
+  pre.textContent = debugReport(verbose);
+  pre.style.maxHeight = verbose ? "none" : "340px";
+  pre.style.overflow = verbose ? "visible" : "auto";
+}
+
 function showDebugButton() {
   var b = document.getElementById("debugToggle");
   b.style.display = "";
   b.textContent = "Show debug log (" + DEBUG.order.length + " codes)";
   var card = document.getElementById("debugCard");
-  if (card.style.display !== "none") document.getElementById("debugPre").textContent = debugReport(debugVerboseOn());
+  if (card.style.display !== "none") paintDebug(debugVerboseOn());
 }
 
 // The format the tool will use for one file: the forced choice, or auto detect.
@@ -886,7 +896,7 @@ document.getElementById("formatSel").addEventListener("change", function () {
 document.getElementById("debugToggle").addEventListener("click", function () {
   var card = document.getElementById("debugCard");
   if (card.style.display === "none") {
-    document.getElementById("debugPre").textContent = debugReport(debugVerboseOn());
+    paintDebug(debugVerboseOn());
     card.style.display = "";
     this.textContent = "Hide debug log";
   } else {
@@ -898,7 +908,7 @@ document.getElementById("debugToggle").addEventListener("click", function () {
 // Re-render the open report when the verbose box is toggled.
 document.getElementById("debugVerbose").addEventListener("change", function () {
   var card = document.getElementById("debugCard");
-  if (card.style.display !== "none") document.getElementById("debugPre").textContent = debugReport(debugVerboseOn());
+  if (card.style.display !== "none") paintDebug(debugVerboseOn());
 });
 
 document.getElementById("debugCopy").addEventListener("click", function () {
