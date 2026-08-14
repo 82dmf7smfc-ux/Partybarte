@@ -7,6 +7,17 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: P5000 elogs are tagged with the tool they came from. The tool
+  name is read from the backup path in the preamble (for example
+  `E:\Backups\etch4\Data\ELOG.DAT` reads as "etch4"), and a name that starts with
+  "dep" or "etch" is classified as a dep or etch tool. The import message names
+  the tool, a new "Tool" column tags every row, a "Tool" Pareto level ranks by
+  tool, and a Tool filter narrows to one tool. Load a dep log and an etch log
+  together to compare them side by side.
+- Browser tool: more built-in category rules from real etch elogs, including lot
+  processing complete, all wafers completed, pump motor error, pump running
+  without N2, vent complete, remote MFC autofill, access level changed, RF forward
+  power error, ready to send cassette, and the XEP event strings.
 - Browser tool: the debug log grows to fit the whole report when "Verbose" is on,
   with no inner scroll bar, so a single screenshot or scroll captures everything.
   Without Verbose it stays a compact scroll pane.

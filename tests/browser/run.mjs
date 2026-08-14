@@ -120,10 +120,13 @@ async function main() {
   eq("detectFormat delimited", await ev("AP.detectFormat(window.__csv)"), "delimited");
 
   // 4. P5000 parser output.
-  var pk = await ev("(function(){AP.resetDebug();var r=AP.parseP5000Block(window.__p,'fix');var codes=AP.getDebug().order.slice();var internal=r.rows.filter(function(x){return x.c4.indexOf('total number=')>=0;})[0];var cont=r.rows.filter(function(x){return x.c2==='736';})[0];var unreg=codes.filter(function(c){return !AP.DEBUG_CODES[c];});return {labels:r.columns.map(function(c){return c.label;}),rowCount:r.rows.length,firstChamber:r.rows[0].c5,internalDesc:internal?internal.c4:null,contDesc:cont?cont.c4:null,codes:codes,unregistered:unreg};})()");
-  check("P5000 columns", pk.labels.join(",") === "Date,Time,Event Number,Event Type,Description,Chamber", pk.labels);
+  var pk = await ev("(function(){AP.resetDebug();var r=AP.parseP5000Block(window.__p,'fix');var codes=AP.getDebug().order.slice();var internal=r.rows.filter(function(x){return x.c4.indexOf('total number=')>=0;})[0];var cont=r.rows.filter(function(x){return x.c2==='736';})[0];var unreg=codes.filter(function(c){return !AP.DEBUG_CODES[c];});return {labels:r.columns.map(function(c){return c.label;}),rowCount:r.rows.length,firstChamber:r.rows[0].c5,firstTool:r.rows[0].c6,tool:r.tool,kind:r.kind,internalDesc:internal?internal.c4:null,contDesc:cont?cont.c4:null,codes:codes,unregistered:unreg};})()");
+  check("P5000 columns", pk.labels.join(",") === "Date,Time,Event Number,Event Type,Description,Chamber,Tool", pk.labels);
   eq("P5000 row count", pk.rowCount, 12);
   eq("P5000 chamber extracted", pk.firstChamber, "S4EXT");
+  eq("P5000 tool detected", pk.tool, "dep1");
+  eq("P5000 tool kind", pk.kind, "dep");
+  eq("P5000 tool column tagged on row", pk.firstTool, "dep1");
   check("P5000 keeps inner spaces", pk.internalDesc && pk.internalDesc.indexOf("<L1>   log") >= 0, pk.internalDesc);
   check("P5000 rejoins continuation", pk.contDesc && /wrapped by the editor$/.test(pk.contDesc), pk.contDesc);
   check("P5000 debug has ROW-NOMATCH", pk.codes.indexOf("ROW-NOMATCH") >= 0, pk.codes);
@@ -135,13 +138,15 @@ async function main() {
   check("extractChamber rules", ch[0] === "S4EXT" && ch[1] === "S1EXT" && ch[2] === "" && ch[3] === "", ch);
 
   // 6. Full-page P5000 flow: load, auto-map, analyze.
-  var flow = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);function role(lbl){for(var i=0;i<STATE.columns.length;i++){if(STATE.columns[i].label===lbl){var s=document.getElementById('colid_'+STATE.columns[i].key);return s?s.value:'?';}}return '?';}document.getElementById('downMode').value='none';runAnalysis();var R=STATE.lastResult;return {rows:STATE.rows.length,sevRole:role('Event Type'),chamberRole:role('Chamber'),total:R.totalFaults,topFault:R.levels.fault_code.byCount[0].key,topModule:R.levels.equipment.byCount[0].key};})()");
+  var flow = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);function role(lbl){for(var i=0;i<STATE.columns.length;i++){if(STATE.columns[i].label===lbl){var s=document.getElementById('colid_'+STATE.columns[i].key);return s?s.value:'?';}}return '?';}document.getElementById('downMode').value='none';runAnalysis();var R=STATE.lastResult;return {rows:STATE.rows.length,sevRole:role('Event Type'),chamberRole:role('Chamber'),toolRole:role('Tool'),total:R.totalFaults,topFault:R.levels.fault_code.byCount[0].key,topModule:R.levels.equipment.byCount[0].key,topTool:R.levels.tool?R.levels.tool.byCount[0].key:null};})()");
   eq("full flow: rows parsed", flow.rows, 12);
   eq("full flow: Event Type -> severity", flow.sevRole, "severity");
   eq("full flow: Chamber -> equipment", flow.chamberRole, "equipment");
+  eq("full flow: Tool -> tool", flow.toolRole, "tool");
   eq("full flow: kept after severity filter", flow.total, 8);
   eq("full flow: top fault", flow.topFault, "494");
   eq("full flow: top module", flow.topModule, "S4EXT");
+  eq("full flow: Tool level top is dep1", flow.topTool, "dep1");
 
   // 6b. Message categorization.
   var cat = await ev("(function(){"
@@ -155,6 +160,32 @@ async function main() {
     + "})()");
   check("categorize built-in PM", cat.pm.matched === true && cat.pm.category === "PM trigger reached", cat.pm);
   check("categorize built-in gas flow", cat.gas.matched === true && cat.gas.category === "Gas flow error", cat.gas);
+
+  // 6b-etch. The etch4 vocabulary rules, including ordering (lot before wafer).
+  var ecat = await ev("(function(){function c(s){return AP.categorize(s).category;}return {"
+    + "lot:c('chamber <S4EXT> lot processing complete for cassette <L1>'),"
+    + "wafer:c('processing complete for wafer <S1> of lot <S3>'),"
+    + "pumpMotor:c('chamber <S1EXT> pump motor error detected'),"
+    + "pumpN2:c('chamber <S1EXT> pump is running without n2 purge'),"
+    + "vent:c('chamber <S4EXT> completed vent service cycle'),"
+    + "mfc:c('remote mfc <L1> autofill in progress'),"
+    + "access:c('access changed to user engineer'),"
+    + "fwd:c('chamber <S4EXT> rfu forward power error'),"
+    + "xep:c('func_string xep_evt_127_str reported'),"
+    + "cassette:c('robot is ready to send the cassette to the loadlock'),"
+    + "allWafers:c('chamber <S4EXT> has all wafers completed')"
+    + "};})()");
+  eq("categorize lot processing (before wafer)", ecat.lot, "Lot processing complete");
+  eq("categorize wafer processing still works", ecat.wafer, "Wafer processing complete");
+  eq("categorize pump motor error", ecat.pumpMotor, "Pump motor error");
+  eq("categorize pump without N2", ecat.pumpN2, "Pump running without N2");
+  eq("categorize vent complete", ecat.vent, "Vent complete");
+  eq("categorize remote MFC autofill", ecat.mfc, "Remote MFC autofill");
+  eq("categorize access changed", ecat.access, "Access level changed");
+  eq("categorize RF forward power error", ecat.fwd, "RF forward power error");
+  eq("categorize XEP event string", ecat.xep, "Event string (XEP)");
+  eq("categorize ready to send cassette", ecat.cassette, "Ready to send cassette");
+  eq("categorize all wafers completed", ecat.allWafers, "All wafers completed");
   check("categorize unmatched falls back to readable label", cat.novel.matched === false && cat.novel.category === "Some brand new message", cat.novel);
   check("categorize user rule wins", cat.override.matched === true && cat.override.category === "Custom PM", cat.override);
   check("normCategory collapses tags and numbers", cat.norm === "step at # #", cat.norm);
@@ -245,6 +276,29 @@ async function main() {
   check("filter UI: chamber checkboxes built", ff.hasChamberBoxes, ff);
   check("filter UI: only S4EXT kept", ff.onlyS4 && ff.kept > 0, ff);
   check("filter UI: filter note shown", /after the filters/.test(ff.note), ff.note);
+
+  // 6g-tool. Two tools in one batch: the Tool filter narrows to one, and the
+  // Tool Pareto level counts per tool.
+  var tf = await ev("(function(){"
+    + "var etch='System type:  P5000\\nProcess type: Etch\\n   SCIII+ Event Data File:  E:\\\\Backups\\\\etch4\\\\Data\\\\ELOG.DAT\\nDate  Time  Event Number  Event Type  Description\\n"
+    + "08/07/26  12:00:00  807  FAULT  chamber <S2EXT> chamber minimum gas flow error\\n"
+    + "08/07/26  12:01:00  807  FAULT  chamber <S2EXT> chamber minimum gas flow error\\n';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p, etch],2);"
+    + "document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
+    + "var toolVals=Array.prototype.map.call(document.querySelectorAll('.toolchk'),function(c){return c.value;}).sort();"
+    + "var hasToolBoxes=document.querySelectorAll('.toolchk').length>0;"
+    + "runAnalysis();"
+    + "var toolLevel=STATE.lastResult.levels.tool.byCount.map(function(x){return x.key+':'+x.count;}).sort();"
+    + "document.querySelectorAll('.toolchk').forEach(function(c){c.checked=(c.value==='etch4');});"
+    + "runAnalysis();"
+    + "var onlyEtch=STATE.lastResult.kept.every(function(o){return o.tool==='etch4';});"
+    + "var keptEtch=STATE.lastResult.totalFaults;"
+    + "return {toolVals:toolVals, hasToolBoxes:hasToolBoxes, toolLevel:toolLevel, onlyEtch:onlyEtch, keptEtch:keptEtch};"
+    + "})()");
+  check("filter UI: tool checkboxes built (dep1, etch4)", tf.hasToolBoxes && tf.toolVals.join(",") === "dep1,etch4", tf.toolVals);
+  check("Tool level counts both tools", tf.toolLevel.indexOf("dep1:12") >= 0 && tf.toolLevel.indexOf("etch4:2") >= 0, tf.toolLevel);
+  check("Tool filter narrows to etch4", tf.onlyEtch && tf.keptEtch === 2, tf);
 
   // 6h. min-count floor folds small groups into Other.
   var mc = await ev("(function(){"
