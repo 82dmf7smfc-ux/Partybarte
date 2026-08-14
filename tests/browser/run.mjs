@@ -260,7 +260,10 @@ async function main() {
     + "document.getElementById('catRules').value='id:611 => Widget jam';"
     + "runAnalysis();"
     + "var after=uncategorizedIdReport(100);"
-    + "return {had611:had611, had622:had622, split611:split611, alphaSub:alphaSub, betaSub:betaSub, single622:single622, still611:/\\n\\s*611\\s+x/.test(after), still622:/\\n\\s*622\\s+x/.test(after), headerHasTop:/Uncategorized event IDs \\(top/.test(before)};"
+    + "document.getElementById('catRules').value='id:611 => Widget jam\\nid:622 => Gizmo fault';"
+    + "runAnalysis();"
+    + "var allDone=uncategorizedIdReport(100);"
+    + "return {had611:had611, had622:had622, split611:split611, alphaSub:alphaSub, betaSub:betaSub, single622:single622, still611:/\\n\\s*611\\s+x/.test(after), still622:/\\n\\s*622\\s+x/.test(after), headerHasTop:/Uncategorized event IDs \\(top/.test(before), allDoneNone:/none\\. Every event matched a real category rule/.test(allDone)};"
     + "})()");
   check("worklist header present", idrep.headerHasTop, idrep);
   check("worklist lists uncategorized ID 611 with count", idrep.had611, idrep);
@@ -271,6 +274,11 @@ async function main() {
   check("single-shape ID 622 stays one line", idrep.single622, idrep);
   check("id: rule removes ID 611 from the worklist", idrep.still611 === false, idrep);
   check("unrelated ID 622 stays on the worklist", idrep.still622 === true, idrep);
+  check("when all matched by rules, worklist says none (honest)", idrep.allDoneNone, idrep);
+
+  // 6b-idpre. Before any analysis, the worklist must not claim full categorization.
+  var idpre = await ev("(function(){var saved=ANALYZED; ANALYZED=false; var r=uncategorizedIdReport(100); ANALYZED=saved; return r;})()");
+  check("worklist says run Analyze first before an analysis", /run Analyze first/.test(idpre) && !/every event matched/i.test(idpre), idpre);
 
   // 6c. Category is a Pareto level, and the P5000 sample rolls up correctly.
   var lvl = await ev("(function(){"
