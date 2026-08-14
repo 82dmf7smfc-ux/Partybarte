@@ -7,6 +7,25 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: estimate downtime from the messages. A new "Derive from
+  messages (pair down/up per chamber)" mode reads the chamber name from the
+  message text, then pairs a "down" message with the next "online" message for
+  that chamber. Each pair becomes an estimated downtime interval, so the same
+  attributed and wall-clock math, the Paretos, and the CSV export are reused.
+  Repeat downs while a chamber is already down are ignored, an "up" with no open
+  down is ignored, and a down that never closes is capped at the last timestamp
+  and flagged. A plain fault can optionally start downtime too.
+- Browser tool: estimated-downtime Paretos by Chamber/Module and by Fault
+  (ID + text), plus tool-level numbers. "Restricted" is any chamber offline
+  (the union) and "full tool down" is every chamber seen offline at once (the
+  intersection). Everything derived is labelled "estimated".
+- Browser tool: a paired-interval validation table (chamber, start, end,
+  duration, down message, up message) with flags for unresolved and
+  suspiciously long intervals, so the estimates can be checked by eye.
+- Browser tool: editable down/up phrase lists and a chamber-name list for the
+  derive mode, with defaults seeded near the top of the file, because vendors
+  word these messages differently. A second built-in "message-log sample"
+  button demonstrates the mode offline.
 - Browser tool: full column vocabulary for real elogs. Roles now include Date,
   Time, a combined Timestamp, Severity, Module/equipment, Message ID, and
   Description. Date and Time in separate columns are combined into one event

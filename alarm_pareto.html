@@ -113,6 +113,7 @@
     <div class="row">
       <input type="file" id="fileInput" multiple accept=".csv,.txt,.log,.tsv,.tab,text/plain">
       <button class="secondary" id="loadSample" type="button">Load built-in sample</button>
+      <button class="secondary" id="loadMsgSample" type="button">Load message-log sample</button>
     </div>
     <div id="importMsg"></div>
   </div>
@@ -151,6 +152,7 @@
         <option value="none">No downtime column (rank by count only)</option>
         <option value="duration">A duration column (each row has its own downtime)</option>
         <option value="events">Set and clear are separate rows (pair them)</option>
+        <option value="derive">Derive from messages (pair down/up per chamber)</option>
       </select>
     </div>
 
@@ -181,6 +183,39 @@
       <div class="field">
         <label style="visibility:hidden">x</label>
         <span class="hint" style="margin:0">Tag the state column as "Alarm state" in the table above.</span>
+      </div>
+    </div>
+
+    <div id="deriveOpts" style="display:none; margin-top:12px">
+      <p class="hint" style="margin:0 0 8px">
+        The tool reads the chamber name from the Description text, then pairs a "down" message with the next
+        "online" message for that chamber. Downtime is estimated, not measured. The lists below are editable
+        because vendors word these differently. One phrase or name per line. Matching ignores case and extra spaces.
+      </p>
+      <div class="row" style="align-items:flex-start">
+        <div class="field" style="flex:1 1 220px">
+          <label>Phrases that mean a chamber went down</label>
+          <textarea id="downPhrases" rows="4" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
+        </div>
+        <div class="field" style="flex:1 1 220px">
+          <label>Phrases that mean a chamber came back up</label>
+          <textarea id="upPhrases" rows="4" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
+        </div>
+        <div class="field" style="flex:1 1 220px">
+          <label>Chamber and module names to read from the text</label>
+          <textarea id="chamberNames" rows="4" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
+            <input type="checkbox" id="faultAsDown"> Let a plain FAULT for a chamber also start downtime
+          </label>
+        </div>
+        <div class="field">
+          <label>Flag a single interval longer than (hours)</label>
+          <input type="number" id="capHours" value="8" min="1" step="1" style="width:90px">
+        </div>
       </div>
     </div>
     <div id="mapMsg"></div>
@@ -240,6 +275,12 @@
       <div style="margin-top:16px" class="chartwrap">
         <table id="resultTable"></table>
       </div>
+    </div>
+
+    <div class="card" id="validationCard" style="display:none">
+      <h2>Paired intervals (estimated)</h2>
+      <p class="hint" id="validationHint">Each row is one down/up pair the tool found. Check a few against your log. Rows flagged "unresolved" never saw an "online" message and were capped at the last timestamp. Rows flagged "long" ran past the sanity cap and may be a mis-pairing.</p>
+      <div class="chartwrap"><table id="validationTable"></table></div>
     </div>
   </div>
 </main>
@@ -301,6 +342,37 @@ var KNOWN_SEVERITIES = [
 var FAULT_SEVERITIES = ["FAULT", "ERROR", "ERR", "ALARM", "CRITICAL", "FATAL"];
 var WARN_SEVERITIES = ["WARNING", "WARN"];
 
+// ---------------------------------------------------------------------------
+// Derived downtime config. Used by the "Derive from messages" mode. The tool
+// reads a chamber name from the message text, then pairs a "down" message with
+// the next "up" message for that chamber. These lists seed the editable UI
+// fields, so a user can adjust them for a different vendor's wording.
+//
+// Phrases are matched as substrings, ignoring case and extra spaces. "state
+// changed to offline" also matches "state changed to OFFLINE FOR MAINTENANCE"
+// because it is a prefix of that text. Likewise "state changed to online" also
+// matches "state changed to  ONLINE FOR PROCESS".
+// ---------------------------------------------------------------------------
+var DERIVE_DEFAULTS = {
+  downPhrases: [
+    "state changed to offline",
+    "offline for maintenance"
+  ],
+  upPhrases: [
+    "state changed to online",
+    "online for process"
+  ],
+  // Longest names are tried first so "Load Lock A" wins over a bare "Chamber".
+  chamberNames: [
+    "Load Lock A", "Load Lock B",
+    "Transfer Chamber", "Buffer Chamber",
+    "Chamber 1", "Chamber 2", "Chamber 3", "Chamber 4",
+    "Chamber 5", "Chamber 6",
+    "Chamber A", "Chamber B", "Chamber C", "Chamber D",
+    "Chamber E", "Chamber F"
+  ]
+};
+
 var LEVELS = [
   { key: "fault_code",  nice: "Fault (ID + text)" },
   { key: "equipment",   nice: "Module" },
@@ -319,6 +391,14 @@ document.getElementById("fileInput").addEventListener("change", function (e) {
 document.getElementById("loadSample").addEventListener("click", function () {
   // A small built-in sample so you can try the tool with no file.
   loadTexts([SAMPLE_CSV], 1);
+});
+
+document.getElementById("loadMsgSample").addEventListener("click", function () {
+  // A message-style elog so you can try the "Derive from messages" mode. It has
+  // no downtime column. Chambers go down and come back in the message text.
+  loadTexts([MSG_SAMPLE_CSV], 1);
+  document.getElementById("downMode").value = "derive";
+  syncDownModeUI();
 });
 
 function readFiles(files) {
@@ -767,11 +847,32 @@ function optionEl(value, text) {
   return o;
 }
 
-document.getElementById("downMode").addEventListener("change", function () {
-  var mode = this.value;
+document.getElementById("downMode").addEventListener("change", syncDownModeUI);
+
+// Show the option panel that matches the chosen downtime mode. The derive
+// panel is filled with the default phrase and name lists the first time it is
+// shown, so the user has something to edit.
+function syncDownModeUI() {
+  var mode = document.getElementById("downMode").value;
   document.getElementById("durationOpts").style.display = (mode === "duration") ? "" : "none";
   document.getElementById("eventOpts").style.display = (mode === "events") ? "" : "none";
-});
+  document.getElementById("deriveOpts").style.display = (mode === "derive") ? "" : "none";
+  if (mode === "derive") fillDeriveDefaults();
+}
+
+// Put the default lists into the derive text boxes, but only if they are empty,
+// so we never overwrite something the user typed.
+function fillDeriveDefaults() {
+  var pairs = [
+    ["downPhrases", DERIVE_DEFAULTS.downPhrases],
+    ["upPhrases", DERIVE_DEFAULTS.upPhrases],
+    ["chamberNames", DERIVE_DEFAULTS.chamberNames]
+  ];
+  pairs.forEach(function (p) {
+    var el = document.getElementById(p[0]);
+    if (el && el.value.trim() === "") el.value = p[1].join("\n");
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Date parsing. Browsers parse many formats. We add a couple of common ones
@@ -832,7 +933,59 @@ function readMapping() {
   map.durScale = +document.getElementById("durUnit").value;
   map.setVal = document.getElementById("setVal").value.trim().toUpperCase();
   map.clearVal = document.getElementById("clearVal").value.trim().toUpperCase();
+
+  // Derived downtime settings. Phrases are lower-cased and space-normalized so
+  // the match is forgiving. Chamber names keep their original case for display
+  // but are matched case-insensitively.
+  map.downPhrases = readLines("downPhrases").map(normText);
+  map.upPhrases = readLines("upPhrases").map(normText);
+  map.chamberNames = readLines("chamberNames");
+  // Try the longest names first so "Load Lock A" wins over a bare "Chamber".
+  map.chamberNames.sort(function (a, b) { return b.length - a.length; });
+  map.faultAsDown = document.getElementById("faultAsDown").checked;
+  map.capHours = Math.max(1, parseFloat(document.getElementById("capHours").value) || 8);
   return map;
+}
+
+// Read a textarea into a list of trimmed, non-empty lines.
+function readLines(id) {
+  var el = document.getElementById(id);
+  if (!el) return [];
+  return String(el.value || "").split(/\r\n|\n|\r/)
+    .map(function (s) { return s.trim(); })
+    .filter(function (s) { return s !== ""; });
+}
+
+// Lower-case and collapse runs of whitespace to a single space.
+function normText(s) {
+  return String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// Find the chamber name in a message, trying the configured names first and
+// the Module column second. Returns "" when no chamber can be identified.
+function findChamber(text, moduleVal, names) {
+  var hay = normText(text);
+  for (var i = 0; i < names.length; i++) {
+    if (hay.indexOf(normText(names[i])) !== -1) return names[i];
+  }
+  // Fall back to the Module column, but only if it matches a known name. This
+  // keeps generic modules like "Human interface" from becoming fake chambers.
+  var mod = normText(moduleVal);
+  if (mod) {
+    for (var j = 0; j < names.length; j++) {
+      if (mod === normText(names[j])) return names[j];
+    }
+  }
+  return "";
+}
+
+// Does the text contain any of the given phrases?
+function matchesAny(text, phrases) {
+  var hay = normText(text);
+  for (var i = 0; i < phrases.length; i++) {
+    if (phrases[i] && hay.indexOf(phrases[i]) !== -1) return true;
+  }
+  return false;
 }
 
 // Get the event time for one row. Uses a single Timestamp column if given, or
@@ -868,7 +1021,72 @@ function buildOccurrences(rows, map) {
     };
   }
 
-  if (map.downMode === "events") {
+  if (map.downMode === "derive") {
+    // Read the chamber from the message text, then run a small state machine per
+    // chamber. A "down" phrase opens an interval. The next "up" phrase for that
+    // chamber closes it. Repeat downs while already down are ignored. An "up"
+    // with no open down is ignored. A down that never closes is capped at the
+    // last timestamp and flagged. Each closed or capped interval becomes one
+    // occurrence, attributed to the chamber, so all the downstream math and
+    // charts are reused.
+    var timed = [];
+    rows.forEach(function (r) {
+      var t = rowTimestamp(r, map);
+      if (t) timed.push({ r: r, t: t });
+      else problems.push(1);
+    });
+    timed.sort(function (a, b) { return a.t - b.t; });
+    var maxTs = timed.length ? timed[timed.length - 1].t : null;
+
+    var openByChamber = {}; // chamber -> { start, rec, downMsg }
+
+    function pushInterval(chamber, open, end, upMsg, unresolved) {
+      var rec = open.rec;
+      rec.equipment = chamber; // attribute the downtime to the parsed chamber
+      var o = makeOcc(rec, open.start, end);
+      o.chamber = chamber;
+      o.downMsg = open.downMsg;
+      o.upMsg = unresolved ? "" : upMsg;
+      o.unresolved = !!unresolved;
+      occ.push(o);
+    }
+
+    timed.forEach(function (item) {
+      var r = item.r;
+      var text = rowDescription(r, map);
+      var moduleVal = map.equipment ? r[map.equipment] : "";
+      var chamber = findChamber(text, moduleVal, map.chamberNames);
+      if (!chamber) return; // no chamber, so not attributable downtime
+
+      var sev = map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : "";
+      var isUp = matchesAny(text, map.upPhrases);
+      var isDown = !isUp && matchesAny(text, map.downPhrases);
+      // Optional secondary trigger: a plain fault can open an interval too.
+      if (!isUp && !isDown && map.faultAsDown && FAULT_SEVERITIES.indexOf(sev) !== -1) {
+        isDown = true;
+      }
+
+      if (isUp) {
+        if (openByChamber[chamber]) {
+          pushInterval(chamber, openByChamber[chamber], item.t, text, false);
+          openByChamber[chamber] = null;
+        }
+      } else if (isDown) {
+        if (!openByChamber[chamber]) {
+          openByChamber[chamber] = { start: item.t, rec: baseRec(r), downMsg: text };
+        }
+      }
+    });
+
+    // Downs that never saw an up. Cap at the last timestamp and flag them.
+    Object.keys(openByChamber).forEach(function (ch) {
+      var open = openByChamber[ch];
+      if (!open) return;
+      var end = (maxTs && maxTs > open.start) ? maxTs : open.start;
+      pushInterval(ch, open, end, "", true);
+    });
+
+  } else if (map.downMode === "events") {
     // Pair set and clear rows. A clear matches the most recent open set that
     // shares the same equipment and fault code.
     var withTime = [];
@@ -960,6 +1178,62 @@ function mergedSeconds(intervals) {
   return total / 1000;
 }
 
+// Merge overlapping intervals and return the merged list, not just the total.
+function mergeIntervalList(intervals) {
+  var clean = intervals.filter(function (p) { return p[1] > p[0]; })
+    .map(function (p) { return [p[0], p[1]]; });
+  if (!clean.length) return [];
+  clean.sort(function (a, b) { return a[0] - b[0]; });
+  var out = [[clean[0][0], clean[0][1]]];
+  for (var i = 1; i < clean.length; i++) {
+    var last = out[out.length - 1];
+    if (clean[i][0] <= last[1]) { if (clean[i][1] > last[1]) last[1] = clean[i][1]; }
+    else out.push([clean[i][0], clean[i][1]]);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Tool-level numbers from the per-chamber intervals. "Restricted" is any
+// chamber offline (the union). "Full tool down" is every observed chamber
+// offline at the same moment (the intersection). We merge each chamber's own
+// intervals first, then sweep the boundaries counting distinct chambers down.
+// ---------------------------------------------------------------------------
+function toolLevel(occList) {
+  var byChamber = {};
+  occList.forEach(function (o) {
+    var ch = o.chamber || o.equipment;
+    if (!byChamber[ch]) byChamber[ch] = [];
+    if (o.end > o.start) byChamber[ch].push([o.start, o.end]);
+  });
+  var chambers = Object.keys(byChamber);
+  var total = chambers.length;
+
+  // Boundary events: +1 when a chamber goes down, -1 when it comes back. Each
+  // chamber is merged first so it contributes at most one unit at a time.
+  var events = [];
+  chambers.forEach(function (ch) {
+    mergeIntervalList(byChamber[ch]).forEach(function (iv) {
+      events.push([iv[0], 1]);
+      events.push([iv[1], -1]);
+    });
+  });
+  if (!events.length) return { restrictedSec: 0, fullDownSec: 0, chamberCount: total };
+  events.sort(function (a, b) { return a[0] - b[0]; });
+
+  var restricted = 0, fullDown = 0, active = 0, prev = events[0][0];
+  events.forEach(function (ev) {
+    var span = ev[0] - prev;
+    if (span > 0) {
+      if (active >= 1) restricted += span;
+      if (total > 0 && active === total) fullDown += span;
+    }
+    active += ev[1];
+    prev = ev[0];
+  });
+  return { restrictedSec: restricted / 1000, fullDownSec: fullDown / 1000, chamberCount: total };
+}
+
 // ---------------------------------------------------------------------------
 // Ranking for one grouping level. Returns rows sorted by count and by downtime,
 // each with a cumulative percent and an "Other" bucket past top N.
@@ -1042,17 +1316,26 @@ function runAnalysis() {
   if (!map.fault_code) { setMsg("mapMsg", "err", "Tag one column as Message ID."); return; }
   if (map.downMode === "duration" && !map.durCol) { setMsg("mapMsg", "err", "Tag one column as Duration, or change the downtime setting."); return; }
   if (map.downMode === "events" && !map.stateCol) { setMsg("mapMsg", "err", "Tag one column as Alarm state, or change the downtime setting."); return; }
+  if (map.downMode === "derive" && !map.descCols.length && !map.equipment) { setMsg("mapMsg", "err", "Tag a Description column so chambers can be read from the message text."); return; }
+  if (map.downMode === "derive" && (!map.downPhrases.length || !map.upPhrases.length || !map.chamberNames.length)) { setMsg("mapMsg", "err", "The derive mode needs at least one down phrase, one up phrase, and one chamber name."); return; }
   setMsg("mapMsg", "", "");
 
   var built = buildOccurrences(STATE.rows, map);
-  if (!built.occ.length) { setMsg("summaryMsg", "err", "No rows had a readable timestamp. Check the Timestamp (or Date/Time) columns."); document.getElementById("results").style.display = ""; return; }
+  if (!built.occ.length) {
+    var emptyMsg = (map.downMode === "derive")
+      ? "No down/up pairs were found. Check the phrase lists and chamber names, and the Description column."
+      : "No rows had a readable timestamp. Check the Timestamp (or Date/Time) columns.";
+    setMsg("summaryMsg", "err", emptyMsg); document.getElementById("results").style.display = ""; return;
+  }
 
   // Severity filter. Keep only the ticked levels. Skipped when no Severity
-  // column is mapped.
-  var sevSet = selectedSeverities();
+  // column is mapped, and skipped in derive mode where pairing already used all
+  // rows (the state-change messages are often a low severity like TRACE).
+  var sevSet = (map.downMode === "derive") ? null : selectedSeverities();
   var beforeCount = built.occ.length;
   var occ = built.occ;
   var sevNote = "";
+  if (map.downMode === "derive") sevNote = "Derived downtime uses all rows, so the severity filter is not applied here.";
   if (sevSet) {
     var picked = Object.keys(sevSet);
     if (!picked.length) { setMsg("summaryMsg", "err", "No severities are ticked. Choose at least one in Settings."); document.getElementById("results").style.display = ""; return; }
@@ -1074,12 +1357,36 @@ function runAnalysis() {
   var levels = {};
   LEVELS.forEach(function (lv) { levels[lv.key] = rankLevel(win.kept, lv.key, method, topN); });
 
+  // Derived mode extras: the tool-level numbers and the paired-interval list.
+  var derived = null;
+  if (map.downMode === "derive") {
+    var tl = toolLevel(win.kept);
+    var capSec = map.capHours * 3600;
+    var intervals = win.kept.map(function (o) {
+      return {
+        chamber: o.chamber || o.equipment,
+        start: o.start, end: o.end, durSec: o.durSec,
+        downMsg: o.downMsg || "", upMsg: o.upMsg || "",
+        unresolved: !!o.unresolved,
+        long: o.durSec > capSec
+      };
+    }).sort(function (a, b) { return a.start - b.start; });
+    derived = {
+      restrictedSec: tl.restrictedSec, fullDownSec: tl.fullDownSec, chamberCount: tl.chamberCount,
+      intervals: intervals,
+      unresolvedCount: intervals.filter(function (x) { return x.unresolved; }).length,
+      longCount: intervals.filter(function (x) { return x.long; }).length,
+      capHours: map.capHours
+    };
+  }
+
   STATE.lastResult = {
     map: map, method: method, windowDays: windowDays, topN: topN,
     windowStart: win.start, windowEnd: win.end,
     totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
     hasDowntime: (map.downMode !== "none"), levels: levels,
-    unparsed: built.unparsed, kept: win.kept, sevNote: sevNote
+    unparsed: built.unparsed, kept: win.kept, sevNote: sevNote,
+    isDerived: (map.downMode === "derive"), derived: derived
   };
 
   renderResults();
@@ -1099,16 +1406,32 @@ function renderResults() {
     ? "Attributed (each fault credited its full duration)"
     : "True wall clock (overlaps merged, counted once)";
 
-  document.getElementById("statCards").innerHTML =
-    stat(R.totalFaults, "Events in window (after filter)") +
-    stat(hours(R.grandAttrib), "Attributed downtime (h)") +
-    stat(hours(R.grandWall), "True wall-clock downtime (h)") +
-    stat(R.windowDays, "Window length (days)");
+  if (R.isDerived) {
+    var D = R.derived;
+    document.getElementById("statCards").innerHTML =
+      stat(R.totalFaults, "Down/up pairs in window") +
+      stat(hours(R.grandAttrib), "Est. attributed downtime (h)") +
+      stat(hours(R.grandWall), "Est. per-chamber wall clock (h)") +
+      stat(hours(D.restrictedSec), "Est. tool restricted (h, any chamber down)") +
+      stat(hours(D.fullDownSec), "Est. full tool down (h, all chambers down)") +
+      stat(R.windowDays, "Window length (days)");
+  } else {
+    document.getElementById("statCards").innerHTML =
+      stat(R.totalFaults, "Events in window (after filter)") +
+      stat(hours(R.grandAttrib), "Attributed downtime (h)") +
+      stat(hours(R.grandWall), "True wall-clock downtime (h)") +
+      stat(R.windowDays, "Window length (days)");
+  }
 
+  var derivedNote = R.isDerived
+    ? " All downtime here is <b>estimated</b> from the messages, not measured. Restricted means one or more chambers offline. Full tool down means every chamber seen was offline at once."
+    : "";
   document.getElementById("rangeFoot").innerHTML =
     "Date range: <b>" + fmt(R.windowStart) + "</b> to <b>" + fmt(R.windowEnd) + "</b>. " +
     "Downtime ranking method: <b>" + methodLabel + "</b>. " +
-    "The two downtime numbers answer different questions and are never mixed.";
+    "The two per-item downtime numbers answer different questions and are never mixed." + derivedNote;
+
+  renderValidation();
 
   // Level tabs.
   var tabs = document.getElementById("levelTabs");
@@ -1121,8 +1444,46 @@ function renderResults() {
     tabs.appendChild(b);
   });
 
-  document.getElementById("dtTitle").textContent = "Ranked by downtime (" + R.method + ")";
+  document.getElementById("dtTitle").textContent =
+    (R.isDerived ? "Ranked by estimated downtime (" : "Ranked by downtime (") + R.method + ")";
   renderLevel();
+}
+
+// Show the paired down/up intervals so they can be checked by eye. Only used in
+// derive mode. Flags mark unresolved pairs and suspiciously long ones.
+function renderValidation() {
+  var R = STATE.lastResult;
+  var card = document.getElementById("validationCard");
+  if (!R.isDerived) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  var D = R.derived;
+  document.getElementById("validationHint").innerHTML =
+    "Each row is one down/up pair. <b>" + D.intervals.length + "</b> pairs, " +
+    "<b>" + D.unresolvedCount + "</b> unresolved (never saw an online message, capped at the last timestamp), " +
+    "<b>" + D.longCount + "</b> longer than the " + D.capHours + " hour sanity cap. " +
+    "Check a few against your log. Unresolved and long rows may be mis-pairings.";
+
+  var head =
+    "<tr><th class='txt'>Chamber</th><th class='txt'>Start</th><th class='txt'>End</th>" +
+    "<th>Duration (h)</th><th class='txt'>Down message</th><th class='txt'>Up message</th><th class='txt'>Flags</th></tr>";
+  var body = D.intervals.map(function (iv) {
+    var flags = [];
+    if (iv.unresolved) flags.push("unresolved");
+    if (iv.long) flags.push("long");
+    var flagTxt = flags.length ? flags.join(", ") : "ok";
+    var rowStyle = flags.length ? " style='background:#fff5e6'" : "";
+    return "<tr" + rowStyle + ">" +
+      "<td class='txt'>" + esc(iv.chamber) + "</td>" +
+      "<td class='txt'>" + fmt(iv.start) + "</td>" +
+      "<td class='txt'>" + (iv.unresolved ? fmt(iv.end) + " (cap)" : fmt(iv.end)) + "</td>" +
+      "<td>" + hours(iv.durSec) + "</td>" +
+      "<td class='txt'>" + esc(clip(iv.downMsg, 60)) + "</td>" +
+      "<td class='txt'>" + esc(iv.upMsg ? clip(iv.upMsg, 60) : "(none)") + "</td>" +
+      "<td class='txt'>" + esc(flagTxt) + "</td>" +
+      "</tr>";
+  }).join("");
+  document.getElementById("validationTable").innerHTML = head + (body || "<tr><td class='txt' colspan='7'>No pairs.</td></tr>");
 }
 
 function renderLevel() {
@@ -1134,7 +1495,7 @@ function renderLevel() {
 
   var data = R.levels[lv.key];
   drawPareto("countChart", data.byCount, "count", "Count", lv.nice);
-  var downLabel = R.hasDowntime ? "Downtime (hours)" : "Downtime (none)";
+  var downLabel = R.hasDowntime ? (R.isDerived ? "Est. downtime (hours)" : "Downtime (hours)") : "Downtime (none)";
   drawPareto("downChart", data.byDown, data.metric, downLabel, lv.nice, R.hasDowntime);
   drawTable(data, lv);
 }
@@ -1249,6 +1610,15 @@ function exportCsv() {
   out.push(["Attributed downtime (h)", hours(R.grandAttrib)]);
   out.push(["True wall-clock downtime (h)", hours(R.grandWall)]);
   out.push(["Downtime method", R.method]);
+  if (R.isDerived) {
+    var D = R.derived;
+    out.push(["Downtime source", "Estimated from messages (derived)"]);
+    out.push(["Est. tool restricted (h, any chamber down)", hours(D.restrictedSec)]);
+    out.push(["Est. full tool down (h, all chambers down)", hours(D.fullDownSec)]);
+    out.push(["Down/up pairs", D.intervals.length]);
+    out.push(["Unresolved pairs", D.unresolvedCount]);
+    out.push(["Pairs over " + D.capHours + "h cap", D.longCount]);
+  }
   out.push([]);
 
   LEVELS.forEach(function (lv) {
@@ -1259,6 +1629,18 @@ function exportCsv() {
     });
     out.push([]);
   });
+
+  if (R.isDerived) {
+    out.push(["Paired intervals (estimated)"]);
+    out.push(["Chamber", "Start", "End", "Duration (h)", "Down message", "Up message", "Flags"]);
+    R.derived.intervals.forEach(function (iv) {
+      var flags = [];
+      if (iv.unresolved) flags.push("unresolved");
+      if (iv.long) flags.push("long");
+      out.push([iv.chamber, fmt(iv.start), fmt(iv.end), hours(iv.durSec), iv.downMsg, (iv.upMsg || "(none)"), flags.join(" ")]);
+    });
+    out.push([]);
+  }
 
   var csv = out.map(function (row) {
     return row.map(function (c) {
@@ -1321,6 +1703,26 @@ var SAMPLE_CSV =
 "2026-02-20 22:00:00,E101,Chamber over temperature,CH-C,7200\n" +
 "2026-02-21 03:00:00,E404,Vacuum pump warning,CH-C,1800\n" +
 "2026-02-21 20:00:00,E404,Vacuum pump warning,CH-A,1800\n";
+
+// A message-style elog for the "Derive from messages" mode. It has no downtime
+// column. Chambers go down and come back in the Description text, and the
+// Module column is often generic (Human interface) on the state-change rows, so
+// the chamber is read from the text. Includes an overlap (Chamber 2 and Chamber
+// 4 both down at once), an ignored repeat down, an ignored unmatched up, a
+// tool-level System control row that is not a chamber, and one chamber that
+// never comes back (unresolved).
+var MSG_SAMPLE_CSV =
+"Date,Time,Severity,Module,MsgID,Description\n" +
+"8/12/2026,10:00:00,TRACE,Human interface,1956,Chamber 2 state changed to OFFLINE FOR MAINTENANCE.\n" +
+"8/12/2026,10:30:00,PROMPT,Wafer Handler,75,The Chamber 2 is not ready to receive a wafer.\n" +
+"8/12/2026,11:00:00,TRACE,Chamber 4,448,Chamber 4 state changed to offline.\n" +
+"8/12/2026,11:15:00,FAULT,Chamber 2,782,Chamber 2 pressure behind wafer out of spec in step 3.\n" +
+"8/12/2026,11:45:00,TRACE,System control,447,System control state changed to Manual.\n" +
+"8/12/2026,12:00:00,TRACE,Human interface,1955,Chamber 2 state changed to online.\n" +
+"8/12/2026,13:00:00,TRACE,Human interface,448,Chamber 4 state changed to  ONLINE FOR PROCESS.\n" +
+"8/12/2026,13:30:00,TRACE,Human interface,1955,Chamber 4 state changed to online.\n" +
+"8/12/2026,14:00:00,TRACE,Chamber A,159,Chamber A state changed to OFFLINE FOR MAINTENANCE.\n" +
+"8/12/2026,20:00:00,TRACE,Wafer History,53,Chamber 4 process step 3 has ended and summary data was saved.\n";
 </script>
 </body>
 </html>

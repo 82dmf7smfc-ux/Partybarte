@@ -26,6 +26,11 @@ keep good ideas so they are not lost between sessions.
 
 ## Medium term
 
+- **Mirror derived downtime in the Python tool.** The browser tool can now
+  estimate downtime by pairing down and up messages per chamber. The Python tool
+  should grow the same mode, sharing the phrase and chamber-name lists, so both
+  tools agree. Cover it with unit tests for the state machine and the tool-level
+  restricted and full-down numbers.
 - **More vendor config blocks.** Add real column mappings as new tools come
   online. This is a JSON edit, not code.
 - **Browser export to Excel.** Let the browser tool write a simple `.xlsx`
