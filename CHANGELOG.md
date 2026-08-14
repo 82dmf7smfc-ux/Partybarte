@@ -6,6 +6,8 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-14
+
 ### Added
 - Browser tool: estimate downtime from the messages. A new "Derive from
   messages (pair down/up per chamber)" mode reads the chamber name from the
