@@ -7,6 +7,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: message categories. Templated messages that differ only by a
+  chamber tag or a number are grouped under one category, so a new "Category"
+  Pareto reads cleanly. Built-in rules cover the common P5000 messages, and you
+  can add your own rules ("pattern => Label", one per line) which are saved in
+  the browser and run first. A message that matches no rule is grouped by its
+  normalized shape and listed under the CAT-UNMATCHED debug code, so it is easy
+  to see what rule to add next.
 - Browser tool: reads P5000 Etch elogs. A new format layer detects the file, skips
   the text preamble, finds the "Date Time Event Number Event Type Description"
   header, and reads records whose columns are separated by runs of spaces. The

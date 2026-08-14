@@ -143,6 +143,38 @@ async function main() {
   eq("full flow: top fault", flow.topFault, "494");
   eq("full flow: top module", flow.topModule, "S4EXT");
 
+  // 6b. Message categorization.
+  var cat = await ev("(function(){"
+    + "var a=AP.categorize('chamber <S4EXT> ... has reached the pm trigger time');"
+    + "var b=AP.categorize('chamber <S4EXT> chamber minimum gas flow error');"
+    + "var c=AP.categorize('some brand new message 12345 <Z9>');"
+    + "var rules=AP.parseCatRules(['pm trigger => Custom PM']);"
+    + "var d=AP.categorize('has reached the pm trigger time', rules);"
+    + "var bad=[]; AP.resetDebug(); AP.parseCatRules(['(unclosed => Oops']); var codes=AP.getDebug().order.slice();"
+    + "return {pm:a, gas:b, novel:c, override:d, norm:AP.normCategory('Chamber <S4EXT> step <L2> at 12:00'), badRuleCode:codes.indexOf('CAT-BADRULE')>=0};"
+    + "})()");
+  check("categorize built-in PM", cat.pm.matched === true && cat.pm.category === "PM trigger reached", cat.pm);
+  check("categorize built-in gas flow", cat.gas.matched === true && cat.gas.category === "Gas flow error", cat.gas);
+  check("categorize unmatched falls back", cat.novel.matched === false && cat.novel.category.indexOf("#") >= 0, cat.novel);
+  check("categorize user rule wins", cat.override.matched === true && cat.override.category === "Custom PM", cat.override);
+  check("normCategory collapses tags and numbers", cat.norm === "chamber <*> step <*> at #:#", cat.norm);
+  check("parseCatRules bad regex -> CAT-BADRULE", cat.badRuleCode === true, cat);
+
+  // 6c. Category is a Pareto level, and the P5000 sample rolls up correctly.
+  var lvl = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';runAnalysis();"
+    + "var R=STATE.lastResult;"
+    + "var hasCat=!!R.levels.category;"
+    + "var top=hasCat?R.levels.category.byCount[0]:null;"
+    + "var tabs=Array.prototype.map.call(document.querySelectorAll('#levelTabs button'),function(b){return b.textContent;});"
+    + "return {hasCat:hasCat, topKey:top?top.key:null, topCount:top?top.count:null, tabs:tabs};"
+    + "})()");
+  check("Category is a level", lvl.hasCat, lvl);
+  check("Category tab present", lvl.tabs.indexOf("Category") >= 0, lvl.tabs);
+  check("Category top is PM trigger reached", lvl.topKey === "PM trigger reached", lvl);
+  eq("Category top count (5 PM warnings kept)", lvl.topCount, 5);
+
   // 7. Regression: the delimited path still works.
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([SAMPLE_CSV],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: built-in CSV rows", reg.rows, 15);
