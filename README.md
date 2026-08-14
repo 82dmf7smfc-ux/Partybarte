@@ -34,8 +34,7 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 1. Click "Choose Files" and pick one or more elog files from the same tool.
    CSV and delimited text files work. So do P5000 Etch elogs, which have a text
    preamble and columns separated by spaces. The Format drop-down is set to "Auto
-   detect", or you can force CSV or P5000. Or click "Load built-in sample" to try
-   it.
+   detect", or you can force CSV or P5000.
 2. Point the tool at your data. Set "First data row" to the line where the data
    begins, so any preamble lines above it are skipped. The tool reads from that
    row down until the first blank line. Older rows outside the window are dropped
@@ -77,17 +76,22 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    chamber's share and mean gap. A burst on any one day is flagged.
 7. Read the summary and the Pareto charts. The fault chart labels each bar with
    the message ID and its most common text, for example
-   "810 - Chamber 2 unable to start recipe". Switch grouping level with the tabs
-   (Fault, Category, Module, Message text). Use the "Chart" picker to switch
-   between the Pareto, horizontal bars (better for long labels), and a heatmap of
-   events by hour of day and weekday, with an optional log scale. Download a CSV
-   summary, or use "Print / Save as PDF" to make a report.
+   "810 - Chamber 2 unable to start recipe". The Pareto opens on the Category
+   level; switch grouping with the tabs (Fault, Category, Module, Message text).
+   The Category table has a "Matched by" column that says how each category was
+   decided (a built-in rule, your rule, or the auto label from the message shape).
+   Use the "Chart" picker to switch between the Pareto, horizontal bars (better
+   for long labels), and a heatmap of events by hour of day and weekday, with an
+   optional log scale. Download a CSV summary, or use "Print / Save as PDF".
    - The "Category" level groups messages that differ only by a chamber tag or a
      number, so repeated template messages fall under one name. Built-in rules
      cover the common cases. Add your own under "Message categories" in step 2, as
      `pattern => Label`, one per line. Your rules are saved in the browser and run
      first. Anything left uncategorized shows up in the debug log so you can see
      what rule to add.
+   - When a row has no chamber tag, the tool reads a name from the message text
+     using the editable "Subsystem / module names" list in step 2, so tool-level
+     events land on a real module instead of "(unknown)".
 
 If many messages fall outside your category rules, the "Unknown events" panel
 after the analysis ranks the most common uncategorized message shapes and the

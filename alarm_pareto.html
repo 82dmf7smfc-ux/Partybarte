@@ -120,8 +120,6 @@
           <option value="p5000">P5000 Etch</option>
         </select>
       </div>
-      <button class="secondary" id="loadSample" type="button">Load built-in sample</button>
-      <button class="secondary" id="loadMsgSample" type="button">Load message-log sample</button>
     </div>
     <div id="importMsg"></div>
     <div style="margin-top:12px" class="noprint">
@@ -248,6 +246,12 @@
       <label>Message categories (optional)</label>
       <p class="hint" style="margin:2px 0 6px">Group similar messages under one name for the Category Pareto. Built-in rules run automatically. Add your own here, one per line, as <code>pattern =&gt; Label</code>. The pattern is a regular expression, matched without case, and your rules run first. Saved in this browser.</p>
       <textarea id="catRules" rows="3" placeholder="gas flow error =&gt; Gas flow error" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
+    </div>
+
+    <div style="margin-top:14px">
+      <label>Subsystem / module names (optional)</label>
+      <p class="hint" style="margin:2px 0 6px">When a row has no chamber tag, the tool looks for one of these names in the message text and uses it as the Module. One name per line, matched without case. Helps events like "front panel" or "wafer handler" land on a module. Saved in this browser.</p>
+      <textarea id="moduleNames" rows="3" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
     </div>
 
     <div id="mapMsg"></div>
@@ -409,7 +413,7 @@ var STATE = {
   columns: [],       // [{key, label, samples:[...]}] detected in the current parse
   rows: [],          // array of objects, one per data row, keyed by column key
   lastResult: null,  // the most recent analysis, used by the CSV export
-  activeLevel: "fault_code"
+  activeLevel: "category"
 };
 
 // The standard identities a column can be tagged with. "other" lets the user
@@ -491,6 +495,14 @@ var LEVELS = [
   { key: "description", nice: "Message text" }
 ];
 
+// Default subsystem/module names read from the message text when a row has no
+// chamber tag. Seeds the editable field, so a user can adjust them for a tool.
+var MODULE_DEFAULTS = [
+  "Wafer Handler", "Load Lock A", "Load Lock B", "Load Lock",
+  "Transfer Chamber", "Buffer Chamber", "System Control", "Human Interface",
+  "Front Panel", "Storage Elevator", "Wafer History", "Robot", "Loadport"
+];
+
 // ---------------------------------------------------------------------------
 // Message categories. Templated messages repeat with small changes, like a
 // chamber tag or a number, so a plain message Pareto is noisy. We collapse
@@ -506,34 +518,47 @@ var BUILTIN_CAT_RULES = [
   { re: /calibration is not done/i,                   label: "Calibration not done" },
   { re: /invalid rfu.*power|invalid.*power or mode/i, label: "Invalid RF power or mode" },
   { re: /wafer not sensed/i,                          label: "Wafer not sensed" },
-  { re: /completed pumpdown/i,                        label: "Pumpdown complete" }
+  { re: /completed pumpdown/i,                        label: "Pumpdown complete" },
+  { re: /log wafer count|total number\s*=/i,          label: "Wafer count logged" },
+  { re: /front panel .*func|func_append\+dquote/i,    label: "Front panel key event" },
+  { re: /system reboot time down/i,                   label: "System reboot" },
+  { re: /ready to process wafers/i,                   label: "Ready to process" },
+  { re: /out of spec/i,                               label: "Parameter out of spec" }
 ];
 
 // Collapse the varying parts of a message so similar lines group together.
-// Angle-bracket tags become <*> and runs of digits become #.
+// Bracket tags and numbers are dropped, punctuation and case are ignored, and
+// the P5000 boilerplate and the leading "chamber"/"port" word are removed. So
+// two lines that differ only by a chamber tag or a value land on the same shape.
 function normCategory(desc) {
   return String(desc == null ? "" : desc)
     .toLowerCase()
-    .replace(/<[^>]*>/g, "<*>")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\bchamber\s+abcd\s+optset\b/g, " ")
+    .replace(/\bchamber\s+name\s+table\b/g, " ")
     .replace(/\d+/g, "#")
+    .replace(/[^a-z0-9#\s]/g, " ")
     .replace(/\s+/g, " ")
+    .replace(/^\s*(chamber|port)\s+/, "")
     .trim();
 }
 
-// Return the category for one message. User rules are tried first, then the
-// built-in rules. "matched" is false when nothing matched, so the caller can
-// record it. The fallback category is the normalized shape of the message.
+// Return the category for one message, and say how it was decided. User rules
+// are tried first, then the built-in rules. When nothing matches, the category
+// is a readable label from the message shape (not the raw shape), and "matched"
+// is false so the caller can record it.
 function categorize(desc, userRules) {
   var text = String(desc == null ? "" : desc);
   var rules = userRules || [];
   for (var i = 0; i < rules.length; i++) {
-    if (rules[i].re.test(text)) return { category: rules[i].label, matched: true };
+    if (rules[i].re.test(text)) return { category: rules[i].label, matched: true, source: "your rule: " + rules[i].re.source };
   }
   for (var j = 0; j < BUILTIN_CAT_RULES.length; j++) {
-    if (BUILTIN_CAT_RULES[j].re.test(text)) return { category: BUILTIN_CAT_RULES[j].label, matched: true };
+    if (BUILTIN_CAT_RULES[j].re.test(text)) return { category: BUILTIN_CAT_RULES[j].label, matched: true, source: "built-in: " + BUILTIN_CAT_RULES[j].label };
   }
-  var norm = normCategory(text);
-  return { category: norm || "(blank)", matched: false };
+  // No rule matched. Use a readable label from the leading words of the shape.
+  var auto = suggestRule(text).label;
+  return { category: auto || "(blank)", matched: false, source: "auto: message shape" };
 }
 
 // Turn user rule lines ("pattern => Label") into {re, label}. A bad regex is
@@ -561,6 +586,40 @@ function parseCatRules(lines) {
 var UNKNOWN = { catList: [], chamberList: [] };
 function resetUnknown() { UNKNOWN = { catList: [], chamberList: [] }; }
 
+// Category metrics for one analysis: how many were categorized, by which rule,
+// and which rules never fired. Filled in baseRec, read by the debug report.
+var CATSTATS = { matched: 0, unmatched: 0, ruleHits: {}, cats: {} };
+function resetCatStats() { CATSTATS = { matched: 0, unmatched: 0, ruleHits: {}, cats: {} }; }
+function noteCatStat(cat) {
+  if (cat.matched) { CATSTATS.matched += 1; CATSTATS.ruleHits[cat.source] = (CATSTATS.ruleHits[cat.source] || 0) + 1; }
+  else CATSTATS.unmatched += 1;
+  CATSTATS.cats[cat.category] = true;
+}
+
+// Build the "Category metrics" lines for the debug report. Shows coverage, the
+// distinct category count, per-rule hit counts, and any rules that never fired.
+function categoryMetricsLines(map) {
+  var total = CATSTATS.matched + CATSTATS.unmatched;
+  if (!total) return [];
+  var out = [];
+  out.push("");
+  out.push("Category metrics:");
+  var pc = Math.round(CATSTATS.matched / total * 100);
+  out.push("  categorized " + CATSTATS.matched + " of " + total + " (" + pc + "%), uncategorized " + CATSTATS.unmatched);
+  out.push("  distinct categories: " + Object.keys(CATSTATS.cats).length);
+  var hitKeys = Object.keys(CATSTATS.ruleHits).sort(function (a, b) { return CATSTATS.ruleHits[b] - CATSTATS.ruleHits[a]; });
+  if (hitKeys.length) {
+    out.push("  rule hits:");
+    hitKeys.forEach(function (k) { out.push("    " + CATSTATS.ruleHits[k] + "x  " + k); });
+  }
+  // Rules that never matched, so dead rules are easy to spot and prune.
+  var dead = [];
+  BUILTIN_CAT_RULES.forEach(function (r) { if (!CATSTATS.ruleHits["built-in: " + r.label]) dead.push("built-in: " + r.label); });
+  (map && map.catRules ? map.catRules : []).forEach(function (r) { if (!CATSTATS.ruleHits["your rule: " + r.re.source]) dead.push("your rule: " + r.re.source); });
+  if (dead.length) { out.push("  rules that never matched:"); dead.forEach(function (d) { out.push("    " + d); }); }
+  return out;
+}
+
 // Group a list of messages by their normalized shape. Returns the top rows,
 // most common first, each with a count, a percent, and one example. Pure.
 function rollupByShape(list, topN) {
@@ -578,14 +637,14 @@ function rollupByShape(list, topN) {
   return topN ? arr.slice(0, topN) : arr;
 }
 
-// Suggest a category rule from one example message. The pattern is the leading
-// run of words before the first placeholder or number, which is a safe literal.
-// The label is that text with the first letter capitalized.
+// Suggest a category rule from one example message. The pattern is the first
+// few words of the normalized shape (tags, numbers, and the chamber prefix
+// removed), which is a safe case-insensitive literal. The label is that text
+// with the first letter capitalized.
 function suggestRule(example) {
-  var head = String(example == null ? "" : example).split(/<[^>]*>|\d/)[0];
-  var words = head.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 6);
+  var words = normCategory(example).split(" ").filter(function (w) { return w && w !== "#"; }).slice(0, 5);
   var pattern = words.join(" ").trim();
-  if (!pattern) pattern = String(example || "").toLowerCase().slice(0, 30).trim();
+  if (!pattern) pattern = String(example || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim().slice(0, 30);
   var label = pattern.charAt(0).toUpperCase() + pattern.slice(1);
   return { pattern: pattern, label: label };
 }
@@ -650,7 +709,7 @@ function debugReport(verbose) {
   out.push("Generated: " + fmt(new Date()));
   out.push("Files: " + STATE.fileCount + ", rows: " + STATE.rows.length);
   out.push("");
-  if (!DEBUG.order.length) { out.push("No debug codes recorded."); return out.join("\n"); }
+  if (!DEBUG.order.length) out.push("No debug codes recorded.");
   var cap = verbose ? 25 : 5;
   DEBUG.order.forEach(function (code) {
     var e = DEBUG.codes[code];
@@ -660,6 +719,9 @@ function debugReport(verbose) {
     e.samples.slice(0, cap).forEach(function (s) { out.push("    - " + s); });
     if (e.samples.length > cap) out.push("    ... " + (e.count - cap) + " more");
   });
+
+  // Category metrics: coverage and per-rule hits from the last analysis.
+  categoryMetricsLines(STATE.lastResult ? STATE.lastResult.map : null).forEach(function (l) { out.push(l); });
 
   if (verbose) {
     var catRoll = rollupByShape(UNKNOWN.catList, 20);
@@ -716,19 +778,6 @@ document.getElementById("fileInput").addEventListener("change", function (e) {
   var files = Array.from(e.target.files || []);
   if (!files.length) return;
   readFiles(files);
-});
-
-document.getElementById("loadSample").addEventListener("click", function () {
-  // A small built-in sample so you can try the tool with no file.
-  loadTexts([SAMPLE_CSV], 1);
-});
-
-document.getElementById("loadMsgSample").addEventListener("click", function () {
-  // A message-style elog so you can try the "Derive from messages" mode. It has
-  // no downtime column. Chambers go down and come back in the message text.
-  loadTexts([MSG_SAMPLE_CSV], 1);
-  document.getElementById("downMode").value = "derive";
-  syncDownModeUI();
 });
 
 function readFiles(files) {
@@ -1392,7 +1441,11 @@ function refreshFilters() {
     STATE.rows.forEach(function (r) {
       var v = String(r[map.equipment] || "(blank)");
       // Match the relabel in baseRec so the filter and the occurrences agree.
-      if (map.systemBucket && v === "(unknown)") v = "System";
+      if (v === "(unknown)") {
+        var sub = (map.moduleNames && map.moduleNames.length) ? findChamber(rowDescription(r, map), "", map.moduleNames) : "";
+        if (sub) v = sub;
+        else if (map.systemBucket) v = "System";
+      }
       chamberCounts[v] = (chamberCounts[v] || 0) + 1;
     });
   }
@@ -1434,14 +1487,24 @@ function optionEl(value, text) {
 
 document.getElementById("downMode").addEventListener("change", syncDownModeUI);
 
-// Remember the user's category rules in this browser, so they survive a reload.
+// Remember the user's editable lists in this browser, so they survive a reload.
+// The module names seed with defaults the first time.
 (function () {
-  var ta = document.getElementById("catRules");
-  if (!ta) return;
-  try { var saved = localStorage.getItem("ap_cat_rules"); if (saved != null) ta.value = saved; } catch (e) {}
-  ta.addEventListener("input", function () {
-    try { localStorage.setItem("ap_cat_rules", ta.value); } catch (e) {}
-    if (STATE.rows.length) refreshFilters();
+  var pairs = [
+    { id: "catRules", key: "ap_cat_rules", seed: null },
+    { id: "moduleNames", key: "ap_module_names", seed: MODULE_DEFAULTS.join("\n") }
+  ];
+  pairs.forEach(function (p) {
+    var ta = document.getElementById(p.id);
+    if (!ta) return;
+    var saved = null;
+    try { saved = localStorage.getItem(p.key); } catch (e) {}
+    if (saved != null) ta.value = saved;
+    else if (p.seed != null) ta.value = p.seed;
+    ta.addEventListener("input", function () {
+      try { localStorage.setItem(p.key, ta.value); } catch (e) {}
+      if (STATE.rows.length) refreshFilters();
+    });
   });
 })();
 
@@ -1562,6 +1625,11 @@ function readMapping() {
   map.catRules = parseCatRules(readLines("catRules"));
   var sysBox = document.getElementById("systemBucket");
   map.systemBucket = sysBox ? sysBox.checked : false;
+
+  // Subsystem/module names read from the message text, used when a row has no
+  // chamber tag. Longest first so "Load Lock A" wins over a bare "Load Lock".
+  map.moduleNames = readLines("moduleNames");
+  map.moduleNames.sort(function (a, b) { return b.length - a.length; });
   return map;
 }
 
@@ -1633,18 +1701,26 @@ function buildOccurrences(rows, map) {
   function baseRec(r) {
     var desc = rowDescription(r, map);
     var cat = categorize(desc, map.catRules);
+    noteCatStat(cat);
     if (!cat.matched && desc && desc !== "(blank)") { dbg("CAT-UNMATCHED", desc); UNKNOWN.catList.push(desc); }
     var eq = map.equipment ? (r[map.equipment] || "(blank)") : "(blank)";
     if (eq === "(unknown)") {
-      if (desc && desc !== "(blank)") UNKNOWN.chamberList.push(desc);
-      if (map.systemBucket) eq = "System"; // group tag-less tool/system events
+      // Try to read a subsystem name from the message text before giving up.
+      var sub = (map.moduleNames && map.moduleNames.length) ? findChamber(desc, "", map.moduleNames) : "";
+      if (sub) {
+        eq = sub;
+      } else {
+        if (desc && desc !== "(blank)") UNKNOWN.chamberList.push(desc);
+        if (map.systemBucket) eq = "System"; // group tag-less tool/system events
+      }
     }
     return {
       fault_code: map.fault_code ? (r[map.fault_code] || "(blank)") : "(blank)",
       description: desc,
       equipment: eq,
       severity: map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : "",
-      category: cat.category
+      category: cat.category,
+      catSource: cat.source || ""
     };
   }
 
@@ -1772,6 +1848,7 @@ function makeOcc(rec, start, end, durSec) {
     equipment: rec.equipment,
     severity: rec.severity,
     category: rec.category,
+    catSource: rec.catSource || "",
     start: start,
     end: (end && end > start) ? end : start,
     durSec: durSec
@@ -2026,6 +2103,7 @@ function runAnalysis() {
   // Drop analysis codes from a previous run so they do not double count.
   clearCodes(["TS-BADDATE", "CAT-UNMATCHED", "CAT-BADRULE", "FLT-BADREGEX"]);
   resetUnknown();
+  resetCatStats();
   var built = buildOccurrences(STATE.rows, map);
   if (!built.occ.length) {
     var emptyMsg = (map.downMode === "derive")
@@ -2103,7 +2181,8 @@ function runAnalysis() {
     hasDowntime: (map.downMode !== "none"), levels: levels,
     unparsed: built.unparsed, kept: win.kept, sevNote: sevNote, filterNote: filterNote,
     isDerived: (map.downMode === "derive"), derived: derived,
-    stats: analyzeStats(win.kept, win.start, win.end)
+    stats: analyzeStats(win.kept, win.start, win.end),
+    catSources: catSourcesFrom(win.kept)
   };
 
   renderResults();
@@ -2327,6 +2406,7 @@ function renderLevel() {
   });
 
   var data = R.levels[lv.key];
+  var sources = (lv.key === "category") ? R.catSources : null;
   var type = document.getElementById("chartType").value;
   var log = document.getElementById("logScale").checked;
   var countTitle = document.getElementById("countTitle");
@@ -2344,10 +2424,17 @@ function renderLevel() {
     countTitle.textContent = "Ranked by occurrence count";
     dtTitle.textContent = dtText;
     var draw = (type === "hbar") ? drawHBars : drawPareto;
-    draw("countChart", data.byCount, "count", "Count", lv.nice, true, log);
-    draw("downChart", data.byDown, data.metric, downLabel, lv.nice, R.hasDowntime, log);
+    draw("countChart", data.byCount, "count", "Count", lv.nice, true, log, sources);
+    draw("downChart", data.byDown, data.metric, downLabel, lv.nice, R.hasDowntime, log, sources);
   }
-  drawTable(data, lv);
+  drawTable(data, lv, sources);
+}
+
+// The "matched by" source per category, shown only on the Category level.
+function catSourcesFrom(occ) {
+  var m = {};
+  occ.forEach(function (o) { if (m[o.category] === undefined) m[o.category] = o.catSource || ""; });
+  return m;
 }
 
 document.getElementById("chartType").addEventListener("change", function () {
@@ -2361,7 +2448,7 @@ document.getElementById("logScale").addEventListener("change", function () {
 // SVG Pareto chart. Bars, a cumulative percent line on the right, and a dashed
 // 80 percent guide line.
 // ---------------------------------------------------------------------------
-function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueIsHours, logScale) {
+function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueIsHours, logScale, sources) {
   var W = 520, H = 360;
   var padL = 52, padR = 46, padT = 20, padB = 96;
   var plotW = W - padL - padR, plotH = H - padT - padB;
@@ -2404,7 +2491,8 @@ function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueI
     var x = padL + step * i + (step - bw) / 2;
     var y = padT + plotH - h;
     var lab = String(r.label || r.key);
-    svg.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(lab) + ": " + fmtNum(v) + '</title></rect>');
+    var srcT = (sources && sources[r.key]) ? " | " + sources[r.key] : "";
+    svg.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(lab) + ": " + fmtNum(v) + esc(srcT) + '</title></rect>');
     // x labels, rotated.
     var lx = padL + step * i + step / 2;
     svg.push('<text x="' + lx.toFixed(1) + '" y="' + (padT + plotH + 12) + '" font-size="9" fill="#1b1f24" transform="rotate(45 ' + lx.toFixed(1) + ' ' + (padT + plotH + 12) + ')">' + esc(clip(lab, 22)) + '</text>');
@@ -2432,7 +2520,7 @@ function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueI
 
 // Horizontal bar chart of the same ranked rows. Labels sit to the left at full
 // width, which reads better than rotated labels when they are long.
-function drawHBars(containerId, rows, valueField, valueLabel, levelNice, valueIsHours, logScale) {
+function drawHBars(containerId, rows, valueField, valueLabel, levelNice, valueIsHours, logScale, sources) {
   var rowH = 22, padL = 150, padR = 40, padT = 24, padB = 10;
   var n = rows.length;
   var W = 520, plotW = W - padL - padR;
@@ -2452,9 +2540,10 @@ function drawHBars(containerId, rows, valueField, valueLabel, levelNice, valueIs
     var w = (sv(v) / maxScaled) * plotW;
     var y = padT + i * rowH;
     var lab = String(r.label || r.key);
+    var srcT = (sources && sources[r.key]) ? " | " + sources[r.key] : "";
     svg.push('<text x="' + (padL - 6) + '" y="' + (y + rowH / 2 + 3) + '" font-size="10" text-anchor="end" fill="#1b1f24">' + esc(clip(lab, 26)) + '</text>');
     svg.push('<rect x="' + padL + '" y="' + (y + 3) + '" width="' + Math.max(0, w).toFixed(1) + '" height="' + (rowH - 6) +
-      '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(lab) + ": " + fmtNum(v) + '</title></rect>');
+      '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(lab) + ": " + fmtNum(v) + esc(srcT) + '</title></rect>');
     svg.push('<text x="' + (padL + Math.max(0, w) + 4) + '" y="' + (y + rowH / 2 + 3) + '" font-size="10" fill="#5b6570">' + fmtNum(v) + '</text>');
   });
   svg.push('</svg>');
@@ -2504,18 +2593,22 @@ function drawHeatmap(containerId, occ) {
   document.getElementById(containerId).innerHTML = svg.join("");
 }
 
-function drawTable(data, lv) {
-  var R = STATE.lastResult;
+function drawTable(data, lv, sources) {
   var rows = data.byCount; // one row per group; we show both measures side by side
-  // Build a lookup of downtime rank order for context.
+  var showSource = !!sources; // the Category level passes a source per category
   var head =
     "<tr><th>#</th><th class='txt'>" + esc(lv.nice) + "</th>" +
+    (showSource ? "<th class='txt'>Matched by</th>" : "") +
     "<th>Count</th><th>Count %</th><th>Cum %</th>" +
     "<th>Attributed (h)</th><th>Wall clock (h)</th></tr>";
   var body = rows.map(function (r) {
+    var srcCell = showSource
+      ? "<td class='txt' style='color:#5b6570;font-size:12px'>" + esc(r.key === "Other" ? "" : (sources[r.key] || "")) + "</td>"
+      : "";
     return "<tr>" +
       "<td>" + r.rank + "</td>" +
       "<td class='txt'>" + esc(String(r.label || r.key)) + "</td>" +
+      srcCell +
       "<td>" + r.count + "</td>" +
       "<td>" + r.pct.toFixed(1) + "</td>" +
       "<td>" + r.cum.toFixed(1) + "</td>" +
@@ -2618,46 +2711,6 @@ function setMsg(id, cls, text) {
   if (!text) { el.innerHTML = ""; return; }
   el.innerHTML = '<div class="msg ' + cls + '">' + esc(text) + '</div>';
 }
-
-// Built-in sample. Same rows as the desktop tool's test file, including one
-// overlapping alarm pair and one row outside the 30 day window.
-var SAMPLE_CSV =
-"EventTime,AlarmID,AlarmText,ChamberID,DownSeconds\n" +
-"2026-01-05 10:00:00,E101,Chamber over temperature,CH-A,3600\n" +
-"2026-02-10 10:00:00,E101,Chamber over temperature,CH-A,14400\n" +
-"2026-02-10 12:00:00,E101,Chamber over temperature,CH-A,10800\n" +
-"2026-02-11 06:00:00,E202,Gas flow deviation,CH-B,1800\n" +
-"2026-02-12 08:00:00,E101,Chamber over temperature,CH-B,3600\n" +
-"2026-02-13 11:00:00,E303,RF power fault,CH-C,7200\n" +
-"2026-02-14 13:00:00,E202,Gas flow deviation,CH-B,1800\n" +
-"2026-02-15 09:00:00,E101,Chamber over temperature,CH-A,3600\n" +
-"2026-02-16 11:00:00,E303,RF power fault,CH-A,3600\n" +
-"2026-02-17 11:00:00,E303,RF power fault,CH-B,3600\n" +
-"2026-02-18 15:00:00,E202,Gas flow deviation,CH-C,3600\n" +
-"2026-02-19 15:00:00,E202,Gas flow deviation,CH-A,1800\n" +
-"2026-02-20 22:00:00,E101,Chamber over temperature,CH-C,7200\n" +
-"2026-02-21 03:00:00,E404,Vacuum pump warning,CH-C,1800\n" +
-"2026-02-21 20:00:00,E404,Vacuum pump warning,CH-A,1800\n";
-
-// A message-style elog for the "Derive from messages" mode. It has no downtime
-// column. Chambers go down and come back in the Description text, and the
-// Module column is often generic (Human interface) on the state-change rows, so
-// the chamber is read from the text. Includes an overlap (Chamber 2 and Chamber
-// 4 both down at once), an ignored repeat down, an ignored unmatched up, a
-// tool-level System control row that is not a chamber, and one chamber that
-// never comes back (unresolved).
-var MSG_SAMPLE_CSV =
-"Date,Time,Severity,Module,MsgID,Description\n" +
-"8/12/2026,10:00:00,TRACE,Human interface,1956,Chamber 2 state changed to OFFLINE FOR MAINTENANCE.\n" +
-"8/12/2026,10:30:00,PROMPT,Wafer Handler,75,The Chamber 2 is not ready to receive a wafer.\n" +
-"8/12/2026,11:00:00,TRACE,Chamber 4,448,Chamber 4 state changed to offline.\n" +
-"8/12/2026,11:15:00,FAULT,Chamber 2,782,Chamber 2 pressure behind wafer out of spec in step 3.\n" +
-"8/12/2026,11:45:00,TRACE,System control,447,System control state changed to Manual.\n" +
-"8/12/2026,12:00:00,TRACE,Human interface,1955,Chamber 2 state changed to online.\n" +
-"8/12/2026,13:00:00,TRACE,Human interface,448,Chamber 4 state changed to  ONLINE FOR PROCESS.\n" +
-"8/12/2026,13:30:00,TRACE,Human interface,1955,Chamber 4 state changed to online.\n" +
-"8/12/2026,14:00:00,TRACE,Chamber A,159,Chamber A state changed to OFFLINE FOR MAINTENANCE.\n" +
-"8/12/2026,20:00:00,TRACE,Wafer History,53,Chamber 4 process step 3 has ended and summary data was saved.\n";
 
 // ---------------------------------------------------------------------------
 // Pure data layer. These functions take data in and give data out, with no
