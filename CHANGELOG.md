@@ -7,10 +7,15 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: a "First data row" setting. The tool now starts reading at the
+  chosen row, skipping any preamble, and reads down until the first blank line.
+  The trailing-window date filter then drops older rows.
+- Browser tool: column labelling that works with no header row. Each column gets
+  a preview and a drop-down to say what it holds (Timestamp, Fault code,
+  Description, Equipment, Duration, Alarm state, Ignore, or a typed "Other").
+  Headerless files show columns as "Column 1", "Column 2", and so on.
 - Manual dispatch trigger for the release workflow, so a release can be cut from
   the Actions tab when a tag cannot be pushed directly.
-
-### Added
 - Proprietary `LICENSE` (all rights reserved). The license is now included in
   both zip packages.
 
