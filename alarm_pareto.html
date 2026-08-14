@@ -122,24 +122,6 @@
       </div>
     </div>
     <div id="importMsg"></div>
-    <div style="margin-top:12px" class="noprint">
-      <button class="secondary" id="debugToggle" type="button" style="display:none">Show debug log</button>
-    </div>
-  </div>
-
-  <div class="card noprint" id="debugCard" style="display:none; background:#fbfbfc">
-    <div class="row" style="justify-content:space-between; align-items:center">
-      <h2 style="margin:0">Debug log</h2>
-      <div style="display:flex;align-items:center;gap:12px">
-        <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
-          <input type="checkbox" id="debugVerbose"> Verbose
-        </label>
-        <button class="secondary" id="debugCopyIds" type="button">Copy uncategorized IDs</button>
-        <button class="secondary" id="debugCopy" type="button">Copy debug report</button>
-      </div>
-    </div>
-    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Verbose adds more samples, the uncategorized event IDs, and the unknown-event shapes. "Copy uncategorized IDs" grabs just the ID worklist. Nothing here leaves your computer.</p>
-    <pre id="debugPre" style="white-space:pre-wrap; font-size:12px; max-height:340px; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; margin:0"></pre>
   </div>
 
   <div class="card" id="mapCard" style="display:none">
@@ -399,6 +381,28 @@
       <p class="hint" id="validationHint">Each row is one down/up pair the tool found. Check a few against your log. Rows flagged "unresolved" never saw an "online" message and were capped at the last timestamp. Rows flagged "long" ran past the sanity cap and may be a mis-pairing.</p>
       <div class="chartwrap"><table id="validationTable"></table></div>
     </div>
+  </div>
+
+  <div id="debugSection" class="noprint" style="display:none; margin-top:8px">
+    <div class="row" style="align-items:center; gap:12px">
+      <button class="secondary" id="debugToggle" type="button">Show debug log</button>
+      <span class="hint" style="margin:0">Run Analyze first, then open this. The category metrics and the uncategorized event ID worklist are only built during analysis, so open the debug log after you Analyze.</span>
+    </div>
+  </div>
+
+  <div class="card noprint" id="debugCard" style="display:none; background:#fbfbfc">
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <h2 style="margin:0">Debug log</h2>
+      <div style="display:flex;align-items:center;gap:12px">
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
+          <input type="checkbox" id="debugVerbose"> Verbose
+        </label>
+        <button class="secondary" id="debugCopyIds" type="button">Copy uncategorized IDs</button>
+        <button class="secondary" id="debugCopy" type="button">Copy debug report</button>
+      </div>
+    </div>
+    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Verbose adds more samples, the uncategorized event IDs, and the unknown-event shapes. "Copy uncategorized IDs" grabs just the ID worklist. Run Analyze first so the worklist and category metrics are filled in. Nothing here leaves your computer.</p>
+    <pre id="debugPre" style="white-space:pre-wrap; font-size:12px; max-height:340px; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; margin:0"></pre>
   </div>
 </main>
 
@@ -884,8 +888,8 @@ function paintDebug(verbose) {
 }
 
 function showDebugButton() {
+  document.getElementById("debugSection").style.display = "";
   var b = document.getElementById("debugToggle");
-  b.style.display = "";
   b.textContent = "Show debug log (" + DEBUG.order.length + " codes)";
   var card = document.getElementById("debugCard");
   if (card.style.display !== "none") paintDebug(debugVerboseOn());

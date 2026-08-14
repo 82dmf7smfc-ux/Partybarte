@@ -524,6 +524,20 @@ async function main() {
   eq("debug box compact height when not verbose", dbgBox.compact, "340px");
   eq("verbose debug box auto-expands", dbgBox.expanded, "none");
 
+  // 6p. The debug button lives at the bottom, after the results section, and is
+  // revealed once there is data. A note tells the user to Analyze first.
+  var dbgPos = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);runAnalysis();"
+    + "var sec=document.getElementById('debugSection');"
+    + "var results=document.getElementById('results');"
+    + "var afterResults=(results.compareDocumentPosition(sec) & Node.DOCUMENT_POSITION_FOLLOWING)!==0;"
+    + "var note=sec.textContent;"
+    + "return {shown:sec.style.display!=='none', afterResults:afterResults, hasNote:/Analyze first/i.test(note)};"
+    + "})()");
+  check("debug section is revealed after import/analyze", dbgPos.shown, dbgPos);
+  check("debug section sits after the results section", dbgPos.afterResults, dbgPos);
+  check("debug section note says Analyze first", dbgPos.hasNote, dbgPos);
+
   // 7. Regression: the delimited path still works (uses the CSV fixture).
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: delimited fixture rows", reg.rows, 4);
