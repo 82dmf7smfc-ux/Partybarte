@@ -112,9 +112,10 @@ events can be grouped under one "System" name with the option in Settings.
 If a file does not read the way you expect, press "Show debug log". It lists
 short codes for how each file was parsed, such as the detected format, skipped
 rows, rejoined lines, 2-digit years, and missing chamber tags. Turn on "Verbose"
-for more example lines, the uncategorized event IDs (top 100 by count, each with
-its severity, distinct-shape count, and an example message), and the ranked
-unknown-event shapes. Use "Copy debug report" to copy the codes, or "Copy
+for more example lines, the uncategorized event IDs (top 100 by count), and the
+ranked unknown-event shapes. An ID with a single message shape is one line; an ID
+that carries several distinct messages is split into one line per sub-message, so
+each can get its own rule. Use "Copy debug report" to copy the codes, or "Copy
 uncategorized IDs" to copy just the ID worklist so you can turn it into category
 rules. Nothing there leaves your computer.
 

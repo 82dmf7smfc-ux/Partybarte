@@ -673,44 +673,73 @@ function rollupByShape(list, topN) {
   return topN ? arr.slice(0, topN) : arr;
 }
 
+// Pick the most common raw text from a {text -> count} map.
+function mostCommonText(texts) {
+  var ex = "", best = -1;
+  Object.keys(texts).forEach(function (t) { if (texts[t] > best) { best = texts[t]; ex = t; } });
+  return ex;
+}
+
 // Group uncategorized events by their Event Number (ID). For each ID returns the
-// count, a representative severity, the most common message as the example, and
-// how many distinct message shapes that ID carries. A shape count of 1 means the
-// ID is a clean 1:1 that is safe to map by number; a high count means its text
-// varies, so a text rule fits better. Most common first. Pure.
+// count, a representative severity, how many distinct message shapes that ID
+// carries, and a shapeList breaking the ID down into its sub-messages (each a
+// distinct shape, with its own count and example, most common first). A shape
+// count of 1 is a clean 1:1 ID (map it by number); a higher count means the ID
+// carries several distinct messages, so it is split per sub-message. Pure.
 function rollupById(list, topN) {
   var groups = {};
   list.forEach(function (o) {
     var id = String(o && o.id != null ? o.id : "").trim() || "(blank)";
-    var g = groups[id] || (groups[id] = { id: id, count: 0, shapes: {}, texts: {}, sev: (o && o.sev) || "" });
+    var g = groups[id] || (groups[id] = { id: id, count: 0, shapes: {}, sev: (o && o.sev) || "" });
     g.count += 1;
     var d = String((o && o.desc) || "");
-    g.texts[d] = (g.texts[d] || 0) + 1;
-    g.shapes[normCategory(d)] = true;
+    var sk = normCategory(d);
+    var sh = g.shapes[sk] || (g.shapes[sk] = { shape: sk, count: 0, texts: {}, sev: (o && o.sev) || "" });
+    sh.count += 1;
+    sh.texts[d] = (sh.texts[d] || 0) + 1;
+    if (!sh.sev && o && o.sev) sh.sev = o.sev;
     if (!g.sev && o && o.sev) g.sev = o.sev;
   });
   var arr = Object.keys(groups).map(function (id) {
     var g = groups[id];
-    var ex = "", best = -1;
-    Object.keys(g.texts).forEach(function (t) { if (g.texts[t] > best) { best = g.texts[t]; ex = t; } });
-    return { id: g.id, count: g.count, severity: g.sev, shapes: Object.keys(g.shapes).length, example: ex };
+    var shapeList = Object.keys(g.shapes).map(function (k) {
+      var sh = g.shapes[k];
+      return { shape: sh.shape, count: sh.count, severity: sh.sev, example: mostCommonText(sh.texts) };
+    }).sort(function (a, b) { return b.count - a.count || (a.example < b.example ? -1 : 1); });
+    return {
+      id: g.id, count: g.count, severity: g.sev,
+      shapes: shapeList.length,
+      example: shapeList.length ? shapeList[0].example : "",
+      shapeList: shapeList
+    };
   }).sort(function (a, b) { return b.count - a.count || (a.id < b.id ? -1 : 1); });
   return topN ? arr.slice(0, topN) : arr;
 }
 
-// Build the copy-friendly "uncategorized event IDs" worklist. One line per ID,
-// most common first: ID, count, severity, distinct-shape count, example message.
-// This is the loop the user feeds back so new category rules can be written.
+// Build the copy-friendly "uncategorized event IDs" worklist, most common first.
+// A single-shape ID is one line (ID, count, severity, example). An ID that
+// carries several distinct messages is split: a header line, then one indented
+// line per sub-message (count and example) so each can get its own rule. This is
+// the loop the user feeds back so new category rules can be written.
 function uncategorizedIdReport(topN) {
   var cap = topN || 100;
-  var rows = rollupById(UNKNOWN.idList, cap);
+  var all = rollupById(UNKNOWN.idList);
+  var rows = all.slice(0, cap);
   var out = [];
-  out.push("Uncategorized event IDs (top " + rows.length + " of " + rollupById(UNKNOWN.idList).length + " distinct, by count):");
+  out.push("Uncategorized event IDs (top " + rows.length + " of " + all.length + " distinct, by count):");
   if (!rows.length) { out.push("  none - every event matched a category rule."); return out.join("\n"); }
+  var SHAPE_CAP = 8;
   rows.forEach(function (r) {
     var sev = r.severity ? ("[" + r.severity + "] ") : "";
-    var shapes = r.shapes + (r.shapes === 1 ? " shape" : " shapes");
-    out.push("  " + r.id + "  x" + r.count + "  " + sev + shapes + "  " + clip(r.example, 140));
+    if (r.shapes <= 1) {
+      out.push("  " + r.id + "  x" + r.count + "  " + sev + "1 shape  " + clip(r.example, 140));
+      return;
+    }
+    out.push("  " + r.id + "  x" + r.count + "  " + sev + r.shapes + " shapes, split per sub-message:");
+    r.shapeList.slice(0, SHAPE_CAP).forEach(function (s) {
+      out.push("      x" + s.count + "  " + clip(s.example, 140));
+    });
+    if (r.shapeList.length > SHAPE_CAP) out.push("      ... " + (r.shapeList.length - SHAPE_CAP) + " more sub-messages");
   });
   return out.join("\n");
 }

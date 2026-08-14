@@ -217,19 +217,25 @@ async function main() {
     + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S1> of lot <S3>'},"
     + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S2> of lot <S4>'},"      // same shape, diff numbers
     + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S5> of lot <S6>'},"      // still same shape
+    + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S7> of lot <S8>'},"      // 4 total, clear top
     + "{id:'570',sev:'PROMPT',desc:'port <S1EXT> wafer not sensed by vacuum'},"
     + "{id:'050',sev:'TRACE',desc:'front panel func_char a depressed'},"
+    + "{id:'050',sev:'TRACE',desc:'front panel func_char a depressed'},"                    // repeat: this sub-message wins
     + "{id:'050',sev:'TRACE',desc:'front panel totally different free text here now'}"     // two distinct shapes
     + "];"
     + "var roll=AP.rollupById(list);"
     + "var top=roll[0];"
     + "var fp=roll.filter(function(r){return r.id==='050';})[0];"
-    + "return {topId:top.id, topCount:top.count, topShapes:top.shapes, fpShapes:fp.shapes, n:roll.length};"
+    + "return {topId:top.id, topCount:top.count, topShapes:top.shapes, topListLen:top.shapeList.length, fpShapes:fp.shapes, fpListLen:fp.shapeList.length, fpTopCount:fp.shapeList[0].count, fpTopEx:fp.shapeList[0].example, n:roll.length};"
     + "})()");
   eq("rollupById ranks most common ID first", idroll.topId, "901");
-  eq("rollupById counts occurrences", idroll.topCount, 3);
+  eq("rollupById counts occurrences", idroll.topCount, 4);
   eq("rollupById collapses same-shape variants to 1 shape", idroll.topShapes, 1);
+  eq("rollupById single-shape ID has one shapeList entry", idroll.topListLen, 1);
   eq("rollupById counts distinct shapes for mixed ID", idroll.fpShapes, 2);
+  eq("rollupById mixed ID shapeList has both sub-messages", idroll.fpListLen, 2);
+  eq("rollupById shapeList sorts most common sub-message first", idroll.fpTopEx, "front panel func_char a depressed");
+  eq("rollupById shapeList counts the top sub-message", idroll.fpTopCount, 2);
   eq("rollupById distinct IDs", idroll.n, 3);
 
   // 6b-idreport. Full-page: after an analysis, the worklist lists uncategorized IDs
@@ -247,14 +253,22 @@ async function main() {
     + "var before=uncategorizedIdReport(100);"
     + "var had611=/\\n\\s*611\\s+x2\\s/.test(before);"
     + "var had622=/\\n\\s*622\\s+x1\\s/.test(before);"
+    + "var split611=/611\\s+x2\\s+\\[FAULT\\]\\s+2 shapes, split per sub-message:/.test(before);"
+    + "var alphaSub=/\\n\\s+x1\\s+chamber <S4EXT> zzz brand new widget alpha jam/.test(before);"
+    + "var betaSub=/\\n\\s+x1\\s+chamber <S4EXT> zzz brand new widget beta jam/.test(before);"
+    + "var single622=/622\\s+x1\\s+\\[FAULT\\]\\s+1 shape\\s+totally novel gizmo/.test(before);"
     + "document.getElementById('catRules').value='id:611 => Widget jam';"
     + "runAnalysis();"
     + "var after=uncategorizedIdReport(100);"
-    + "return {had611:had611, had622:had622, still611:/\\n\\s*611\\s+x/.test(after), still622:/\\n\\s*622\\s+x/.test(after), headerHasTop:/Uncategorized event IDs \\(top/.test(before)};"
+    + "return {had611:had611, had622:had622, split611:split611, alphaSub:alphaSub, betaSub:betaSub, single622:single622, still611:/\\n\\s*611\\s+x/.test(after), still622:/\\n\\s*622\\s+x/.test(after), headerHasTop:/Uncategorized event IDs \\(top/.test(before)};"
     + "})()");
   check("worklist header present", idrep.headerHasTop, idrep);
   check("worklist lists uncategorized ID 611 with count", idrep.had611, idrep);
   check("worklist lists uncategorized ID 622 with count", idrep.had622, idrep);
+  check("multi-shape ID 611 is split per sub-message", idrep.split611, idrep);
+  check("worklist shows the alpha sub-message", idrep.alphaSub, idrep);
+  check("worklist shows the beta sub-message", idrep.betaSub, idrep);
+  check("single-shape ID 622 stays one line", idrep.single622, idrep);
   check("id: rule removes ID 611 from the worklist", idrep.still611 === false, idrep);
   check("unrelated ID 622 stays on the worklist", idrep.still622 === true, idrep);
 
