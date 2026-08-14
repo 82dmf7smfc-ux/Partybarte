@@ -7,6 +7,15 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: smarter categorization via the debug loop. The verbose debug log
+  now lists the uncategorized event IDs (top 100 by count), each with its count,
+  severity, how many distinct message shapes it carries, and an example message. A
+  "Copy uncategorized IDs" button grabs just that worklist. Paste it back and the
+  next batch of still-uncategorized IDs surfaces automatically as rules are added.
+- Browser tool: category rules can now match on the Event Number, not just the
+  message text. Add a line like `id:494,807 => Label` under "Message categories".
+  Because the Event Number is stable while the text varies by chamber and values,
+  an ID rule is more reliable for events whose wording changes. ID rules run first.
 - Browser tool: P5000 elogs are tagged with the tool they came from. The tool
   name is read from the backup path in the preamble (for example
   `E:\Backups\etch4\Data\ELOG.DAT` reads as "etch4"), and a name that starts with

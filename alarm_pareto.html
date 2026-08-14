@@ -134,10 +134,11 @@
         <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
           <input type="checkbox" id="debugVerbose"> Verbose
         </label>
+        <button class="secondary" id="debugCopyIds" type="button">Copy uncategorized IDs</button>
         <button class="secondary" id="debugCopy" type="button">Copy debug report</button>
       </div>
     </div>
-    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Verbose adds more samples and the unknown-event shapes. Nothing here leaves your computer.</p>
+    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Verbose adds more samples, the uncategorized event IDs, and the unknown-event shapes. "Copy uncategorized IDs" grabs just the ID worklist. Nothing here leaves your computer.</p>
     <pre id="debugPre" style="white-space:pre-wrap; font-size:12px; max-height:340px; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; margin:0"></pre>
   </div>
 
@@ -244,8 +245,8 @@
 
     <div style="margin-top:14px">
       <label>Message categories (optional)</label>
-      <p class="hint" style="margin:2px 0 6px">Group similar messages under one name for the Category Pareto. Built-in rules run automatically. Add your own here, one per line, as <code>pattern =&gt; Label</code>. The pattern is a regular expression, matched without case, and your rules run first. Saved in this browser.</p>
-      <textarea id="catRules" rows="3" placeholder="gas flow error =&gt; Gas flow error" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
+      <p class="hint" style="margin:2px 0 6px">Group similar messages under one name for the Category Pareto. Built-in rules run automatically. Add your own here, one per line, as <code>pattern =&gt; Label</code> (a case-insensitive regular expression on the message text) or <code>id:494,495 =&gt; Label</code> (an exact match on the Event Number, which is more reliable when a message&#39;s text varies). Your rules run first. Saved in this browser.</p>
+      <textarea id="catRules" rows="3" placeholder="gas flow error =&gt; Gas flow error&#10;id:807 =&gt; Gas flow error" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;width:100%"></textarea>
     </div>
 
     <div style="margin-top:14px">
@@ -561,11 +562,22 @@ function normCategory(desc) {
 // are tried first, then the built-in rules. When nothing matches, the category
 // is a readable label from the message shape (not the raw shape), and "matched"
 // is false so the caller can record it.
-function categorize(desc, userRules) {
+// A stable, human-readable source string per user rule, so rule-hit counts and
+// dead-rule detection line up. ID rules key on their id list, text on the regex.
+function ruleSource(rule) {
+  return rule.ids ? ("your ID rule: " + Object.keys(rule.ids).join(",")) : ("your rule: " + rule.re.source);
+}
+
+function categorize(desc, userRules, id) {
   var text = String(desc == null ? "" : desc);
   var rules = userRules || [];
+  var idStr = (id == null) ? "" : String(id).trim();
+  // User rules run first, in the order typed. An ID rule matches the Event
+  // Number, which is stable, so it is more reliable than a text pattern.
   for (var i = 0; i < rules.length; i++) {
-    if (rules[i].re.test(text)) return { category: rules[i].label, matched: true, source: "your rule: " + rules[i].re.source };
+    var r = rules[i];
+    var hit = r.ids ? (idStr !== "" && r.ids[idStr]) : r.re.test(text);
+    if (hit) return { category: r.label, matched: true, source: ruleSource(r) };
   }
   for (var j = 0; j < BUILTIN_CAT_RULES.length; j++) {
     if (BUILTIN_CAT_RULES[j].re.test(text)) return { category: BUILTIN_CAT_RULES[j].label, matched: true, source: "built-in: " + BUILTIN_CAT_RULES[j].label };
@@ -575,8 +587,10 @@ function categorize(desc, userRules) {
   return { category: auto || "(blank)", matched: false, source: "auto: message shape" };
 }
 
-// Turn user rule lines ("pattern => Label") into {re, label}. A bad regex is
-// skipped and recorded, so one typo does not stop the analysis.
+// Turn user rule lines into rule objects. Two forms are accepted:
+//   pattern => Label        a case-insensitive regex on the message text
+//   id:494,495 => Label     an exact match on the Event Number (one or a list)
+// A bad regex is skipped and recorded, so one typo does not stop the analysis.
 function parseCatRules(lines) {
   var rules = [];
   lines.forEach(function (ln) {
@@ -585,6 +599,14 @@ function parseCatRules(lines) {
     var pat = ln.slice(0, idx).trim();
     var label = ln.slice(idx + 2).trim();
     if (!pat || !label) return;
+    var idm = /^id\s*:\s*(.+)$/i.exec(pat);
+    if (idm) {
+      var ids = {};
+      idm[1].split(/[\s,]+/).forEach(function (v) { v = v.trim(); if (v) ids[v] = true; });
+      if (Object.keys(ids).length) rules.push({ ids: ids, label: label });
+      else dbg("CAT-BADRULE", "rule: " + ln);
+      return;
+    }
     try { rules.push({ re: new RegExp(pat, "i"), label: label }); }
     catch (e) { dbg("CAT-BADRULE", "rule: " + ln); }
   });
@@ -597,8 +619,8 @@ function parseCatRules(lines) {
 // normalized shape so the biggest unknown groups float to the top. This turns a
 // large count into a short worklist of rules to add.
 // ---------------------------------------------------------------------------
-var UNKNOWN = { catList: [], chamberList: [] };
-function resetUnknown() { UNKNOWN = { catList: [], chamberList: [] }; }
+var UNKNOWN = { catList: [], chamberList: [], idList: [] };
+function resetUnknown() { UNKNOWN = { catList: [], chamberList: [], idList: [] }; }
 
 // Category metrics for one analysis: how many were categorized, by which rule,
 // and which rules never fired. Filled in baseRec, read by the debug report.
@@ -629,7 +651,7 @@ function categoryMetricsLines(map) {
   // Rules that never matched, so dead rules are easy to spot and prune.
   var dead = [];
   BUILTIN_CAT_RULES.forEach(function (r) { if (!CATSTATS.ruleHits["built-in: " + r.label]) dead.push("built-in: " + r.label); });
-  (map && map.catRules ? map.catRules : []).forEach(function (r) { if (!CATSTATS.ruleHits["your rule: " + r.re.source]) dead.push("your rule: " + r.re.source); });
+  (map && map.catRules ? map.catRules : []).forEach(function (r) { var k = ruleSource(r); if (!CATSTATS.ruleHits[k]) dead.push(k); });
   if (dead.length) { out.push("  rules that never matched:"); dead.forEach(function (d) { out.push("    " + d); }); }
   return out;
 }
@@ -649,6 +671,48 @@ function rollupByShape(list, topN) {
     return { shape: g.shape, count: g.count, pct: g.count / total * 100, example: g.example };
   }).sort(function (a, b) { return b.count - a.count; });
   return topN ? arr.slice(0, topN) : arr;
+}
+
+// Group uncategorized events by their Event Number (ID). For each ID returns the
+// count, a representative severity, the most common message as the example, and
+// how many distinct message shapes that ID carries. A shape count of 1 means the
+// ID is a clean 1:1 that is safe to map by number; a high count means its text
+// varies, so a text rule fits better. Most common first. Pure.
+function rollupById(list, topN) {
+  var groups = {};
+  list.forEach(function (o) {
+    var id = String(o && o.id != null ? o.id : "").trim() || "(blank)";
+    var g = groups[id] || (groups[id] = { id: id, count: 0, shapes: {}, texts: {}, sev: (o && o.sev) || "" });
+    g.count += 1;
+    var d = String((o && o.desc) || "");
+    g.texts[d] = (g.texts[d] || 0) + 1;
+    g.shapes[normCategory(d)] = true;
+    if (!g.sev && o && o.sev) g.sev = o.sev;
+  });
+  var arr = Object.keys(groups).map(function (id) {
+    var g = groups[id];
+    var ex = "", best = -1;
+    Object.keys(g.texts).forEach(function (t) { if (g.texts[t] > best) { best = g.texts[t]; ex = t; } });
+    return { id: g.id, count: g.count, severity: g.sev, shapes: Object.keys(g.shapes).length, example: ex };
+  }).sort(function (a, b) { return b.count - a.count || (a.id < b.id ? -1 : 1); });
+  return topN ? arr.slice(0, topN) : arr;
+}
+
+// Build the copy-friendly "uncategorized event IDs" worklist. One line per ID,
+// most common first: ID, count, severity, distinct-shape count, example message.
+// This is the loop the user feeds back so new category rules can be written.
+function uncategorizedIdReport(topN) {
+  var cap = topN || 100;
+  var rows = rollupById(UNKNOWN.idList, cap);
+  var out = [];
+  out.push("Uncategorized event IDs (top " + rows.length + " of " + rollupById(UNKNOWN.idList).length + " distinct, by count):");
+  if (!rows.length) { out.push("  none - every event matched a category rule."); return out.join("\n"); }
+  rows.forEach(function (r) {
+    var sev = r.severity ? ("[" + r.severity + "] ") : "";
+    var shapes = r.shapes + (r.shapes === 1 ? " shape" : " shapes");
+    out.push("  " + r.id + "  x" + r.count + "  " + sev + shapes + "  " + clip(r.example, 140));
+  });
+  return out.join("\n");
 }
 
 // Suggest a category rule from one example message. The pattern is the first
@@ -738,6 +802,10 @@ function debugReport(verbose) {
   categoryMetricsLines(STATE.lastResult ? STATE.lastResult.map : null).forEach(function (l) { out.push(l); });
 
   if (verbose) {
+    if (UNKNOWN.idList.length) {
+      out.push("");
+      out.push(uncategorizedIdReport(100));
+    }
     var catRoll = rollupByShape(UNKNOWN.catList, 20);
     var chRoll = rollupByShape(UNKNOWN.chamberList, 20);
     if (catRoll.length) {
@@ -937,6 +1005,22 @@ document.getElementById("debugCopy").addEventListener("click", function () {
   function done() {
     self.textContent = "Copied";
     setTimeout(function () { self.textContent = "Copy debug report"; }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
+  } else {
+    fallbackCopy(txt); done();
+  }
+});
+
+// Copy just the uncategorized event ID worklist, so it can be pasted back to
+// grow the category rules without the rest of the report.
+document.getElementById("debugCopyIds").addEventListener("click", function () {
+  var txt = uncategorizedIdReport(100);
+  var self = this;
+  function done() {
+    self.textContent = "Copied";
+    setTimeout(function () { self.textContent = "Copy uncategorized IDs"; }, 1500);
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
@@ -1502,7 +1586,8 @@ function refreshFilters() {
   var categoryCounts = {};
   if (map.descCols.length) {
     STATE.rows.forEach(function (r) {
-      var cat = categorize(rowDescription(r, map), map.catRules).category;
+      var cid = map.fault_code ? String(r[map.fault_code] || "").trim() : "";
+      var cat = categorize(rowDescription(r, map), map.catRules, cid).category;
       categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
     });
   }
@@ -1758,9 +1843,15 @@ function buildOccurrences(rows, map) {
 
   function baseRec(r) {
     var desc = rowDescription(r, map);
-    var cat = categorize(desc, map.catRules);
+    var idVal = map.fault_code ? String(r[map.fault_code] || "").trim() : "";
+    var sev = map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : "";
+    var cat = categorize(desc, map.catRules, idVal);
     noteCatStat(cat);
-    if (!cat.matched && desc && desc !== "(blank)") { dbg("CAT-UNMATCHED", desc); UNKNOWN.catList.push(desc); }
+    if (!cat.matched && desc && desc !== "(blank)") {
+      dbg("CAT-UNMATCHED", desc);
+      UNKNOWN.catList.push(desc);
+      UNKNOWN.idList.push({ id: idVal || "(blank)", sev: sev, desc: desc });
+    }
     var eq = map.equipment ? (r[map.equipment] || "(blank)") : "(blank)";
     if (eq === "(unknown)") {
       // Try to read a subsystem name from the message text before giving up.
@@ -1777,7 +1868,7 @@ function buildOccurrences(rows, map) {
       description: desc,
       equipment: eq,
       tool: map.tool ? (String(r[map.tool] || "").trim() || "(unknown)") : "(unknown)",
-      severity: map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : "",
+      severity: sev,
       category: cat.category,
       catSource: cat.source || ""
     };
@@ -2806,6 +2897,7 @@ window.AP = {
   normCategory: normCategory,
   parseCatRules: parseCatRules,
   rollupByShape: rollupByShape,
+  rollupById: rollupById,
   suggestRule: suggestRule,
   // Filtering.
   applyFilters: applyFilters,
