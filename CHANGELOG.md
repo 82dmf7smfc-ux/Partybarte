@@ -7,6 +7,9 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: the debug log grows to fit the whole report when "Verbose" is on,
+  with no inner scroll bar, so a single screenshot or scroll captures everything.
+  Without Verbose it stays a compact scroll pane.
 - Browser tool: the Pareto now opens on the Category level, and the Category
   table shows a "Matched by" column, so you can see how each category was decided
   (a built-in rule, your rule, or the auto label from the message shape). The

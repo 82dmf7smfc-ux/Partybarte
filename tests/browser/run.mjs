@@ -367,6 +367,20 @@ async function main() {
   check("system bucket: tag-less events labeled System", sysb.hasSystem, sysb);
   check("system bucket: no (unknown) left", sysb.noUnknown, sysb);
 
+  // 6o. Verbose debug box auto-expands so a screenshot captures the whole report.
+  var dbgBox = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);runAnalysis();"
+    + "document.getElementById('debugVerbose').checked=false;"
+    + "var card=document.getElementById('debugCard');"
+    + "if(card.style.display==='none') document.getElementById('debugToggle').click();"
+    + "var compact=document.getElementById('debugPre').style.maxHeight;"
+    + "document.getElementById('debugVerbose').checked=true;document.getElementById('debugVerbose').dispatchEvent(new Event('change'));"
+    + "var expanded=document.getElementById('debugPre').style.maxHeight;"
+    + "return {compact:compact, expanded:expanded};"
+    + "})()");
+  eq("debug box compact height when not verbose", dbgBox.compact, "340px");
+  eq("verbose debug box auto-expands", dbgBox.expanded, "none");
+
   // 7. Regression: the delimited path still works (uses the CSV fixture).
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: delimited fixture rows", reg.rows, 4);
