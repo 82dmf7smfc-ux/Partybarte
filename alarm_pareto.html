@@ -622,6 +622,11 @@ function parseCatRules(lines) {
 var UNKNOWN = { catList: [], chamberList: [], idList: [] };
 function resetUnknown() { UNKNOWN = { catList: [], chamberList: [], idList: [] }; }
 
+// True once an analysis has categorized the rows. The uncategorized-ID worklist
+// is only meaningful after that, so before it we say "run Analyze first" instead
+// of the misleading "every event matched a category rule".
+var ANALYZED = false;
+
 // Category metrics for one analysis: how many were categorized, by which rule,
 // and which rules never fired. Filled in baseRec, read by the debug report.
 var CATSTATS = { matched: 0, unmatched: 0, ruleHits: {}, cats: {} };
@@ -726,8 +731,20 @@ function uncategorizedIdReport(topN) {
   var all = rollupById(UNKNOWN.idList);
   var rows = all.slice(0, cap);
   var out = [];
+  // The worklist is built during Analyze. Before that it is empty, which is not
+  // the same as "all categorized", so say so plainly.
+  if (!ANALYZED) {
+    out.push("Uncategorized event IDs: run Analyze first, then press this again.");
+    out.push("  (The worklist is built when the rows are categorized during analysis.)");
+    return out.join("\n");
+  }
   out.push("Uncategorized event IDs (top " + rows.length + " of " + all.length + " distinct, by count):");
-  if (!rows.length) { out.push("  none - every event matched a category rule."); return out.join("\n"); }
+  if (!rows.length) {
+    out.push("  none. Every event matched a real category rule (a built-in rule, one of");
+    out.push("  your text rules, or an id: rule). A message that only gets an auto-generated");
+    out.push("  label from its text still counts as uncategorized and would be listed here.");
+    return out.join("\n");
+  }
   var SHAPE_CAP = 8;
   rows.forEach(function (r) {
     var sev = r.severity ? ("[" + r.severity + "] ") : "";
@@ -831,7 +848,7 @@ function debugReport(verbose) {
   categoryMetricsLines(STATE.lastResult ? STATE.lastResult.map : null).forEach(function (l) { out.push(l); });
 
   if (verbose) {
-    if (UNKNOWN.idList.length) {
+    if (ANALYZED) {
       out.push("");
       out.push(uncategorizedIdReport(100));
     }
@@ -946,6 +963,10 @@ function fmtName(f) { return f === "p5000" ? "P5000 Etch" : f === "delimited" ? 
 function reparse() {
   if (!STATE.texts.length) return;
   resetDebug();
+  // New parse. The old worklist no longer matches the data on screen.
+  ANALYZED = false;
+  resetUnknown();
+  resetCatStats();
 
   var startRow = Math.max(1, parseInt(document.getElementById("startRow").value, 10) || 1);
   var hasHeader = document.getElementById("hasHeader").checked;
@@ -2365,6 +2386,7 @@ function runAnalysis() {
     catSources: catSourcesFrom(win.kept)
   };
 
+  ANALYZED = true;
   renderResults();
   // Analysis may have added codes (bad timestamps). Refresh the debug button.
   showDebugButton();

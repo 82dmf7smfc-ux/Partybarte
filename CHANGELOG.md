@@ -6,6 +6,15 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+- Browser tool: the uncategorized event-ID worklist no longer claims "every event
+  matched a category rule" before an analysis has run. The worklist is built during
+  Analyze, so until then "Copy uncategorized IDs" (and the verbose report) now say
+  "run Analyze first". After an analysis, an empty worklist reads "none. Every event
+  matched a real category rule", and it spells out that a message which only gets an
+  auto-generated label from its text still counts as uncategorized and is listed. So
+  "categorized" always means a real rule matched, never a placeholder.
+
 ### Added
 - Browser tool: smarter categorization via the debug loop. The verbose debug log
   now lists the uncategorized event IDs (top 100 by count), each with its count,
