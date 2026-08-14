@@ -256,6 +256,37 @@ async function main() {
     + "})()");
   check("min-count: small group folded to Other", mc.keys.indexOf("B") === -1 && mc.keys.indexOf("Other") >= 0, mc.keys);
 
+  // 6i. Charts: heatmapBins bins by weekday and hour.
+  var hb = await ev("(function(){"
+    + "var occ=[{start:new Date(2026,0,1,9,0,0)},{start:new Date(2026,0,1,9,30,0)},{start:new Date(2026,0,2,14,0,0)}];"  // Jan 1 2026 = Thursday (getDay 4)
+    + "var b=AP.heatmapBins(occ);"
+    + "return {total:b.total,max:b.max,thu9:b.matrix[4][9],fri14:b.matrix[5][14],empty:b.matrix[0][0],rows:b.matrix.length,cols:b.matrix[0].length};"
+    + "})()");
+  eq("heatmap: total", hb.total, 3);
+  eq("heatmap: max cell", hb.max, 2);
+  eq("heatmap: Thu 09:00 has 2", hb.thu9, 2);
+  eq("heatmap: Fri 14:00 has 1", hb.fri14, 1);
+  eq("heatmap: empty cell 0", hb.empty, 0);
+  check("heatmap: 7x24 grid", hb.rows === 7 && hb.cols === 24, hb);
+
+  // 6j. Chart-type switch renders each chart on the P5000 sample.
+  var ch = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';runAnalysis();"
+    + "function bars(){return document.querySelectorAll('#countChart svg rect').length;}"
+    + "document.getElementById('chartType').value='pareto';renderLevel();var pareto=document.querySelectorAll('#countChart svg polyline').length;"
+    + "document.getElementById('chartType').value='hbar';renderLevel();var hbar=bars();"
+    + "document.getElementById('logScale').checked=true;renderLevel();var hbarLog=bars();"
+    + "document.getElementById('chartType').value='heatmap';document.getElementById('logScale').checked=false;renderLevel();"
+    + "var cells=document.querySelectorAll('#countChart svg rect').length;var downEmpty=document.getElementById('downChart').innerHTML==='';"
+    + "return {paretoLine:pareto,hbar:hbar,hbarLog:hbarLog,heatCells:cells,downEmpty:downEmpty};"
+    + "})()");
+  check("chart: pareto has cumulative line", ch.paretoLine >= 1, ch);
+  check("chart: horizontal bars render", ch.hbar >= 1, ch);
+  check("chart: log scale still renders bars", ch.hbarLog >= 1, ch);
+  check("chart: heatmap renders 168 cells", ch.heatCells === 168, ch);
+  check("chart: heatmap clears downtime panel", ch.downEmpty, ch);
+
   // 7. Regression: the delimited path still works.
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([SAMPLE_CSV],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: built-in CSV rows", reg.rows, 15);
