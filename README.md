@@ -67,8 +67,10 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 5. If you mapped a Severity column, choose which severities to include. Use the
    preset buttons "Faults only", "Warnings only", or "Faults + warnings", or tick
    the levels by hand. The default is faults and warnings, so routine trace and
-   prompt lines are left out. Set the window length and the top-N cutoff. Click
-   "Analyze".
+   prompt lines are left out. You can also narrow the events further: tick which
+   chambers and categories to include, set a From/To date range, search the
+   message text (plain, or a /regex/), and hide groups smaller than a chosen size.
+   Set the window length and the top-N cutoff. Click "Analyze".
 6. Read the Insights card for the numbers behind the charts: events per day, the
    busiest day and hour, the mean gap between events, how concentrated the events
    are (how many groups make up 80 percent), and a per-chamber breakdown with each

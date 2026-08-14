@@ -251,6 +251,30 @@
   <div class="card" id="controlsCard" style="display:none">
     <h2>3. Settings</h2>
     <div id="sevFilter" style="display:none; margin-bottom:12px"></div>
+
+    <div id="moreFilters" style="display:none; margin-bottom:12px">
+      <div class="row">
+        <div class="field" style="flex:2 1 260px">
+          <label>Search message text (plain, or /regex/)</label>
+          <input type="text" id="fSearch" placeholder="e.g. pm trigger   or   /gas.*flow/" style="width:100%">
+        </div>
+        <div class="field">
+          <label>From date (optional)</label>
+          <input type="text" id="fFrom" placeholder="YYYY-MM-DD" style="width:130px">
+        </div>
+        <div class="field">
+          <label>To date (optional)</label>
+          <input type="text" id="fTo" placeholder="YYYY-MM-DD" style="width:130px">
+        </div>
+        <div class="field">
+          <label>Hide groups smaller than</label>
+          <input type="number" id="fMinCount" value="1" min="1" step="1" style="width:100px">
+        </div>
+      </div>
+      <div id="chamberFilter" style="margin-top:8px"></div>
+      <div id="categoryFilter" style="margin-top:6px"></div>
+    </div>
+
     <div class="row">
       <div class="field">
         <label>Trailing window (days)</label>
@@ -503,7 +527,8 @@ var DEBUG_CODES = {
   "EQ-NOCHAMBER": { level: "info",  meaning: "No chamber tag was found in a description." },
   "FMT-EMPTY":    { level: "error", meaning: "A file was detected but produced no data rows." },
   "CAT-UNMATCHED":{ level: "info",  meaning: "A message matched no category rule and was grouped by its shape." },
-  "CAT-BADRULE":  { level: "warn",  meaning: "A category rule had an invalid pattern and was skipped." }
+  "CAT-BADRULE":  { level: "warn",  meaning: "A category rule had an invalid pattern and was skipped." },
+  "FLT-BADREGEX": { level: "warn",  meaning: "The search box held an invalid /regex/, so it was used as plain text." }
 };
 
 var DEBUG = { codes: {}, order: [] };
@@ -1099,11 +1124,13 @@ function buildMappingUI() {
     function sync() {
       other.style.display = (sel.value === "other") ? "" : "none";
       refreshSeverityFilter();
+      refreshFilters();
     }
     sel.addEventListener("change", sync);
   });
 
   refreshSeverityFilter();
+  refreshFilters();
   document.getElementById("mapCard").style.display = "";
   document.getElementById("controlsCard").style.display = "";
 }
@@ -1190,6 +1217,101 @@ function selectedSeverities() {
   return set;
 }
 
+// ---------------------------------------------------------------------------
+// Filters. These narrow the events before the window and the Paretos. Severity
+// has its own control above. Here we add chamber, category, a date range, and a
+// message search. applyFilters is pure so the harness can check it.
+// ---------------------------------------------------------------------------
+function applyFilters(occ, f) {
+  return occ.filter(function (o) {
+    if (f.dateStart && o.start < f.dateStart) return false;
+    if (f.dateEnd && o.start > f.dateEnd) return false;
+    if (f.chambers && !f.chambers[o.equipment]) return false;
+    if (f.categories && !f.categories[o.category]) return false;
+    if (f.searchRe) { if (!f.searchRe.test(o.description || "")) return false; }
+    else if (f.searchText) { if (String(o.description || "").toLowerCase().indexOf(f.searchText) === -1) return false; }
+    return true;
+  });
+}
+
+// Read the filter controls into a plain object.
+function readFilters() {
+  var f = { dateStart: null, dateEnd: null, chambers: null, categories: null, searchRe: null, searchText: "", minCount: 1 };
+  var s = String(document.getElementById("fSearch").value || "").trim();
+  if (s) {
+    var m = s.match(/^\/(.*)\/([a-z]*)$/);
+    if (m) {
+      try { f.searchRe = new RegExp(m[1], m[2].indexOf("i") >= 0 ? m[2] : (m[2] + "i")); }
+      catch (e) { dbg("FLT-BADREGEX", s); f.searchText = s.toLowerCase(); }
+    } else {
+      f.searchText = s.toLowerCase();
+    }
+  }
+  var from = parseDate(document.getElementById("fFrom").value);
+  if (from) f.dateStart = from;
+  var to = parseDate(document.getElementById("fTo").value);
+  if (to) f.dateEnd = to;
+  f.minCount = Math.max(1, parseInt(document.getElementById("fMinCount").value, 10) || 1);
+  f.chambers = collectChecked("chamberchk");
+  f.categories = collectChecked("categorychk");
+  return f;
+}
+
+// Read a group of checkboxes into a set. Returns null when there are none, so
+// that kind of filter is skipped. When some exist, only the ticked ones pass.
+function collectChecked(cls) {
+  var boxes = document.querySelectorAll("." + cls);
+  if (!boxes.length) return null;
+  var set = {};
+  Array.prototype.forEach.call(boxes, function (b) { if (b.checked) set[b.value] = true; });
+  return set;
+}
+
+// Rebuild the chamber and category checkbox groups from the current data and
+// mapping. Called when the mapping or the category rules change.
+function refreshFilters() {
+  var wrap = document.getElementById("moreFilters");
+  if (!STATE.columns.length || !STATE.rows.length) { wrap.style.display = "none"; return; }
+  var map = readMapping();
+  wrap.style.display = "";
+
+  var chamberCounts = {};
+  if (map.equipment) {
+    STATE.rows.forEach(function (r) {
+      var v = String(r[map.equipment] || "(blank)");
+      chamberCounts[v] = (chamberCounts[v] || 0) + 1;
+    });
+  }
+  buildCheckGroup("chamberFilter", "chamberchk", "Chambers / modules", chamberCounts);
+
+  var categoryCounts = {};
+  if (map.descCols.length) {
+    STATE.rows.forEach(function (r) {
+      var cat = categorize(rowDescription(r, map), map.catRules).category;
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    });
+  }
+  buildCheckGroup("categoryFilter", "categorychk", "Categories", categoryCounts);
+}
+
+// Render one labelled group of checkboxes, all ticked by default, most common
+// first. Caps the list so a huge set does not fill the page.
+function buildCheckGroup(containerId, cls, label, counts) {
+  var el = document.getElementById(containerId);
+  var keys = Object.keys(counts);
+  if (!keys.length) { el.style.display = "none"; el.innerHTML = ""; return; }
+  el.style.display = "";
+  keys.sort(function (a, b) { return counts[b] - counts[a]; });
+  var shown = keys.slice(0, 40);
+  var checks = shown.map(function (k) {
+    return "<label style='display:inline-flex;align-items:center;gap:5px;margin:0 12px 6px 0;font-size:13px;color:var(--ink)'>" +
+      "<input type=\"checkbox\" class=\"" + cls + "\" value=\"" + esc(k) + "\" checked> " +
+      esc(clip(k, 28)) + " <span style='color:#5b6570'>(" + counts[k] + ")</span></label>";
+  }).join("");
+  var more = keys.length > 40 ? " <span style='color:#5b6570'>(showing 40 of " + keys.length + ")</span>" : "";
+  el.innerHTML = "<label>" + esc(label) + more + "</label><div style='margin-top:4px'>" + checks + "</div>";
+}
+
 function optionEl(value, text) {
   var o = document.createElement("option");
   o.value = value; o.textContent = text;
@@ -1205,6 +1327,7 @@ document.getElementById("downMode").addEventListener("change", syncDownModeUI);
   try { var saved = localStorage.getItem("ap_cat_rules"); if (saved != null) ta.value = saved; } catch (e) {}
   ta.addEventListener("input", function () {
     try { localStorage.setItem("ap_cat_rules", ta.value); } catch (e) {}
+    if (STATE.rows.length) refreshFilters();
   });
 })();
 
@@ -1617,7 +1740,7 @@ function toolLevel(occList) {
 // Ranking for one grouping level. Returns rows sorted by count and by downtime,
 // each with a cumulative percent and an "Other" bucket past top N.
 // ---------------------------------------------------------------------------
-function rankLevel(occ, levelKey, method, topN) {
+function rankLevel(occ, levelKey, method, topN, minCount) {
   var groups = {};
   var pairWithText = (levelKey === "fault_code");
   occ.forEach(function (o) {
@@ -1652,17 +1775,22 @@ function rankLevel(occ, levelKey, method, topN) {
     };
   });
 
-  var byCount = collapse(arr.slice().sort(function (a, b) { return b.count - a.count; }), topN, "count");
+  var byCount = collapse(arr.slice().sort(function (a, b) { return b.count - a.count; }), topN, "count", minCount);
   var metric = (method === "attributed") ? "attributed_s" : "wallclock_s";
-  var byDown = collapse(arr.slice().sort(function (a, b) { return b[metric] - a[metric]; }), topN, metric);
+  var byDown = collapse(arr.slice().sort(function (a, b) { return b[metric] - a[metric]; }), topN, metric, minCount);
   return { byCount: byCount, byDown: byDown, metric: metric };
 }
 
-function collapse(sorted, topN, sortField) {
+// Fold groups past the top N, and any group smaller than minCount, into one
+// "Other" bucket. minCount defaults to 1, which keeps every group.
+function collapse(sorted, topN, sortField, minCount) {
+  minCount = minCount || 1;
+  var big = [], small = [];
+  sorted.forEach(function (r) { (r.count >= minCount ? big : small).push(r); });
+  var head = big.slice(0, topN);
+  var tail = big.slice(topN).concat(small);
   var rows;
-  if (sorted.length > topN) {
-    var head = sorted.slice(0, topN);
-    var tail = sorted.slice(topN);
+  if (tail.length) {
     var other = { key: "Other", label: "Other", count: 0, attributed_s: 0, wallclock_s: 0 };
     tail.forEach(function (r) {
       other.count += r.count;
@@ -1671,7 +1799,7 @@ function collapse(sorted, topN, sortField) {
     });
     rows = head.concat([other]);
   } else {
-    rows = sorted.slice();
+    rows = head.slice();
   }
   var total = rows.reduce(function (s, r) { return s + r[sortField]; }, 0) || 1;
   var run = 0;
@@ -1770,7 +1898,7 @@ function runAnalysis() {
   setMsg("mapMsg", "", "");
 
   // Drop analysis codes from a previous run so they do not double count.
-  clearCodes(["TS-BADDATE", "CAT-UNMATCHED", "CAT-BADRULE"]);
+  clearCodes(["TS-BADDATE", "CAT-UNMATCHED", "CAT-BADRULE", "FLT-BADREGEX"]);
   var built = buildOccurrences(STATE.rows, map);
   if (!built.occ.length) {
     var emptyMsg = (map.downMode === "derive")
@@ -1795,6 +1923,16 @@ function runAnalysis() {
     if (!occ.length) { setMsg("summaryMsg", "err", "No rows match the ticked severities."); document.getElementById("results").style.display = ""; return; }
   }
 
+  // Chamber, category, date range, and message search filters.
+  var filters = readFilters();
+  var beforeFilter = occ.length;
+  occ = applyFilters(occ, filters);
+  var filterNote = "";
+  if (occ.length !== beforeFilter) {
+    filterNote = "Kept " + occ.length + " of " + beforeFilter + " rows after the filters.";
+  }
+  if (!occ.length) { setMsg("summaryMsg", "err", "No rows match the current filters. Loosen them in Settings."); document.getElementById("results").style.display = ""; return; }
+
   var windowDays = Math.max(1, parseInt(document.getElementById("windowDays").value, 10) || 30);
   var topN = Math.max(1, parseInt(document.getElementById("topN").value, 10) || 15);
   var method = document.getElementById("method").value;
@@ -1806,7 +1944,7 @@ function runAnalysis() {
   var grandWall = mergedSeconds(win.kept.map(function (o) { return [o.start, o.end]; }));
 
   var levels = {};
-  LEVELS.forEach(function (lv) { levels[lv.key] = rankLevel(win.kept, lv.key, method, topN); });
+  LEVELS.forEach(function (lv) { levels[lv.key] = rankLevel(win.kept, lv.key, method, topN, filters.minCount); });
 
   // Derived mode extras: the tool-level numbers and the paired-interval list.
   var derived = null;
@@ -1836,7 +1974,7 @@ function runAnalysis() {
     windowStart: win.start, windowEnd: win.end,
     totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
     hasDowntime: (map.downMode !== "none"), levels: levels,
-    unparsed: built.unparsed, kept: win.kept, sevNote: sevNote,
+    unparsed: built.unparsed, kept: win.kept, sevNote: sevNote, filterNote: filterNote,
     isDerived: (map.downMode === "derive"), derived: derived,
     stats: analyzeStats(win.kept, win.start, win.end)
   };
@@ -1852,6 +1990,7 @@ function renderResults() {
 
   var notes = [];
   if (R.sevNote) notes.push(R.sevNote);
+  if (R.filterNote) notes.push(R.filterNote);
   if (R.unparsed) notes.push(R.unparsed + " row(s) had no readable timestamp and were skipped.");
   if (!R.hasDowntime) notes.push("No downtime column was mapped, so downtime is shown as zero. Ranking is by count.");
   setMsg("summaryMsg", notes.length ? "warn" : "ok", notes.length ? notes.join(" ") : "Analysis complete.");
@@ -2281,6 +2420,8 @@ window.AP = {
   categorize: categorize,
   normCategory: normCategory,
   parseCatRules: parseCatRules,
+  // Filtering.
+  applyFilters: applyFilters,
   // Analytics.
   analyzeStats: analyzeStats,
   concentrationOf: concentrationOf,
