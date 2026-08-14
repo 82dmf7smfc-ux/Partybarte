@@ -212,6 +212,50 @@ async function main() {
   check("insights: day bars rendered", ins.bars >= 1, ins);
   check("insights: chamber table has rows", ins.chamberRows >= 2, ins);
 
+  // 6f. Filtering: applyFilters over a small occurrence set.
+  var flt = await ev("(function(){"
+    + "function mk(da,eq,cat,desc){return {start:new Date(2026,0,da,0,0,0),equipment:eq,category:cat,description:desc,durSec:0};}"
+    + "var occ=[mk(1,'A','PM','pm trigger reached'),mk(2,'B','Gas','gas flow error'),mk(3,'A','PM','pm trigger reached'),mk(4,'C','Cal','calibration not done')];"
+    + "var byChamber=AP.applyFilters(occ,{chambers:{A:true}});"
+    + "var byCat=AP.applyFilters(occ,{categories:{PM:true,Gas:true}});"
+    + "var byDate=AP.applyFilters(occ,{dateStart:new Date(2026,0,2),dateEnd:new Date(2026,0,3,23,59,59)});"
+    + "var bySearch=AP.applyFilters(occ,{searchText:'gas'});"
+    + "var byRe=AP.applyFilters(occ,{searchRe:/pm|cal/i});"
+    + "return {all:occ.length,chamber:byChamber.length,cat:byCat.length,date:byDate.length,search:bySearch.length,re:byRe.length};"
+    + "})()");
+  eq("filter: base count", flt.all, 4);
+  eq("filter: by chamber A", flt.chamber, 2);
+  eq("filter: by category PM+Gas", flt.cat, 3);
+  eq("filter: by date range", flt.date, 2);
+  eq("filter: by search text", flt.search, 1);
+  eq("filter: by regex", flt.re, 3);
+
+  // 6g. Full-page: a chamber filter narrows the P5000 analysis, and min-count folds.
+  var ff = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"       // include all severities
+    + "document.querySelectorAll('.chamberchk').forEach(function(c){c.checked=(c.value==='S4EXT');});"
+    + "runAnalysis();"
+    + "var only=STATE.lastResult.kept.every(function(o){return o.equipment==='S4EXT';});"
+    + "var note=document.getElementById('summaryMsg').innerText;"
+    + "var hasChamberBoxes=document.querySelectorAll('.chamberchk').length>0;"
+    + "return {kept:STATE.lastResult.totalFaults, onlyS4:only, hasChamberBoxes:hasChamberBoxes, note:note};"
+    + "})()");
+  check("filter UI: chamber checkboxes built", ff.hasChamberBoxes, ff);
+  check("filter UI: only S4EXT kept", ff.onlyS4 && ff.kept > 0, ff);
+  check("filter UI: filter note shown", /after the filters/.test(ff.note), ff.note);
+
+  // 6h. min-count floor folds small groups into Other.
+  var mc = await ev("(function(){"
+    + "function mk(eq){return {start:new Date(2026,0,1,0,0,0),equipment:eq,category:'c',fault_code:eq,description:'d',durSec:0};}"
+    + "var occ=[mk('A'),mk('A'),mk('A'),mk('B')];"           // A x3, B x1
+    + "var r=AP.rankLevel(occ,'equipment','attributed',15,2);"  // minCount 2 -> B folds to Other
+    + "var keys=r.byCount.map(function(x){return x.key;});"
+    + "return {keys:keys};"
+    + "})()");
+  check("min-count: small group folded to Other", mc.keys.indexOf("B") === -1 && mc.keys.indexOf("Other") >= 0, mc.keys);
+
   // 7. Regression: the delimited path still works.
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([SAMPLE_CSV],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: built-in CSV rows", reg.rows, 15);

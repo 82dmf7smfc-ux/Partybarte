@@ -7,6 +7,11 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: more filters in Settings, on top of the severity filter. Narrow
+  the events by chamber/module and by category (checkboxes built from the data),
+  by an explicit date range, and by a message search (plain text, or a /regex/).
+  A "Hide groups smaller than" floor folds rare groups into "Other" in the
+  Paretos. The summary reports how many rows were kept after the filters.
 - Browser tool: an Insights card with analytics beyond the Paretos. Headline
   tiles show events per day, the busiest day, the mean gap between events, the
   top group's share, and how many groups make up 80 percent of the events. An
