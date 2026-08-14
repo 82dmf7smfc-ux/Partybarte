@@ -191,6 +191,73 @@ async function main() {
   check("normCategory collapses tags and numbers", cat.norm === "step at # #", cat.norm);
   check("parseCatRules bad regex -> CAT-BADRULE", cat.badRuleCode === true, cat);
 
+  // 6b-id. ID-based category rules: parse `id:` lines and match by Event Number.
+  var idr = await ev("(function(){"
+    + "var rules=AP.parseCatRules(['id:494,807 => Known IDs','gas flow => Text Cat']);"
+    + "var idRule=rules.filter(function(r){return r.ids;})[0];"
+    + "var byId=AP.categorize('any text at all', rules, '494');"          // matches ID rule
+    + "var byId2=AP.categorize('unrelated', rules, '807');"
+    + "var miss=AP.categorize('nothing here', rules, '999');"            // no ID, no text -> auto
+    + "var textStill=AP.categorize('chamber minimum gas flow error', rules, '999');" // text rule still works
+    + "var idBeatsText=AP.categorize('chamber minimum gas flow error', rules, '494');" // ID rule listed first wins
+    + "var noId=AP.categorize('any text at all', rules);"                // id omitted -> ID rule cannot fire
+    + "return {ids:idRule?Object.keys(idRule.ids).sort():null, byId:byId, byId2:byId2, miss:miss, textStill:textStill, idBeats:idBeatsText, noId:noId};"
+    + "})()");
+  check("parseCatRules reads id: list", idr.ids && idr.ids.join(",") === "494,807", idr.ids);
+  check("categorize by ID matches", idr.byId.matched === true && idr.byId.category === "Known IDs" && /ID rule/.test(idr.byId.source), idr.byId);
+  eq("categorize by ID (second id in list)", idr.byId2.category, "Known IDs");
+  check("categorize unknown ID falls through to auto", idr.miss.matched === false, idr.miss);
+  eq("categorize text rule still fires without ID match", idr.textStill.category, "Text Cat");
+  eq("categorize ID rule beats later text rule", idr.idBeats.category, "Known IDs");
+  check("categorize ID rule inert when id omitted", idr.noId.matched === false, idr.noId);
+
+  // 6b-idroll. rollupById and the uncategorized-ID worklist.
+  var idroll = await ev("(function(){"
+    + "var list=["
+    + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S1> of lot <S3>'},"
+    + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S2> of lot <S4>'},"      // same shape, diff numbers
+    + "{id:'901',sev:'TRACE',desc:'processing complete for wafer <S5> of lot <S6>'},"      // still same shape
+    + "{id:'570',sev:'PROMPT',desc:'port <S1EXT> wafer not sensed by vacuum'},"
+    + "{id:'050',sev:'TRACE',desc:'front panel func_char a depressed'},"
+    + "{id:'050',sev:'TRACE',desc:'front panel totally different free text here now'}"     // two distinct shapes
+    + "];"
+    + "var roll=AP.rollupById(list);"
+    + "var top=roll[0];"
+    + "var fp=roll.filter(function(r){return r.id==='050';})[0];"
+    + "return {topId:top.id, topCount:top.count, topShapes:top.shapes, fpShapes:fp.shapes, n:roll.length};"
+    + "})()");
+  eq("rollupById ranks most common ID first", idroll.topId, "901");
+  eq("rollupById counts occurrences", idroll.topCount, 3);
+  eq("rollupById collapses same-shape variants to 1 shape", idroll.topShapes, 1);
+  eq("rollupById counts distinct shapes for mixed ID", idroll.fpShapes, 2);
+  eq("rollupById distinct IDs", idroll.n, 3);
+
+  // 6b-idreport. Full-page: after an analysis, the worklist lists uncategorized IDs
+  // (the standard fixture is fully categorized, so use an inline log with novel IDs)
+  // and an id: rule removes one ID from the worklist while the other stays.
+  var idrep = await ev("(function(){"
+    + "var log='System type:  P5000\\nProcess type: Etch\\n   SCIII+ Event Data File:  E:\\\\Backups\\\\dep1\\\\Data\\\\ELOG.DAT\\nDate  Time  Event Number  Event Type  Description\\n"
+    + "08/07/26  12:00:00  611  FAULT  chamber <S4EXT> zzz brand new widget alpha jam\\n"
+    + "08/07/26  12:01:00  611  FAULT  chamber <S4EXT> zzz brand new widget beta jam\\n"
+    + "08/07/26  12:02:00  622  FAULT  totally novel gizmo condition observed\\n';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([log],1);"
+    + "document.getElementById('catRules').value='';document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
+    + "runAnalysis();"
+    + "var before=uncategorizedIdReport(100);"
+    + "var had611=/\\n\\s*611\\s+x2\\s/.test(before);"
+    + "var had622=/\\n\\s*622\\s+x1\\s/.test(before);"
+    + "document.getElementById('catRules').value='id:611 => Widget jam';"
+    + "runAnalysis();"
+    + "var after=uncategorizedIdReport(100);"
+    + "return {had611:had611, had622:had622, still611:/\\n\\s*611\\s+x/.test(after), still622:/\\n\\s*622\\s+x/.test(after), headerHasTop:/Uncategorized event IDs \\(top/.test(before)};"
+    + "})()");
+  check("worklist header present", idrep.headerHasTop, idrep);
+  check("worklist lists uncategorized ID 611 with count", idrep.had611, idrep);
+  check("worklist lists uncategorized ID 622 with count", idrep.had622, idrep);
+  check("id: rule removes ID 611 from the worklist", idrep.still611 === false, idrep);
+  check("unrelated ID 622 stays on the worklist", idrep.still622 === true, idrep);
+
   // 6c. Category is a Pareto level, and the P5000 sample rolls up correctly.
   var lvl = await ev("(function(){"
     + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"

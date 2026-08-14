@@ -27,7 +27,7 @@ means a file produced nothing.
 | `TS-BADDATE` | warn | A timestamp could not be read, so the row was skipped in the analysis. | Check the Date and Time columns are mapped and formatted as expected. |
 | `EQ-NOCHAMBER` | info | No chamber tag was found in a description. | Fine for lines with no chamber. Share samples if a real chamber was missed. |
 | `FMT-EMPTY` | error | A file was detected but produced no data rows. | Check the start row, the header, and the format. |
-| `CAT-UNMATCHED` | info | A message matched no category rule and was grouped by its normalized shape. | Look at the samples. Add a rule under "Message categories" to name that group. |
+| `CAT-UNMATCHED` | info | A message matched no category rule and was grouped by its normalized shape. | Turn on "Verbose" (or press "Copy uncategorized IDs") to see the uncategorized event IDs, then add a rule under "Message categories" - either `pattern => Label` or `id:494 => Label` - to name that group. |
 | `CAT-BADRULE` | warn | A category rule had an invalid pattern and was skipped. | Fix the regular expression on the named line. |
 | `FLT-BADREGEX` | warn | The search box held an invalid `/regex/`, so it was used as plain text. | Fix the expression between the slashes, or drop the slashes for a plain search. |
 

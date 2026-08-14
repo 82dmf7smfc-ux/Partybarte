@@ -92,10 +92,13 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    optional log scale. Download a CSV summary, or use "Print / Save as PDF".
    - The "Category" level groups messages that differ only by a chamber tag or a
      number, so repeated template messages fall under one name. Built-in rules
-     cover the common cases. Add your own under "Message categories" in step 2, as
-     `pattern => Label`, one per line. Your rules are saved in the browser and run
-     first. Anything left uncategorized shows up in the debug log so you can see
-     what rule to add.
+     cover the common cases. Add your own under "Message categories" in step 2, one
+     per line, in either form: `pattern => Label` (a case-insensitive regex on the
+     message text) or `id:494,807 => Label` (an exact match on the Event Number).
+     Because the Event Number is stable while the wording changes with the chamber
+     and values, an ID rule is more reliable for events whose text varies. Your
+     rules are saved in the browser and run first. Anything left uncategorized shows
+     up in the debug log so you can see what rule to add.
    - When a row has no chamber tag, the tool reads a name from the message text
      using the editable "Subsystem / module names" list in step 2, so tool-level
      events land on a real module instead of "(unknown)".
@@ -109,9 +112,11 @@ events can be grouped under one "System" name with the option in Settings.
 If a file does not read the way you expect, press "Show debug log". It lists
 short codes for how each file was parsed, such as the detected format, skipped
 rows, rejoined lines, 2-digit years, and missing chamber tags. Turn on "Verbose"
-for more example lines and the ranked unknown-event shapes. Use "Copy debug
-report" to copy the codes so they can be shared for troubleshooting. Nothing
-there leaves your computer.
+for more example lines, the uncategorized event IDs (top 100 by count, each with
+its severity, distinct-shape count, and an example message), and the ranked
+unknown-event shapes. Use "Copy debug report" to copy the codes, or "Copy
+uncategorized IDs" to copy just the ID worklist so you can turn it into category
+rules. Nothing there leaves your computer.
 
 Because it runs in the browser, it does not write native Excel chart files. If
 you need those, use the Python tool.
