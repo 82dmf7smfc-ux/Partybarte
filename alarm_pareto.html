@@ -2001,6 +2001,53 @@ var MSG_SAMPLE_CSV =
 "8/12/2026,13:30:00,TRACE,Human interface,1955,Chamber 4 state changed to online.\n" +
 "8/12/2026,14:00:00,TRACE,Chamber A,159,Chamber A state changed to OFFLINE FOR MAINTENANCE.\n" +
 "8/12/2026,20:00:00,TRACE,Wafer History,53,Chamber 4 process step 3 has ended and summary data was saved.\n";
+
+// ---------------------------------------------------------------------------
+// Pure data layer. These functions take data in and give data out, with no
+// reading of the page. They are grouped here under one name so an automated
+// test can call them directly (see tests/browser). The buttons and rendering
+// above still call the same functions; this only adds a second door in.
+// ---------------------------------------------------------------------------
+window.AP = {
+  // Format detection and parsing.
+  detectFormat: detectFormat,
+  sniffDelimiter: sniffDelimiter,
+  splitLines: splitLines,
+  isBlankLine: isBlankLine,
+  splitLine: splitLine,
+  parseFileBlock: parseFileBlock,
+  parseP5000Block: parseP5000Block,
+  extractChamber: extractChamber,
+  detectStartAndHeader: detectStartAndHeader,
+  // Column classification and role guessing.
+  classifyColumn: classifyColumn,
+  guessIdentities: guessIdentities,
+  // Dates.
+  expandYear: expandYear,
+  parseDate: parseDate,
+  // Message helpers used by the analysis.
+  normText: normText,
+  findChamber: findChamber,
+  matchesAny: matchesAny,
+  rowTimestamp: rowTimestamp,
+  rowDescription: rowDescription,
+  // Occurrence building, windowing, and ranking.
+  buildOccurrences: buildOccurrences,
+  makeOcc: makeOcc,
+  applyWindow: applyWindow,
+  mergedSeconds: mergedSeconds,
+  toolLevel: toolLevel,
+  rankLevel: rankLevel,
+  // Small formatting helpers.
+  fmt: fmt,
+  fmtName: fmtName,
+  // Debug log, so a test can read what a parse recorded.
+  DEBUG_CODES: DEBUG_CODES,
+  resetDebug: resetDebug,
+  dbg: dbg,
+  debugReport: debugReport,
+  getDebug: function () { return DEBUG; }
+};
 </script>
 </body>
 </html>

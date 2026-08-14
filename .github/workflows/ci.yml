@@ -1,8 +1,8 @@
 name: CI
 
-# Runs the Python test suite on every push and every pull request. This is the
-# real check that the analysis math still gives the right answers. The browser
-# tool has no build step, so there is nothing to compile for it here.
+# Runs on every push and every pull request. Two jobs: the Python test suite
+# checks the analysis math, and the browser-tests job drives a real headless
+# Chromium against alarm_pareto.html to check the import and analysis there.
 
 on:
   push:
@@ -35,3 +35,25 @@ jobs:
 
       - name: Build the distributable zips
         run: python tools/build_zips.py
+
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # Node 22 ships a built-in WebSocket, which the harness uses to speak the
+      # Chrome DevTools Protocol. No npm packages are installed.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Run the browser tests
+        run: node tests/browser/run.mjs
+        env:
+          CHROME_BIN: ${{ steps.setup-chrome.outputs.chrome-path }}

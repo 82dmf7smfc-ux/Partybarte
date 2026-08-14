@@ -21,6 +21,14 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   (format, preamble, skipped rows, rejoined lines, 2-digit years, missing chamber
   tags, unreadable timestamps). A button copies the report for troubleshooting.
   Nothing there leaves the browser.
+- Browser tool: an automated test harness. `tests/browser/run.mjs` drives a real
+  headless Chromium against `alarm_pareto.html` and checks the pure data layer
+  (now grouped under a `window.AP` name) and a couple of full-page flows. It uses
+  only Node built-ins, so there is nothing to install.
+- CI: a `browser-tests` job runs the harness on every push and pull request,
+  alongside the Python suite.
+- `docs/DEBUG_CODES.md`, a reference for the browser tool's debug codes. The
+  harness checks that every code the tool emits is listed in the registry.
 
 ## [1.3.0] - 2026-08-14
 
