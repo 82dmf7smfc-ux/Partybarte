@@ -7,6 +7,15 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: an "Unknown events" panel. It ranks the messages that matched no
+  category rule, and the events with no chamber tag, by how common each shape is,
+  so the biggest unknown groups are obvious. Each uncategorized shape has an "Add
+  rule" button that appends a starter rule to the category box, so cleaning up the
+  Category Pareto is a few clicks.
+- Browser tool: a "Verbose" toggle on the debug log that shows more example lines
+  per code and appends the ranked unknown-event shapes to the copyable report.
+- Browser tool: an option to label tag-less tool/system events as "System"
+  instead of "(unknown)", so they group in one place in the Module Pareto.
 - Browser tool: more chart types. A "Chart" picker on the Pareto card switches
   between the Pareto (bars plus the cumulative line), horizontal bars that read
   well when the labels are long, and a heatmap of events by hour of day and
