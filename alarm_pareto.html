@@ -109,13 +109,33 @@
 <main>
   <div class="card" id="importCard">
     <h2>1. Import elog files</h2>
-    <p class="hint">Select one or more CSV or delimited text files from the same tool. Nothing leaves your computer. No internet is used.</p>
+    <p class="hint">Select one or more log files from the same tool. Comma or tab files and P5000 Etch elogs both work. Nothing leaves your computer. No internet is used.</p>
     <div class="row">
-      <input type="file" id="fileInput" multiple accept=".csv,.txt,.log,.tsv,.tab,text/plain">
+      <input type="file" id="fileInput" multiple accept=".csv,.txt,.log,.tsv,.tab,.el3,text/plain">
+      <div class="field">
+        <label>Format</label>
+        <select id="formatSel">
+          <option value="auto">Auto detect</option>
+          <option value="delimited">CSV or delimited</option>
+          <option value="p5000">P5000 Etch</option>
+        </select>
+      </div>
       <button class="secondary" id="loadSample" type="button">Load built-in sample</button>
       <button class="secondary" id="loadMsgSample" type="button">Load message-log sample</button>
     </div>
     <div id="importMsg"></div>
+    <div style="margin-top:12px" class="noprint">
+      <button class="secondary" id="debugToggle" type="button" style="display:none">Show debug log</button>
+    </div>
+  </div>
+
+  <div class="card noprint" id="debugCard" style="display:none; background:#fbfbfc">
+    <div class="row" style="justify-content:space-between; align-items:center">
+      <h2 style="margin:0">Debug log</h2>
+      <button class="secondary" id="debugCopy" type="button">Copy debug report</button>
+    </div>
+    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Nothing here leaves your computer.</p>
+    <pre id="debugPre" style="white-space:pre-wrap; font-size:12px; max-height:340px; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; margin:0"></pre>
   </div>
 
   <div class="card" id="mapCard" style="display:none">
@@ -380,6 +400,98 @@ var LEVELS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Debug log. Each parse records short codes here. The codes are hidden until
+// you press the button. Paste the report back to report a file that read wrong.
+// The registry is the stable list of codes and what they mean.
+// ---------------------------------------------------------------------------
+var DEBUG_CODES = {
+  "FMT-P5000":    { level: "info",  meaning: "A file was read as a P5000 Etch elog." },
+  "FMT-DELIM":    { level: "info",  meaning: "A file was read as a delimited (CSV style) file." },
+  "FMT-OVERRIDE": { level: "info",  meaning: "The format was forced by the Format drop-down." },
+  "FMT-MIXED":    { level: "warn",  meaning: "The batch mixed formats. Columns were matched by position." },
+  "PRE-META":     { level: "info",  meaning: "Tool details were read from the P5000 preamble." },
+  "HDR-NOTFOUND": { level: "warn",  meaning: "The P5000 header row was not found. Every date line was read." },
+  "ROW-NOMATCH":  { level: "warn",  meaning: "A line did not match the P5000 row pattern and was skipped." },
+  "ROW-CONT":     { level: "info",  meaning: "A line with no leading date was joined to the record above it." },
+  "TS-Y2K":       { level: "info",  meaning: "Rows used a 2-digit year, expanded with the 1969 pivot." },
+  "TS-BADDATE":   { level: "warn",  meaning: "A timestamp could not be read, so the row was skipped." },
+  "EQ-NOCHAMBER": { level: "info",  meaning: "No chamber tag was found in a description." },
+  "FMT-EMPTY":    { level: "error", meaning: "A file was detected but produced no data rows." }
+};
+
+var DEBUG = { codes: {}, order: [] };
+
+function resetDebug() { DEBUG = { codes: {}, order: [] }; }
+
+// Drop specific codes so a repeat analysis does not double count them.
+function clearCodes(list) {
+  list.forEach(function (c) {
+    if (DEBUG.codes[c]) {
+      delete DEBUG.codes[c];
+      var i = DEBUG.order.indexOf(c);
+      if (i >= 0) DEBUG.order.splice(i, 1);
+    }
+  });
+}
+
+// Record one debug event. Events with the same code are grouped, with a count
+// and up to five example lines so a big file does not flood the report.
+function dbg(code, msg, sample) {
+  var e = DEBUG.codes[code];
+  if (!e) {
+    var reg = DEBUG_CODES[code] || { level: "info" };
+    e = DEBUG.codes[code] = { code: code, level: reg.level, msg: msg, count: 0, samples: [] };
+    DEBUG.order.push(code);
+  }
+  e.count += 1;
+  if (sample !== undefined && sample !== "" && e.samples.length < 5) e.samples.push(String(sample));
+}
+
+// Build the copy friendly text report.
+function debugReport() {
+  var out = [];
+  out.push("Alarm Log Pareto debug report");
+  out.push("Generated: " + fmt(new Date()));
+  out.push("Files: " + STATE.fileCount + ", rows: " + STATE.rows.length);
+  out.push("");
+  if (!DEBUG.order.length) { out.push("No debug codes recorded."); return out.join("\n"); }
+  DEBUG.order.forEach(function (code) {
+    var e = DEBUG.codes[code];
+    var meaning = (DEBUG_CODES[code] && DEBUG_CODES[code].meaning) || e.msg || "";
+    out.push("[" + e.code + "] " + e.level + "  " + e.count + "x  " + meaning);
+    if (e.msg && e.msg !== meaning) out.push("    note: " + e.msg);
+    e.samples.forEach(function (s) { out.push("    - " + s); });
+  });
+  return out.join("\n");
+}
+
+function showDebugButton() {
+  var b = document.getElementById("debugToggle");
+  b.style.display = "";
+  b.textContent = "Show debug log (" + DEBUG.order.length + " codes)";
+  var card = document.getElementById("debugCard");
+  if (card.style.display !== "none") document.getElementById("debugPre").textContent = debugReport();
+}
+
+// The format the tool will use for one file: the forced choice, or auto detect.
+function currentFormat(text) {
+  var forced = (document.getElementById("formatSel") || {}).value || "auto";
+  if (forced && forced !== "auto") { dbg("FMT-OVERRIDE", "Forced to " + forced + "."); return forced; }
+  return detectFormat(text);
+}
+
+// Look at the top of the file. A P5000 elog has a known header line or a
+// System Constants preamble. Everything else is treated as delimited.
+function detectFormat(text) {
+  var head = text.slice(0, 20000);
+  if (/^\s*Date\s+Time\s+Event\s+Number\s+Event\s+Type\s+Description\s*$/im.test(head) ||
+      /System Constants III|^\s*System type:/im.test(head)) {
+    return "p5000";
+  }
+  return "delimited";
+}
+
+// ---------------------------------------------------------------------------
 // File reading. Everything happens in the browser. No network.
 // ---------------------------------------------------------------------------
 document.getElementById("fileInput").addEventListener("change", function (e) {
@@ -423,18 +535,29 @@ function loadTexts(texts, fileCount) {
   STATE.texts = texts;
   STATE.fileCount = fileCount;
 
-  // Guess the start row and whether there is a header, from the first file.
-  var guess = detectStartAndHeader(texts[0]);
-  document.getElementById("startRow").value = guess.startRow;
-  document.getElementById("hasHeader").checked = guess.hasHeader;
+  // P5000 files carry their own preamble and header, so the start row does not
+  // apply. For delimited files, guess the start row and header from the file.
+  var forced = (document.getElementById("formatSel") || {}).value || "auto";
+  var fmt0 = (forced !== "auto") ? forced : detectFormat(texts[0]);
+  if (fmt0 === "p5000") {
+    document.getElementById("startRow").value = 1;
+    document.getElementById("hasHeader").checked = false;
+  } else {
+    var guess = detectStartAndHeader(texts[0]);
+    document.getElementById("startRow").value = guess.startRow;
+    document.getElementById("hasHeader").checked = guess.hasHeader;
+  }
 
   reparse();
 }
+
+function fmtName(f) { return f === "p5000" ? "P5000 Etch" : f === "delimited" ? "delimited" : f; }
 
 // Re-read every file using the current start row and header choice. This runs
 // on import and again whenever the user changes those controls.
 function reparse() {
   if (!STATE.texts.length) return;
+  resetDebug();
 
   var startRow = Math.max(1, parseInt(document.getElementById("startRow").value, 10) || 1);
   var hasHeader = document.getElementById("hasHeader").checked;
@@ -442,9 +565,15 @@ function reparse() {
   var columns = null;
   var rows = [];
   var warnings = [];
+  var formats = [];
 
   STATE.texts.forEach(function (text, i) {
-    var parsed = parseFileBlock(text, startRow, hasHeader);
+    var fmt = currentFormat(text);
+    formats.push(fmt);
+    var parsed = (fmt === "p5000")
+      ? parseP5000Block(text, "File " + (i + 1))
+      : parseFileBlock(text, startRow, hasHeader);
+    if (fmt === "delimited" && parsed.columns.length) dbg("FMT-DELIM", "File " + (i + 1) + ": " + parsed.columns.length + " columns");
     if (!parsed.columns.length) return;
     if (columns === null) {
       columns = parsed.columns;
@@ -455,18 +584,24 @@ function reparse() {
     parsed.rows.forEach(function (r) { rows.push(r); });
   });
 
+  var mixed = formats.length > 1 && formats.some(function (f) { return f !== formats[0]; });
+  if (mixed) dbg("FMT-MIXED", "Formats: " + formats.join(", "));
+
   if (!columns || !rows.length) {
-    setMsg("importMsg", "err", "No data rows were found. Check the start row and the file format.");
+    setMsg("importMsg", "err", "No data rows were found. Open the debug log for details, or check the start row and format.");
+    showDebugButton();
     return;
   }
 
   STATE.columns = columns;
   STATE.rows = rows;
 
+  var fmtTag = mixed ? ("mixed (" + formats.map(fmtName).join(", ") + ")") : fmtName(formats[0]);
   var extra = warnings.length ? " " + warnings.join(" ") : "";
   setMsg("importMsg", warnings.length ? "warn" : "ok",
-    "Loaded " + rows.length + " rows from " + STATE.fileCount + " file(s)." + extra);
+    "Loaded " + rows.length + " rows from " + STATE.fileCount + " file(s). Format: " + fmtTag + "." + extra);
 
+  showDebugButton();
   buildMappingUI();
 }
 
@@ -474,6 +609,49 @@ document.getElementById("startRow").addEventListener("change", reparse);
 document.getElementById("hasHeader").addEventListener("change", reparse);
 document.getElementById("rescanBtn").addEventListener("click", reparse);
 document.getElementById("autoMapBtn").addEventListener("click", autoMap);
+
+// Changing the format re-runs the start-row detection, then re-parses.
+document.getElementById("formatSel").addEventListener("change", function () {
+  if (STATE.texts && STATE.texts.length) loadTexts(STATE.texts, STATE.fileCount);
+});
+
+// Debug panel buttons.
+document.getElementById("debugToggle").addEventListener("click", function () {
+  var card = document.getElementById("debugCard");
+  if (card.style.display === "none") {
+    document.getElementById("debugPre").textContent = debugReport();
+    card.style.display = "";
+    this.textContent = "Hide debug log";
+  } else {
+    card.style.display = "none";
+    this.textContent = "Show debug log (" + DEBUG.order.length + " codes)";
+  }
+});
+
+document.getElementById("debugCopy").addEventListener("click", function () {
+  var txt = debugReport();
+  var self = this;
+  function done() {
+    self.textContent = "Copied";
+    setTimeout(function () { self.textContent = "Copy debug report"; }, 1500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done, function () { fallbackCopy(txt); done(); });
+  } else {
+    fallbackCopy(txt); done();
+  }
+});
+
+// A copy that works from a local file, where the clipboard API may be blocked.
+function fallbackCopy(txt) {
+  var ta = document.createElement("textarea");
+  ta.value = txt;
+  ta.style.position = "fixed"; ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  document.body.removeChild(ta);
+}
 
 // ---------------------------------------------------------------------------
 // Delimited text parsing. Handles quoted fields that contain the delimiter.
@@ -562,6 +740,90 @@ function parseFileBlock(text, startRow, hasHeader) {
   return { columns: columns, rows: rows };
 }
 
+// ---------------------------------------------------------------------------
+// P5000 Etch elog parsing. This format has a text preamble, then a header, then
+// records whose columns are separated by runs of spaces (not a delimiter). The
+// first four columns are single tokens and the rest of the line is the free
+// text Description. We emit the same {columns, rows} shape parseFileBlock does,
+// so the mapping, auto-map, severity filter, and analysis are all reused.
+// ---------------------------------------------------------------------------
+function parseP5000Block(text, fileLabel) {
+  var lines = splitLines(text);
+
+  var headerRe = /^\s*Date\s+Time\s+Event\s+Number\s+Event\s+Type\s+Description\s*$/i;
+  var headerIdx = -1;
+  for (var i = 0; i < lines.length; i++) {
+    if (headerRe.test(lines[i])) { headerIdx = i; break; }
+  }
+
+  capturePreamble(lines, headerIdx < 0 ? Math.min(lines.length, 30) : headerIdx, fileLabel);
+  if (headerIdx < 0) dbg("HDR-NOTFOUND", fileLabel);
+  else dbg("FMT-P5000", fileLabel + ": header at line " + (headerIdx + 1));
+
+  // Date, time, event number, event type are single tokens. Description is the
+  // rest of the line, kept verbatim so its own spaces survive.
+  var rowRe = /^\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(\d{1,2}:\d{2}(?::\d{2})?)\s+(\S+)\s+(\S+)\s+(.*\S)\s*$/;
+  var dateLead = /^\s*\d{1,2}\/\d{1,2}\/\d{2,4}\s/;
+  var labels = ["Date", "Time", "Event Number", "Event Type", "Description", "Chamber"];
+  var columns = labels.map(function (lab, idx) { return { key: "c" + idx, label: lab, samples: [] }; });
+  var rows = [];
+  var y2k = 0;
+
+  for (var j = headerIdx + 1; j < lines.length; j++) {
+    var raw = lines[j];
+    if (!raw || !raw.trim()) continue;
+    var m = raw.match(rowRe);
+    if (m) {
+      if (m[1].split("/")[2].length === 2) y2k += 1;
+      var chamber = extractChamber(m[5]);
+      if (!chamber) dbg("EQ-NOCHAMBER", fileLabel, m[5]);
+      rows.push({ c0: m[1], c1: m[2], c2: m[3], c3: m[4], c4: m[5], c5: chamber || "(unknown)" });
+    } else if (!dateLead.test(raw) && rows.length) {
+      // Not a fresh record. Join it to the last record as a wrapped line.
+      rows[rows.length - 1].c4 += " " + raw.trim();
+      dbg("ROW-CONT", fileLabel, "L" + (j + 1) + ": " + raw.trim());
+    } else {
+      dbg("ROW-NOMATCH", fileLabel, "L" + (j + 1) + ": " + raw);
+    }
+  }
+
+  if (y2k) dbg("TS-Y2K", fileLabel + ": " + y2k + " rows");
+  if (!rows.length) { dbg("FMT-EMPTY", fileLabel); return { columns: [], rows: [] }; }
+
+  // Keep a few sample values per column, same as the delimited path.
+  for (var s = 0; s < Math.min(10, rows.length); s++) {
+    columns.forEach(function (col) { col.samples.push(rows[s][col.key]); });
+  }
+  return { columns: columns, rows: rows };
+}
+
+// Read the subsystem tag out of a description. The real chamber follows the
+// word chamber or port, like <S4EXT>. Placeholder tokens such as <L1> or <S1>
+// are ignored.
+function extractChamber(desc) {
+  var m = /(?:chamber|port)\s+<([^>]+)>/i.exec(desc);
+  if (m) return m[1];
+  m = /<(S\d[A-Z]+)>/i.exec(desc);
+  if (m) return m[1];
+  return "";
+}
+
+// Pull the tool details out of the preamble lines above the data.
+function capturePreamble(lines, upto, fileLabel) {
+  var sys = "", proc = "", soft = "";
+  for (var i = 0; i < upto; i++) {
+    var ln = lines[i];
+    if (!ln || !ln.trim()) continue;
+    var m;
+    if ((m = /System type:\s*(.+)$/i.exec(ln))) sys = m[1].trim();
+    else if ((m = /Process type:\s*(.+)$/i.exec(ln))) proc = m[1].trim();
+    else if ((m = /Software version:\s*(.+)$/i.exec(ln))) soft = m[1].trim();
+  }
+  if (sys || proc || soft) {
+    dbg("PRE-META", fileLabel + ": " + [sys, proc, soft].filter(Boolean).join(" / "));
+  }
+}
+
 // Guess a sensible start row and header flag for a freshly imported file.
 // If a line parses as data (its cells contain a date), the data starts there
 // and there is no header. Otherwise we assume the first line is a header.
@@ -609,8 +871,8 @@ function splitLine(line, delim) {
 // ---------------------------------------------------------------------------
 
 // Work out what kind of values a column holds, from its sample rows.
-var RE_DATETIME = /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4})[ T]\d{1,2}:\d{2}/;
-var RE_DATE = /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4})$/;
+var RE_DATETIME = /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4})[ T]\d{1,2}:\d{2}/;
+var RE_DATE = /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4})$/;
 var RE_TIME = /^\d{1,2}:\d{2}(:\d{2})?$/;
 var RE_INT = /^-?\d+$/;
 
@@ -878,6 +1140,9 @@ function fillDeriveDefaults() {
 // Date parsing. Browsers parse many formats. We add a couple of common ones
 // that they do not handle so logs parse the same everywhere.
 // ---------------------------------------------------------------------------
+// Expand a 2-digit year. 00 to 68 is the 2000s, 69 to 99 is the 1900s.
+function expandYear(yy) { return yy <= 68 ? 2000 + yy : 1900 + yy; }
+
 function parseDate(s) {
   if (!s) return null;
   s = s.trim();
@@ -889,6 +1154,15 @@ function parseDate(s) {
   // Try "MM/DD/YYYY HH:MM:SS" (United States style).
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if (m) return new Date(+m[3], +m[1] - 1, +m[2], +m[4], +m[5], +(m[6] || 0));
+
+  // Try "MM/DD/YY HH:MM:SS" with a 2-digit year (P5000 elog style). The pivot
+  // sends 00 to 68 into the 2000s and 69 to 99 into the 1900s.
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(expandYear(+m[3]), +m[1] - 1, +m[2], +m[4], +m[5], +(m[6] || 0));
+
+  // Date only, 2-digit year.
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (m) return new Date(expandYear(+m[3]), +m[1] - 1, +m[2]);
 
   // Date only, no time.
   m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
@@ -1121,7 +1395,7 @@ function buildOccurrences(rows, map) {
     // Duration mode or count-only mode. Each row is one occurrence.
     rows.forEach(function (r) {
       var t = rowTimestamp(r, map);
-      if (!t) { problems.push(1); return; }
+      if (!t) { problems.push(1); dbg("TS-BADDATE", "analysis", map.tsCol ? r[map.tsCol] : (r[map.dateCol] + " " + (map.timeCol ? r[map.timeCol] : ""))); return; }
       var rec = baseRec(r);
       var durSec = 0;
       if (map.downMode === "duration") {
@@ -1320,6 +1594,8 @@ function runAnalysis() {
   if (map.downMode === "derive" && (!map.downPhrases.length || !map.upPhrases.length || !map.chamberNames.length)) { setMsg("mapMsg", "err", "The derive mode needs at least one down phrase, one up phrase, and one chamber name."); return; }
   setMsg("mapMsg", "", "");
 
+  // Drop analysis codes from a previous run so they do not double count.
+  clearCodes(["TS-BADDATE"]);
   var built = buildOccurrences(STATE.rows, map);
   if (!built.occ.length) {
     var emptyMsg = (map.downMode === "derive")
@@ -1390,6 +1666,8 @@ function runAnalysis() {
   };
 
   renderResults();
+  // Analysis may have added codes (bad timestamps). Refresh the debug button.
+  showDebugButton();
 }
 
 function renderResults() {

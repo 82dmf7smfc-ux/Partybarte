@@ -32,7 +32,10 @@ Both run fully offline. Neither makes a network call.
 Open `alarm_pareto.html` in a browser. There is nothing to install.
 
 1. Click "Choose Files" and pick one or more elog files from the same tool.
-   CSV and delimited text files work. Or click "Load built-in sample" to try it.
+   CSV and delimited text files work. So do P5000 Etch elogs, which have a text
+   preamble and columns separated by spaces. The Format drop-down is set to "Auto
+   detect", or you can force CSV or P5000. Or click "Load built-in sample" to try
+   it.
 2. Point the tool at your data. Set "First data row" to the line where the data
    begins, so any preamble lines above it are skipped. The tool reads from that
    row down until the first blank line. Older rows outside the window are dropped
@@ -71,6 +74,12 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    "810 - Chamber 2 unable to start recipe". Switch grouping level with the tabs
    (Fault, Module, Message text). Download a CSV summary, or use
    "Print / Save as PDF" to make a report.
+
+If a file does not read the way you expect, press "Show debug log". It lists
+short codes for how each file was parsed, such as the detected format, skipped
+rows, rejoined lines, 2-digit years, and missing chamber tags. Use "Copy debug
+report" to copy the codes so they can be shared for troubleshooting. Nothing
+there leaves your computer.
 
 Because it runs in the browser, it does not write native Excel chart files. If
 you need those, use the Python tool.
