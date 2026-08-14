@@ -155,9 +155,9 @@ async function main() {
     + "})()");
   check("categorize built-in PM", cat.pm.matched === true && cat.pm.category === "PM trigger reached", cat.pm);
   check("categorize built-in gas flow", cat.gas.matched === true && cat.gas.category === "Gas flow error", cat.gas);
-  check("categorize unmatched falls back", cat.novel.matched === false && cat.novel.category.indexOf("#") >= 0, cat.novel);
+  check("categorize unmatched falls back to readable label", cat.novel.matched === false && cat.novel.category === "Some brand new message", cat.novel);
   check("categorize user rule wins", cat.override.matched === true && cat.override.category === "Custom PM", cat.override);
-  check("normCategory collapses tags and numbers", cat.norm === "chamber <*> step <*> at #:#", cat.norm);
+  check("normCategory collapses tags and numbers", cat.norm === "step at # #", cat.norm);
   check("parseCatRules bad regex -> CAT-BADRULE", cat.badRuleCode === true, cat);
 
   // 6c. Category is a Pareto level, and the P5000 sample rolls up correctly.
@@ -293,34 +293,66 @@ async function main() {
     + "var sr=AP.suggestRule('system reboot time down <L2> minutes, system wafer count <L1>');"
     + "return {topShape:ru[0].shape,topCount:ru[0].count,topPct:Math.round(ru[0].pct),groups:ru.length,pat:sr.pattern,lab:sr.label};"
     + "})()");
-  eq("rollup: top shape", uk.topShape, "chamber <*> abc #");
+  eq("rollup: top shape", uk.topShape, "abc #");
   eq("rollup: top count", uk.topCount, 2);
   eq("rollup: top pct ~67", uk.topPct, 67);
   eq("rollup: distinct shapes", uk.groups, 2);
-  eq("suggestRule: pattern", uk.pat, "system reboot time down");
-  eq("suggestRule: label", uk.lab, "System reboot time down");
+  eq("suggestRule: pattern", uk.pat, "system reboot time down minutes");
+  eq("suggestRule: label", uk.lab, "System reboot time down minutes");
 
-  // 6l. Full-page: Unknown panel renders, Add rule appends, System bucket regroups.
+  // 6l. Full-page: Unknown panel + Add rule, using a mini P5000 with a message
+  // that matches no built-in rule so there is always an uncategorized shape.
+  await ev("window.__mini = 'System type:  P5000\\nDate  Time  Event Number  Event Type  Description\\n08/07/26  12:00:00  494  FAULT  zzz completely novel widget malfunction alpha\\n'; true");
   var up = await ev("(function(){"
-    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__mini],1);"
     + "document.getElementById('downMode').value='none';"
     + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
     + "document.getElementById('systemBucket').checked=false;"
     + "runAnalysis();"
     + "var vis=document.getElementById('unknownCard').style.display!=='none';"
-    + "var catRows=document.querySelectorAll('#unkCatTable tr').length;"        // header + data
     + "var addBtns=document.querySelectorAll('#unkCatTable .addrule').length;"
     + "var before=document.getElementById('catRules').value;"
     + "if(addBtns) document.querySelector('#unkCatTable .addrule').click();"
     + "var after=document.getElementById('catRules').value;"
     + "var verbose=debugReport(true);"
-    + "return {vis:vis,catRows:catRows,addBtns:addBtns,grew:after.length>before.length,hasArrow:/=>/.test(after),verboseHasShapes:/Uncategorized message shapes|No-chamber event shapes/.test(verbose)};"
+    + "return {vis:vis,addBtns:addBtns,grew:after.length>before.length,hasArrow:/=>/.test(after),rule:after,verboseHasShapes:/Uncategorized message shapes|No-chamber event shapes/.test(verbose)};"
     + "})()");
   check("unknown: panel visible", up.vis, up);
-  check("unknown: uncategorized rows listed", up.catRows >= 2, up);
   check("unknown: add-rule buttons present", up.addBtns >= 1, up);
   check("unknown: Add rule appended a rule", up.grew && up.hasArrow, up);
+  check("unknown: appended rule is readable", /zzz completely novel widget/.test(up.rule), up.rule);
   check("verbose report includes shape rollups", up.verboseHasShapes, up);
+
+  // 6m. Category-first default, "Matched by" source, and category metrics.
+  var m6 = await ev("(function(){"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
+    + "runAnalysis();"
+    + "var activeTab=(document.querySelector('#levelTabs button.active')||{}).textContent;"
+    + "var hasMatchedBy=/Matched by/.test(document.getElementById('resultTable').innerHTML);"
+    + "var pm=STATE.lastResult.catSources['PM trigger reached']||'';"
+    + "var metrics=debugReport(false);"
+    + "return {active:activeTab, hasMatchedBy:hasMatchedBy, pmSource:pm, metricsHasCat:/Category metrics/.test(metrics), metricsHasCoverage:/categorized \\d+ of/.test(metrics)};"
+    + "})()");
+  eq("default level is Category", m6.active, "Category");
+  check("Category table has Matched by column", m6.hasMatchedBy, m6);
+  check("PM category source is built-in", /built-in/.test(m6.pmSource), m6);
+  check("debug report has Category metrics", m6.metricsHasCat && m6.metricsHasCoverage, m6);
+
+  // 6n. Subsystem-name mapping: a tag-less 'front panel' event becomes a module.
+  var subm = await ev("(function(){"
+    + "window.__mini2='System type:  P5000\\nDate  Time  Event Number  Event Type  Description\\n08/07/26  12:00:00  050  FAULT  front panel func_char depressed\\n';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__mini2],1);"
+    + "document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
+    + "runAnalysis();"
+    + "var eqs=STATE.lastResult.kept.map(function(o){return o.equipment;});"
+    + "return {eqs:eqs};"
+    + "})()");
+  check("subsystem mapping: front panel -> Front Panel module", subm.eqs.indexOf("Front Panel") >= 0, subm);
 
   var sysb = await ev("(function(){"
     + "document.getElementById('catRules').value='';"                            // clear rule added above
@@ -335,9 +367,9 @@ async function main() {
   check("system bucket: tag-less events labeled System", sysb.hasSystem, sysb);
   check("system bucket: no (unknown) left", sysb.noUnknown, sysb);
 
-  // 7. Regression: the delimited path still works.
-  var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([SAMPLE_CSV],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
-  eq("regression: built-in CSV rows", reg.rows, 15);
+  // 7. Regression: the delimited path still works (uses the CSV fixture).
+  var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
+  eq("regression: delimited fixture rows", reg.rows, 4);
   check("regression: CSV headers read", reg.hasAlarmId, reg);
 
   ws.close();

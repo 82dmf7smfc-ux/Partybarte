@@ -7,6 +7,26 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: the Pareto now opens on the Category level, and the Category
+  table shows a "Matched by" column, so you can see how each category was decided
+  (a built-in rule, your rule, or the auto label from the message shape). The
+  same detail is in the bar hover tooltip.
+- Browser tool: the debug log now includes category metrics: how many messages
+  were categorized (count and percent), the number of distinct categories,
+  per-rule hit counts, and which rules never matched.
+- Browser tool: cleaner categories. Uncategorized messages get a readable label
+  from their leading words instead of a raw shape, the normalization strips the
+  chamber tag and boilerplate so near-identical messages collapse, and more
+  built-in rules cover common P5000 messages.
+- Browser tool: an editable "Subsystem / module names" list. When a row has no
+  chamber tag, the tool reads one of these names from the message text and uses
+  it as the Module, so tool-level events land on a module instead of "(unknown)".
+
+### Changed
+- Browser tool: removed the two demo buttons ("Load built-in sample" and "Load
+  message-log sample").
+
+### Added (earlier in this cycle)
 - Browser tool: an "Unknown events" panel. It ranks the messages that matched no
   category rule, and the events with no chamber tag, by how common each shape is,
   so the biggest unknown groups are obvious. Each uncategorized shape has an "Add
