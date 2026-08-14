@@ -132,9 +132,14 @@
   <div class="card noprint" id="debugCard" style="display:none; background:#fbfbfc">
     <div class="row" style="justify-content:space-between; align-items:center">
       <h2 style="margin:0">Debug log</h2>
-      <button class="secondary" id="debugCopy" type="button">Copy debug report</button>
+      <div style="display:flex;align-items:center;gap:12px">
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
+          <input type="checkbox" id="debugVerbose"> Verbose
+        </label>
+        <button class="secondary" id="debugCopy" type="button">Copy debug report</button>
+      </div>
     </div>
-    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Nothing here leaves your computer.</p>
+    <p class="hint">Codes describing how each file was read. Paste this back for troubleshooting. Verbose adds more samples and the unknown-event shapes. Nothing here leaves your computer.</p>
     <pre id="debugPre" style="white-space:pre-wrap; font-size:12px; max-height:340px; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px; margin:0"></pre>
   </div>
 
@@ -275,6 +280,13 @@
       <div id="categoryFilter" style="margin-top:6px"></div>
     </div>
 
+    <div class="row" style="margin-bottom:8px">
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
+          <input type="checkbox" id="systemBucket"> Label tag-less tool/system events as "System" (instead of "(unknown)")
+        </label>
+      </div>
+    </div>
     <div class="row">
       <div class="field">
         <label>Trailing window (days)</label>
@@ -324,6 +336,22 @@
         </div>
       </div>
       <div class="foot" id="insightsFoot"></div>
+    </div>
+
+    <div class="card" id="unknownCard" style="display:none">
+      <h2>Unknown events</h2>
+      <p class="hint">The most common messages that matched no category rule, and the most common events with no chamber tag. Add a rule for the big ones to clean up the Category Pareto. "Add rule" appends a starter rule to your category box, then click Analyze again.</p>
+      <div class="split">
+        <div>
+          <h3 style="font-size:13px;margin:0 0 6px" id="unkCatTitle">Uncategorized messages</h3>
+          <div class="chartwrap"><table id="unkCatTable"></table></div>
+        </div>
+        <div>
+          <h3 style="font-size:13px;margin:0 0 6px" id="unkChamberTitle">Events with no chamber tag</h3>
+          <div class="chartwrap"><table id="unkChamberTable"></table></div>
+        </div>
+      </div>
+      <div id="unkMsg"></div>
     </div>
 
     <div class="card">
@@ -525,6 +553,44 @@ function parseCatRules(lines) {
 }
 
 // ---------------------------------------------------------------------------
+// Unknown events. As the analysis runs, we collect the messages that matched no
+// category rule, and the messages that had no chamber tag. Then we group them by
+// normalized shape so the biggest unknown groups float to the top. This turns a
+// large count into a short worklist of rules to add.
+// ---------------------------------------------------------------------------
+var UNKNOWN = { catList: [], chamberList: [] };
+function resetUnknown() { UNKNOWN = { catList: [], chamberList: [] }; }
+
+// Group a list of messages by their normalized shape. Returns the top rows,
+// most common first, each with a count, a percent, and one example. Pure.
+function rollupByShape(list, topN) {
+  var groups = {};
+  list.forEach(function (d) {
+    var k = normCategory(d);
+    if (!groups[k]) groups[k] = { shape: k, count: 0, example: d };
+    groups[k].count += 1;
+  });
+  var total = list.length || 1;
+  var arr = Object.keys(groups).map(function (k) {
+    var g = groups[k];
+    return { shape: g.shape, count: g.count, pct: g.count / total * 100, example: g.example };
+  }).sort(function (a, b) { return b.count - a.count; });
+  return topN ? arr.slice(0, topN) : arr;
+}
+
+// Suggest a category rule from one example message. The pattern is the leading
+// run of words before the first placeholder or number, which is a safe literal.
+// The label is that text with the first letter capitalized.
+function suggestRule(example) {
+  var head = String(example == null ? "" : example).split(/<[^>]*>|\d/)[0];
+  var words = head.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim().split(" ").slice(0, 6);
+  var pattern = words.join(" ").trim();
+  if (!pattern) pattern = String(example || "").toLowerCase().slice(0, 30).trim();
+  var label = pattern.charAt(0).toUpperCase() + pattern.slice(1);
+  return { pattern: pattern, label: label };
+}
+
+// ---------------------------------------------------------------------------
 // Debug log. Each parse records short codes here. The codes are hidden until
 // you press the button. Paste the report back to report a file that read wrong.
 // The registry is the stable list of codes and what they mean.
@@ -572,25 +638,49 @@ function dbg(code, msg, sample) {
     DEBUG.order.push(code);
   }
   e.count += 1;
-  if (sample !== undefined && sample !== "" && e.samples.length < 5) e.samples.push(String(sample));
+  // Store more than we usually show, so the verbose report can dig deeper.
+  if (sample !== undefined && sample !== "" && e.samples.length < 25) e.samples.push(String(sample));
 }
 
-// Build the copy friendly text report.
-function debugReport() {
+// Build the copy friendly text report. Verbose shows more samples per code and
+// the ranked unknown-event shapes.
+function debugReport(verbose) {
   var out = [];
-  out.push("Alarm Log Pareto debug report");
+  out.push("Alarm Log Pareto debug report" + (verbose ? " (verbose)" : ""));
   out.push("Generated: " + fmt(new Date()));
   out.push("Files: " + STATE.fileCount + ", rows: " + STATE.rows.length);
   out.push("");
   if (!DEBUG.order.length) { out.push("No debug codes recorded."); return out.join("\n"); }
+  var cap = verbose ? 25 : 5;
   DEBUG.order.forEach(function (code) {
     var e = DEBUG.codes[code];
     var meaning = (DEBUG_CODES[code] && DEBUG_CODES[code].meaning) || e.msg || "";
     out.push("[" + e.code + "] " + e.level + "  " + e.count + "x  " + meaning);
     if (e.msg && e.msg !== meaning) out.push("    note: " + e.msg);
-    e.samples.forEach(function (s) { out.push("    - " + s); });
+    e.samples.slice(0, cap).forEach(function (s) { out.push("    - " + s); });
+    if (e.samples.length > cap) out.push("    ... " + (e.count - cap) + " more");
   });
+
+  if (verbose) {
+    var catRoll = rollupByShape(UNKNOWN.catList, 20);
+    var chRoll = rollupByShape(UNKNOWN.chamberList, 20);
+    if (catRoll.length) {
+      out.push("");
+      out.push("Uncategorized message shapes (top " + catRoll.length + " of " + UNKNOWN.catList.length + "):");
+      catRoll.forEach(function (r) { out.push("  " + r.count + "x  " + r.shape); });
+    }
+    if (chRoll.length) {
+      out.push("");
+      out.push("No-chamber event shapes (top " + chRoll.length + " of " + UNKNOWN.chamberList.length + "):");
+      chRoll.forEach(function (r) { out.push("  " + r.count + "x  " + r.shape); });
+    }
+  }
   return out.join("\n");
+}
+
+function debugVerboseOn() {
+  var v = document.getElementById("debugVerbose");
+  return !!(v && v.checked);
 }
 
 function showDebugButton() {
@@ -598,7 +688,7 @@ function showDebugButton() {
   b.style.display = "";
   b.textContent = "Show debug log (" + DEBUG.order.length + " codes)";
   var card = document.getElementById("debugCard");
-  if (card.style.display !== "none") document.getElementById("debugPre").textContent = debugReport();
+  if (card.style.display !== "none") document.getElementById("debugPre").textContent = debugReport(debugVerboseOn());
 }
 
 // The format the tool will use for one file: the forced choice, or auto detect.
@@ -747,7 +837,7 @@ document.getElementById("formatSel").addEventListener("change", function () {
 document.getElementById("debugToggle").addEventListener("click", function () {
   var card = document.getElementById("debugCard");
   if (card.style.display === "none") {
-    document.getElementById("debugPre").textContent = debugReport();
+    document.getElementById("debugPre").textContent = debugReport(debugVerboseOn());
     card.style.display = "";
     this.textContent = "Hide debug log";
   } else {
@@ -756,8 +846,14 @@ document.getElementById("debugToggle").addEventListener("click", function () {
   }
 });
 
+// Re-render the open report when the verbose box is toggled.
+document.getElementById("debugVerbose").addEventListener("change", function () {
+  var card = document.getElementById("debugCard");
+  if (card.style.display !== "none") document.getElementById("debugPre").textContent = debugReport(debugVerboseOn());
+});
+
 document.getElementById("debugCopy").addEventListener("click", function () {
-  var txt = debugReport();
+  var txt = debugReport(debugVerboseOn());
   var self = this;
   function done() {
     self.textContent = "Copied";
@@ -1295,6 +1391,8 @@ function refreshFilters() {
   if (map.equipment) {
     STATE.rows.forEach(function (r) {
       var v = String(r[map.equipment] || "(blank)");
+      // Match the relabel in baseRec so the filter and the occurrences agree.
+      if (map.systemBucket && v === "(unknown)") v = "System";
       chamberCounts[v] = (chamberCounts[v] || 0) + 1;
     });
   }
@@ -1346,6 +1444,11 @@ document.getElementById("downMode").addEventListener("change", syncDownModeUI);
     if (STATE.rows.length) refreshFilters();
   });
 })();
+
+// The System bucket changes what the chamber filter should show, so rebuild it.
+document.getElementById("systemBucket").addEventListener("change", function () {
+  if (STATE.rows.length) refreshFilters();
+});
 
 // Show the option panel that matches the chosen downtime mode. The derive
 // panel is filled with the default phrase and name lists the first time it is
@@ -1457,6 +1560,8 @@ function readMapping() {
 
   // Category rules the user typed. Tried before the built-in rules.
   map.catRules = parseCatRules(readLines("catRules"));
+  var sysBox = document.getElementById("systemBucket");
+  map.systemBucket = sysBox ? sysBox.checked : false;
   return map;
 }
 
@@ -1528,11 +1633,16 @@ function buildOccurrences(rows, map) {
   function baseRec(r) {
     var desc = rowDescription(r, map);
     var cat = categorize(desc, map.catRules);
-    if (!cat.matched && desc && desc !== "(blank)") dbg("CAT-UNMATCHED", desc);
+    if (!cat.matched && desc && desc !== "(blank)") { dbg("CAT-UNMATCHED", desc); UNKNOWN.catList.push(desc); }
+    var eq = map.equipment ? (r[map.equipment] || "(blank)") : "(blank)";
+    if (eq === "(unknown)") {
+      if (desc && desc !== "(blank)") UNKNOWN.chamberList.push(desc);
+      if (map.systemBucket) eq = "System"; // group tag-less tool/system events
+    }
     return {
       fault_code: map.fault_code ? (r[map.fault_code] || "(blank)") : "(blank)",
       description: desc,
-      equipment: map.equipment ? (r[map.equipment] || "(blank)") : "(blank)",
+      equipment: eq,
       severity: map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : "",
       category: cat.category
     };
@@ -1915,6 +2025,7 @@ function runAnalysis() {
 
   // Drop analysis codes from a previous run so they do not double count.
   clearCodes(["TS-BADDATE", "CAT-UNMATCHED", "CAT-BADRULE", "FLT-BADREGEX"]);
+  resetUnknown();
   var built = buildOccurrences(STATE.rows, map);
   if (!built.occ.length) {
     var emptyMsg = (map.downMode === "derive")
@@ -2042,6 +2153,7 @@ function renderResults() {
 
   renderValidation();
   renderInsights();
+  renderUnknown();
 
   // Level tabs.
   var tabs = document.getElementById("levelTabs");
@@ -2061,6 +2173,48 @@ function renderResults() {
 
 // Fill the Insights card from the computed stats: headline tiles, an
 // events-per-day bar chart, and a per-chamber table.
+// Fill the Unknown-events card from the shape rollups, with an Add rule button
+// on each uncategorized shape.
+function renderUnknown() {
+  var card = document.getElementById("unknownCard");
+  var cats = rollupByShape(UNKNOWN.catList, 20);
+  var chambers = rollupByShape(UNKNOWN.chamberList, 20);
+  if (!cats.length && !chambers.length) { card.style.display = "none"; return; }
+  card.style.display = "";
+
+  document.getElementById("unkCatTitle").textContent = "Uncategorized messages (" + UNKNOWN.catList.length + ")";
+  document.getElementById("unkChamberTitle").textContent = "Events with no chamber tag (" + UNKNOWN.chamberList.length + ")";
+  document.getElementById("unkCatTable").innerHTML = unkRows(cats, true);
+  document.getElementById("unkChamberTable").innerHTML = unkRows(chambers, false);
+
+  Array.prototype.forEach.call(document.querySelectorAll("#unkCatTable .addrule"), function (btn) {
+    btn.addEventListener("click", function () { addCategoryRuleFrom(btn.getAttribute("data-example")); });
+  });
+  setMsg("unkMsg", "", "");
+}
+
+function unkRows(rows, withButton) {
+  var head = "<tr><th>Count</th><th>%</th><th class='txt'>Example</th>" + (withButton ? "<th></th>" : "") + "</tr>";
+  var body = rows.map(function (r) {
+    var btn = withButton
+      ? "<td><button class=\"secondary addrule\" type=\"button\" data-example=\"" + esc(r.example) + "\" style=\"padding:3px 8px\">Add rule</button></td>"
+      : "";
+    return "<tr><td>" + r.count + "</td><td>" + r.pct.toFixed(1) + "%</td><td class='txt'>" + esc(clip(r.example, 60)) + "</td>" + btn + "</tr>";
+  }).join("");
+  return head + (body || "<tr><td class='txt' colspan='4'>None.</td></tr>");
+}
+
+// Append a starter category rule from one example to the rules box and save it.
+function addCategoryRuleFrom(example) {
+  var s = suggestRule(example);
+  var ta = document.getElementById("catRules");
+  var line = s.pattern + " => " + s.label;
+  ta.value = (ta.value.trim() ? ta.value.replace(/\s*$/, "") + "\n" : "") + line;
+  try { localStorage.setItem("ap_cat_rules", ta.value); } catch (e) {}
+  if (STATE.rows.length) refreshFilters();
+  setMsg("unkMsg", "ok", "Added rule: " + line + ".  Click Analyze to apply.");
+}
+
 function renderInsights() {
   var R = STATE.lastResult;
   var S = R.stats;
@@ -2538,6 +2692,8 @@ window.AP = {
   categorize: categorize,
   normCategory: normCategory,
   parseCatRules: parseCatRules,
+  rollupByShape: rollupByShape,
+  suggestRule: suggestRule,
   // Filtering.
   applyFilters: applyFilters,
   // Charts (pure part).

@@ -89,9 +89,16 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
      first. Anything left uncategorized shows up in the debug log so you can see
      what rule to add.
 
+If many messages fall outside your category rules, the "Unknown events" panel
+after the analysis ranks the most common uncategorized message shapes and the
+most common events with no chamber tag. Click "Add rule" on a shape to drop a
+starter rule into the category box, then Analyze again. Tag-less tool or system
+events can be grouped under one "System" name with the option in Settings.
+
 If a file does not read the way you expect, press "Show debug log". It lists
 short codes for how each file was parsed, such as the detected format, skipped
-rows, rejoined lines, 2-digit years, and missing chamber tags. Use "Copy debug
+rows, rejoined lines, 2-digit years, and missing chamber tags. Turn on "Verbose"
+for more example lines and the ranked unknown-event shapes. Use "Copy debug
 report" to copy the codes so they can be shared for troubleshooting. Nothing
 there leaves your computer.
 

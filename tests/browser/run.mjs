@@ -287,6 +287,54 @@ async function main() {
   check("chart: heatmap renders 168 cells", ch.heatCells === 168, ch);
   check("chart: heatmap clears downtime panel", ch.downEmpty, ch);
 
+  // 6k. Unknown-events helpers: rollupByShape and suggestRule (pure).
+  var uk = await ev("(function(){"
+    + "var ru=AP.rollupByShape(['chamber <S4EXT> abc 12','chamber <S1EXT> abc 99','totally other thing'],10);"
+    + "var sr=AP.suggestRule('system reboot time down <L2> minutes, system wafer count <L1>');"
+    + "return {topShape:ru[0].shape,topCount:ru[0].count,topPct:Math.round(ru[0].pct),groups:ru.length,pat:sr.pattern,lab:sr.label};"
+    + "})()");
+  eq("rollup: top shape", uk.topShape, "chamber <*> abc #");
+  eq("rollup: top count", uk.topCount, 2);
+  eq("rollup: top pct ~67", uk.topPct, 67);
+  eq("rollup: distinct shapes", uk.groups, 2);
+  eq("suggestRule: pattern", uk.pat, "system reboot time down");
+  eq("suggestRule: label", uk.lab, "System reboot time down");
+
+  // 6l. Full-page: Unknown panel renders, Add rule appends, System bucket regroups.
+  var up = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
+    + "document.getElementById('systemBucket').checked=false;"
+    + "runAnalysis();"
+    + "var vis=document.getElementById('unknownCard').style.display!=='none';"
+    + "var catRows=document.querySelectorAll('#unkCatTable tr').length;"        // header + data
+    + "var addBtns=document.querySelectorAll('#unkCatTable .addrule').length;"
+    + "var before=document.getElementById('catRules').value;"
+    + "if(addBtns) document.querySelector('#unkCatTable .addrule').click();"
+    + "var after=document.getElementById('catRules').value;"
+    + "var verbose=debugReport(true);"
+    + "return {vis:vis,catRows:catRows,addBtns:addBtns,grew:after.length>before.length,hasArrow:/=>/.test(after),verboseHasShapes:/Uncategorized message shapes|No-chamber event shapes/.test(verbose)};"
+    + "})()");
+  check("unknown: panel visible", up.vis, up);
+  check("unknown: uncategorized rows listed", up.catRows >= 2, up);
+  check("unknown: add-rule buttons present", up.addBtns >= 1, up);
+  check("unknown: Add rule appended a rule", up.grew && up.hasArrow, up);
+  check("verbose report includes shape rollups", up.verboseHasShapes, up);
+
+  var sysb = await ev("(function(){"
+    + "document.getElementById('catRules').value='';"                            // clear rule added above
+    + "document.getElementById('systemBucket').checked=true;"                     // set before load so the filter builds with 'System'
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('downMode').value='none';"
+    + "document.querySelectorAll('.sevchk').forEach(function(c){c.checked=true;});"
+    + "runAnalysis();"
+    + "var eqs=STATE.lastResult.kept.map(function(o){return o.equipment;});"
+    + "return {hasSystem:eqs.indexOf('System')>=0,noUnknown:eqs.indexOf('(unknown)')===-1};"
+    + "})()");
+  check("system bucket: tag-less events labeled System", sysb.hasSystem, sysb);
+  check("system bucket: no (unknown) left", sysb.noUnknown, sysb);
+
   // 7. Regression: the delimited path still works.
   var reg = await ev("(function(){document.getElementById('formatSel').value='auto';loadTexts([SAMPLE_CSV],1);return {rows:STATE.rows.length,hasAlarmId:STATE.columns.some(function(c){return c.label==='AlarmID';})};})()");
   eq("regression: built-in CSV rows", reg.rows, 15);
