@@ -37,20 +37,30 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    begins, so any preamble lines above it are skipped. The tool reads from that
    row down until the first blank line. Older rows outside the window are dropped
    later. The same start row is used for every file you import.
-3. Label the columns. The tool shows a preview of each column. For each one, pick
-   what it holds from the drop-down: Timestamp, Fault code, Description,
-   Equipment, Duration, Alarm state, or Ignore. Only Timestamp and Fault code are
-   required. Files with no header row work fine. The columns are shown as
-   "Column 1", "Column 2", and so on, and the preview helps you tell them apart.
-   Pick "Other" to name a column you want to see but not analyze.
-4. Tell it how downtime is stored. Three choices. A duration column. Or separate
-   set and clear rows that it should pair. Or none, in which case it ranks by
-   count only. For a duration column, tag that column as "Duration". For set and
-   clear rows, tag the marker column as "Alarm state".
-5. Set the window length, the top-N cutoff, and the downtime method. Click
+3. Click "Auto-map columns". The tool shows one row per column with a few sample
+   values and guesses what each column holds from those values. Fix any guess
+   that is wrong using the drop-downs. The roles are: Date, Time, Timestamp
+   (date and time in one column), Severity, Module / equipment, Message ID,
+   Description, Duration, Alarm state, or Ignore. You need a Timestamp, or a Date
+   (plus a Time), and a Message ID. Files with no header row work fine; columns
+   show as "Column 1", "Column 2", and so on.
+   - If a message with commas splits across two columns, tag both as Description
+     and they are joined back together.
+   - Pick "Other" to name a column you want to see but not analyze.
+4. Tell it how downtime is stored. A duration column (tag it "Duration"), or
+   separate set and clear rows (tag the marker column "Alarm state"), or none, in
+   which case it ranks by count only. Many elogs have no downtime, so "none" is
+   common.
+5. If you mapped a Severity column, choose which severities to include. Use the
+   preset buttons "Faults only", "Warnings only", or "Faults + warnings", or tick
+   the levels by hand. The default is faults and warnings, so routine trace and
+   prompt lines are left out. Set the window length and the top-N cutoff. Click
    "Analyze".
-6. Read the summary and the Pareto charts. Switch grouping level with the tabs.
-   Download a CSV summary, or use "Print / Save as PDF" to make a report.
+6. Read the summary and the Pareto charts. The fault chart labels each bar with
+   the message ID and its most common text, for example
+   "810 - Chamber 2 unable to start recipe". Switch grouping level with the tabs
+   (Fault, Module, Message text). Download a CSV summary, or use
+   "Print / Save as PDF" to make a report.
 
 Because it runs in the browser, it does not write native Excel chart files. If
 you need those, use the Python tool.

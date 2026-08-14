@@ -15,16 +15,20 @@ How to use it
 3. Set "First data row" to the line where the data starts. Preamble lines above
    it are skipped. The page reads down until the first blank line. The same start
    row is used for every file you import.
-4. Label the columns. The page shows a preview of each column. Pick what each one
-   holds from the drop-down. Only Timestamp and Fault code are required. Files
-   with no header row work fine; the columns show as "Column 1", "Column 2", and
-   so on. Pick "Other" to name a column you want to see but not analyze.
+4. Click "Auto-map columns". The page lists one row per column with sample
+   values and guesses each role. Fix any that are wrong. Roles include Date,
+   Time, Timestamp, Severity, Module, Message ID, and Description. You need a
+   Timestamp (or a Date plus a Time) and a Message ID. If a message with commas
+   splits across two columns, tag both as Description to join them.
 5. Choose how downtime is stored: a duration column (tag it "Duration"), or
    separate set and clear rows to pair (tag the marker column "Alarm state"), or
    none (rank by count only).
-6. Set the window length and the top-N cutoff. Click "Analyze".
-7. Read the summary and the Pareto charts. Use the tabs to switch grouping
-   level. Download a CSV summary, or use "Print / Save as PDF" for a report.
+6. If you mapped a Severity column, pick which severities to include. Presets:
+   "Faults only", "Warnings only", "Faults + warnings" (the default). Set the
+   window length and the top-N cutoff. Click "Analyze".
+7. Read the summary and the Pareto charts. The fault chart pairs each message ID
+   with its most common text. Use the tabs to switch grouping level. Download a
+   CSV summary, or use "Print / Save as PDF" for a report.
 
 Files in this folder
 --------------------
