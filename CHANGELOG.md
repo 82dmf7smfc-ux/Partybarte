@@ -6,6 +6,22 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+- Browser tool: reads P5000 Etch elogs. A new format layer detects the file, skips
+  the text preamble, finds the "Date Time Event Number Event Type Description"
+  header, and reads records whose columns are separated by runs of spaces. The
+  Description keeps its own spacing. The chamber is read from the `<S4EXT>` style
+  tag in the message. The parsed columns feed the existing auto-map, severity
+  filter, and Pareto pipeline unchanged.
+- Browser tool: a Format drop-down (Auto detect, CSV or delimited, P5000 Etch) so
+  the format can be forced when auto-detect is wrong. Auto is the default.
+- Browser tool: 2-digit years (MM/DD/YY) are read with a 1969 pivot, so 00 to 68
+  is the 2000s and 69 to 99 is the 1900s.
+- Browser tool: a hidden debug log with short codes for how each file was read
+  (format, preamble, skipped rows, rejoined lines, 2-digit years, missing chamber
+  tags, unreadable timestamps). A button copies the report for troubleshooting.
+  Nothing there leaves the browser.
+
 ## [1.3.0] - 2026-08-14
 
 ### Added
