@@ -33,15 +33,23 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 
 1. Click "Choose Files" and pick one or more elog files from the same tool.
    CSV and delimited text files work. Or click "Load built-in sample" to try it.
-2. The tool guesses which column is the timestamp, the fault code, and so on.
-   Fix any guess that is wrong using the drop-downs. Only the timestamp and the
-   fault code are required.
-3. Tell it how downtime is stored. Three choices. A duration column. Or separate
+2. Point the tool at your data. Set "First data row" to the line where the data
+   begins, so any preamble lines above it are skipped. The tool reads from that
+   row down until the first blank line. Older rows outside the window are dropped
+   later. The same start row is used for every file you import.
+3. Label the columns. The tool shows a preview of each column. For each one, pick
+   what it holds from the drop-down: Timestamp, Fault code, Description,
+   Equipment, Duration, Alarm state, or Ignore. Only Timestamp and Fault code are
+   required. Files with no header row work fine. The columns are shown as
+   "Column 1", "Column 2", and so on, and the preview helps you tell them apart.
+   Pick "Other" to name a column you want to see but not analyze.
+4. Tell it how downtime is stored. Three choices. A duration column. Or separate
    set and clear rows that it should pair. Or none, in which case it ranks by
-   count only.
-4. Set the window length, the top-N cutoff, and the downtime method. Click
+   count only. For a duration column, tag that column as "Duration". For set and
+   clear rows, tag the marker column as "Alarm state".
+5. Set the window length, the top-N cutoff, and the downtime method. Click
    "Analyze".
-5. Read the summary and the Pareto charts. Switch grouping level with the tabs.
+6. Read the summary and the Pareto charts. Switch grouping level with the tabs.
    Download a CSV summary, or use "Print / Save as PDF" to make a report.
 
 Because it runs in the browser, it does not write native Excel chart files. If

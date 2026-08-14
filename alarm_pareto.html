@@ -118,9 +118,28 @@
   </div>
 
   <div class="card" id="mapCard" style="display:none">
-    <h2>2. Tell the tool which column is which</h2>
-    <p class="hint">The tool guessed the columns from their names. Fix any that are wrong. Only Timestamp and Fault code are required.</p>
-    <div class="mapgrid" id="mapGrid"></div>
+    <h2>2. Point at your data and label the columns</h2>
+
+    <div class="row" style="margin-bottom:6px">
+      <div class="field">
+        <label>First data row (line number in the file)</label>
+        <input type="number" id="startRow" value="1" min="1" step="1" style="width:120px">
+      </div>
+      <div class="field">
+        <label style="visibility:hidden">x</label>
+        <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
+          <input type="checkbox" id="hasHeader"> The line above the data is a header row
+        </label>
+      </div>
+      <div class="field">
+        <label style="visibility:hidden">x</label>
+        <button class="secondary" id="rescanBtn" type="button">Re-scan</button>
+      </div>
+    </div>
+    <p class="hint">Data is read from that row down until the first blank line. Rows older than the window are dropped later. The same start row is used for every file you import.</p>
+
+    <p class="hint">Set what each column holds. Only Timestamp and Fault code are required. Pick "Other" to name a column you want to keep in view but not analyze.</p>
+    <div class="chartwrap"><table id="previewTable"></table></div>
 
     <div style="margin-top:14px">
       <label>How is downtime stored?</label>
@@ -133,10 +152,6 @@
 
     <div id="durationOpts" style="display:none; margin-top:12px" class="row">
       <div class="field">
-        <label>Duration column</label>
-        <select id="durCol"></select>
-      </div>
-      <div class="field">
         <label>Duration unit</label>
         <select id="durUnit">
           <option value="1">seconds</option>
@@ -144,13 +159,13 @@
           <option value="3600">hours</option>
         </select>
       </div>
+      <div class="field">
+        <label style="visibility:hidden">x</label>
+        <span class="hint" style="margin:0">Tag the duration column as "Duration" in the table above.</span>
+      </div>
     </div>
 
     <div id="eventOpts" style="display:none; margin-top:12px" class="row">
-      <div class="field">
-        <label>State column (holds set or clear)</label>
-        <select id="stateCol"></select>
-      </div>
       <div class="field">
         <label>Text that means "set"</label>
         <input type="text" id="setVal" value="SET" size="8">
@@ -158,6 +173,10 @@
       <div class="field">
         <label>Text that means "clear"</label>
         <input type="text" id="clearVal" value="CLEAR" size="8">
+      </div>
+      <div class="field">
+        <label style="visibility:hidden">x</label>
+        <span class="hint" style="margin:0">Tag the state column as "Alarm state" in the table above.</span>
       </div>
     </div>
     <div id="mapMsg"></div>
@@ -228,11 +247,35 @@
 // buttons can all reach them.
 // ---------------------------------------------------------------------------
 var STATE = {
-  headers: [],       // column names from the files
-  rows: [],          // array of objects, one per data row
+  texts: [],         // the raw text of each imported file
   fileCount: 0,
+  columns: [],       // [{key, label, samples:[...]}] detected in the current parse
+  rows: [],          // array of objects, one per data row, keyed by column key
   lastResult: null,  // the most recent analysis, used by the CSV export
   activeLevel: "fault_code"
+};
+
+// The standard identities a column can be tagged with. "other" lets the user
+// type a name for a column they want to see but not analyze.
+var COLUMN_ROLES = [
+  { value: "ignore",      label: "Ignore" },
+  { value: "ts_set",      label: "Timestamp" },
+  { value: "fault_code",  label: "Fault code" },
+  { value: "description", label: "Description" },
+  { value: "equipment",   label: "Equipment" },
+  { value: "duration",    label: "Duration" },
+  { value: "state",       label: "Alarm state (set/clear)" },
+  { value: "other",       label: "Other (type a name)" }
+];
+
+// Keyword hints used to pre-guess an identity from a header name.
+var ROLE_KEYWORDS = {
+  ts_set:      ["time", "date", "stamp", "when"],
+  fault_code:  ["code", "id", "alarm", "fault", "error", "event"],
+  description: ["desc", "text", "message", "msg", "name", "detail"],
+  equipment:   ["chamber", "module", "equip", "tool", "unit", "station", "eqp"],
+  duration:    ["dur", "down", "second", "elapsed", "minute"],
+  state:       ["state", "status", "set", "clear", "action"]
 };
 
 var LEVELS = [
@@ -252,8 +295,7 @@ document.getElementById("fileInput").addEventListener("change", function (e) {
 
 document.getElementById("loadSample").addEventListener("click", function () {
   // A small built-in sample so you can try the tool with no file.
-  parseAllTexts([SAMPLE_CSV], 1);
-  setMsg("importMsg", "ok", "Loaded the built-in sample (15 rows).");
+  loadTexts([SAMPLE_CSV], 1);
 });
 
 function readFiles(files) {
@@ -264,7 +306,7 @@ function readFiles(files) {
     reader.onload = function () {
       texts.push(String(reader.result));
       pending -= 1;
-      if (pending === 0) parseAllTexts(texts, files.length);
+      if (pending === 0) loadTexts(texts, files.length);
     };
     reader.onerror = function () {
       setMsg("importMsg", "err", "Could not read file: " + file.name);
@@ -273,41 +315,61 @@ function readFiles(files) {
   });
 }
 
-// Combine every file into one table. We use the first file's headers. Rows from
-// other files are matched to those headers by name.
-function parseAllTexts(texts, fileCount) {
-  var all = null;
+// Take the raw text of every file, guess where the data starts, then parse.
+function loadTexts(texts, fileCount) {
+  STATE.texts = texts;
+  STATE.fileCount = fileCount;
+
+  // Guess the start row and whether there is a header, from the first file.
+  var guess = detectStartAndHeader(texts[0]);
+  document.getElementById("startRow").value = guess.startRow;
+  document.getElementById("hasHeader").checked = guess.hasHeader;
+
+  reparse();
+}
+
+// Re-read every file using the current start row and header choice. This runs
+// on import and again whenever the user changes those controls.
+function reparse() {
+  if (!STATE.texts.length) return;
+
+  var startRow = Math.max(1, parseInt(document.getElementById("startRow").value, 10) || 1);
+  var hasHeader = document.getElementById("hasHeader").checked;
+
+  var columns = null;
+  var rows = [];
   var warnings = [];
-  texts.forEach(function (text, i) {
-    var parsed = parseDelimited(text);
-    if (!parsed.headers.length) return;
-    if (all === null) {
-      all = { headers: parsed.headers, rows: parsed.rows.slice() };
-    } else {
-      // Different files should share headers. If they do not, warn but keep the
-      // rows whose columns match.
-      if (parsed.headers.join("|") !== all.headers.join("|")) {
-        warnings.push("File " + (i + 1) + " has different column names. Rows were matched by name where possible.");
-      }
-      parsed.rows.forEach(function (r) { all.rows.push(r); });
+
+  STATE.texts.forEach(function (text, i) {
+    var parsed = parseFileBlock(text, startRow, hasHeader);
+    if (!parsed.columns.length) return;
+    if (columns === null) {
+      columns = parsed.columns;
+    } else if (parsed.columns.map(function (c) { return c.key; }).join("|") !==
+               columns.map(function (c) { return c.key; }).join("|")) {
+      warnings.push("File " + (i + 1) + " has a different column layout. Its rows were matched by position where possible.");
     }
+    parsed.rows.forEach(function (r) { rows.push(r); });
   });
 
-  if (!all || !all.rows.length) {
-    setMsg("importMsg", "err", "No data rows were found. Check the file format.");
+  if (!columns || !rows.length) {
+    setMsg("importMsg", "err", "No data rows were found. Check the start row and the file format.");
     return;
   }
 
-  STATE.headers = all.headers;
-  STATE.rows = all.rows;
-  STATE.fileCount = fileCount;
+  STATE.columns = columns;
+  STATE.rows = rows;
 
   var extra = warnings.length ? " " + warnings.join(" ") : "";
   setMsg("importMsg", warnings.length ? "warn" : "ok",
-    "Loaded " + all.rows.length + " rows from " + fileCount + " file(s)." + extra);
+    "Loaded " + rows.length + " rows from " + STATE.fileCount + " file(s)." + extra);
 
   buildMappingUI();
 }
+
+document.getElementById("startRow").addEventListener("change", reparse);
+document.getElementById("hasHeader").addEventListener("change", reparse);
+document.getElementById("rescanBtn").addEventListener("click", reparse);
 
 // ---------------------------------------------------------------------------
 // Delimited text parsing. Handles quoted fields that contain the delimiter.
@@ -322,26 +384,98 @@ function sniffDelimiter(headerLine) {
   return best;
 }
 
-function parseDelimited(text) {
-  // Drop a byte order mark if present, and split into lines.
-  text = text.replace(/^﻿/, "");
-  var lines = text.split(/\r\n|\n|\r/).filter(function (l) { return l.length > 0; });
-  if (!lines.length) return { headers: [], rows: [] };
+// Split text into physical lines. Blank lines are KEPT, because a blank line is
+// how we know the data block has ended.
+function splitLines(text) {
+  return text.replace(/^﻿/, "").split(/\r\n|\n|\r/);
+}
 
-  var delim = sniffDelimiter(lines[0]);
-  var headers = splitLine(lines[0], delim).map(function (h) { return h.trim(); });
+// A line counts as blank if it is empty or only spaces, tabs, or delimiters.
+function isBlankLine(line) {
+  return line.replace(/[\s,;|\t]/g, "") === "";
+}
 
+// Read one data block from a file. Start at the given line number (1-based).
+// If there is a header, the line above the data holds the column names. Read
+// down until the first blank line. Returns the columns and the data rows.
+function parseFileBlock(text, startRow, hasHeader) {
+  var lines = splitLines(text);
+  var dataStartIndex = startRow - 1; // arrays are 0-based
+  if (dataStartIndex < 0 || dataStartIndex >= lines.length) {
+    return { columns: [], rows: [] };
+  }
+
+  var delim = sniffDelimiter(lines[dataStartIndex]);
+
+  // Work out the column names.
+  var headerCells = null;
+  if (hasHeader && dataStartIndex >= 1) {
+    headerCells = splitLine(lines[dataStartIndex - 1], delim).map(function (h) { return h.trim(); });
+  }
+
+  // Gather data lines from the start row down to the first blank line.
+  var dataLines = [];
+  for (var i = dataStartIndex; i < lines.length; i++) {
+    if (isBlankLine(lines[i])) break;
+    dataLines.push(splitLine(lines[i], delim));
+  }
+  if (!dataLines.length) return { columns: [], rows: [] };
+
+  // How many columns are there? Use the widest row, and the header if present.
+  var nCols = headerCells ? headerCells.length : 0;
+  dataLines.forEach(function (cells) { if (cells.length > nCols) nCols = cells.length; });
+
+  // Build a stable key and a friendly label for each column.
+  var columns = [];
+  for (var c = 0; c < nCols; c++) {
+    var label;
+    if (headerCells && headerCells[c]) {
+      label = headerCells[c];
+    } else {
+      label = "Column " + (c + 1);
+    }
+    // The key stays stable even for headerless files, so the mapping and the
+    // row lookups always agree.
+    columns.push({ key: "c" + c, label: label, samples: [] });
+  }
+
+  // Turn each data line into an object keyed by the column key.
   var rows = [];
-  for (var i = 1; i < lines.length; i++) {
-    var cells = splitLine(lines[i], delim);
-    if (cells.length === 1 && cells[0].trim() === "") continue;
+  dataLines.forEach(function (cells) {
     var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      obj[headers[j]] = (cells[j] === undefined ? "" : cells[j]).trim();
+    for (var k = 0; k < nCols; k++) {
+      obj["c" + k] = (cells[k] === undefined ? "" : cells[k]).trim();
     }
     rows.push(obj);
+  });
+
+  // Keep a few sample values per column for the preview.
+  for (var s = 0; s < Math.min(5, rows.length); s++) {
+    columns.forEach(function (col) { col.samples.push(rows[s][col.key]); });
   }
-  return { headers: headers, rows: rows };
+
+  return { columns: columns, rows: rows };
+}
+
+// Guess a sensible start row and header flag for a freshly imported file.
+// If a line parses as data (its cells contain a date), the data starts there
+// and there is no header. Otherwise we assume the first line is a header.
+function detectStartAndHeader(text) {
+  var lines = splitLines(text);
+  for (var i = 0; i < lines.length; i++) {
+    if (isBlankLine(lines[i])) continue;
+    var delim = sniffDelimiter(lines[i]);
+    var cells = splitLine(lines[i], delim);
+    var hasDate = cells.some(function (cell) { return parseDate(cell) !== null; });
+    if (hasDate) {
+      // This line is data. If there is a non-blank line just above it, treat
+      // that as a header. Otherwise there is no header.
+      var hasHeaderAbove = i >= 1 && !isBlankLine(lines[i - 1]);
+      return { startRow: i + 1, hasHeader: hasHeaderAbove };
+    }
+  }
+  // Nothing looked like data. Fall back to "row 1 is a header".
+  return { startRow: 2, hasHeader: true };
 }
 
 // Split one line on the delimiter, respecting double quotes.
@@ -365,58 +499,102 @@ function splitLine(line, delim) {
 }
 
 // ---------------------------------------------------------------------------
-// Column mapping UI. We guess each role from the header text, then let the user
-// fix it. This is how the tool handles logs from different vendors.
+// Column mapping UI. We show a preview of each column and let the user say what
+// it holds. This works whether or not the file has header names.
 // ---------------------------------------------------------------------------
-var ROLE_FIELDS = [
-  { key: "ts_set",      label: "Timestamp",        required: true,  keywords: ["time", "date", "stamp", "when"] },
-  { key: "fault_code",  label: "Fault code",       required: true,  keywords: ["code", "id", "alarm", "fault", "error", "event"] },
-  { key: "description", label: "Description",      required: false, keywords: ["desc", "text", "message", "msg", "name", "detail"] },
-  { key: "equipment",   label: "Equipment/module", required: false, keywords: ["chamber", "module", "equip", "tool", "unit", "station", "eqp"] }
-];
 
-function guessColumn(keywords) {
-  var lowerHeaders = STATE.headers.map(function (h) { return h.toLowerCase(); });
-  for (var k = 0; k < keywords.length; k++) {
-    for (var h = 0; h < lowerHeaders.length; h++) {
-      if (lowerHeaders[h].indexOf(keywords[k]) !== -1) return STATE.headers[h];
-    }
+// Guess an identity for every column. Returns a map of column key to role. We
+// try to find one column for each role, so no role is guessed twice.
+function guessIdentities(columns) {
+  var picked = {};   // column key -> role value
+  var used = {};     // role value -> true once taken
+
+  function labelHasKeyword(label, words) {
+    var low = String(label).toLowerCase();
+    return words.some(function (w) { return low.indexOf(w) !== -1; });
   }
-  return "";
+  function columnLooksLikeDate(col) {
+    return col.samples.some(function (v) { return parseDate(v) !== null; });
+  }
+
+  // First, always try to find the timestamp by looking at the values. This is
+  // the one column we can spot even with no header names.
+  columns.forEach(function (col) {
+    if (!used.ts_set && !picked[col.key] && columnLooksLikeDate(col)) {
+      picked[col.key] = "ts_set";
+      used.ts_set = true;
+    }
+  });
+
+  // Then, if the columns have real header names, match the other roles by name.
+  var roleOrder = ["fault_code", "description", "equipment", "duration", "state", "ts_set"];
+  columns.forEach(function (col) {
+    if (picked[col.key]) return;
+    if (/^Column \d+$/.test(col.label)) return; // no real name to match on
+    for (var r = 0; r < roleOrder.length; r++) {
+      var role = roleOrder[r];
+      if (used[role]) continue;
+      if (labelHasKeyword(col.label, ROLE_KEYWORDS[role])) {
+        picked[col.key] = role;
+        used[role] = true;
+        return;
+      }
+    }
+  });
+
+  return picked;
 }
 
 function buildMappingUI() {
-  var grid = document.getElementById("mapGrid");
-  grid.innerHTML = "";
-  ROLE_FIELDS.forEach(function (role) {
-    var wrap = document.createElement("div");
-    wrap.className = "field";
-    var lab = document.createElement("label");
-    lab.textContent = role.label + (role.required ? " *" : " (optional)");
-    var sel = document.createElement("select");
-    sel.id = "map_" + role.key;
-    sel.appendChild(optionEl("", role.required ? "-- choose --" : "-- none --"));
-    STATE.headers.forEach(function (h) { sel.appendChild(optionEl(h, h)); });
-    sel.value = guessColumn(role.keywords);
-    wrap.appendChild(lab);
-    wrap.appendChild(sel);
-    grid.appendChild(wrap);
-  });
+  var columns = STATE.columns;
+  var guessed = guessIdentities(columns);
 
-  // Fill the duration and state column pickers.
-  fillColumnSelect("durCol");
-  fillColumnSelect("stateCol");
-  document.getElementById("durCol").value = guessColumn(["dur", "down", "second", "elapsed", "minutes"]);
+  var table = document.getElementById("previewTable");
+
+  // Header row: the column labels.
+  var head = "<tr><th class='txt'>Column</th>" +
+    columns.map(function (c) { return "<th class='txt'>" + esc(c.label) + "</th>"; }).join("") + "</tr>";
+
+  // Identity row: a dropdown per column, plus a hidden "Other" name box.
+  var idRow = "<tr><td class='txt'><b>This column is</b></td>";
+  columns.forEach(function (c) {
+    var options = COLUMN_ROLES.map(function (role) {
+      var sel = (guessed[c.key] === role.value) ? " selected" : "";
+      return "<option value='" + role.value + "'" + sel + ">" + esc(role.label) + "</option>";
+    }).join("");
+    var otherVal = guessed[c.key] ? "" : c.label;
+    idRow += "<td class='txt'>" +
+      "<select id='colid_" + c.key + "' data-key='" + c.key + "' class='colid'>" + options + "</select>" +
+      "<input type='text' id='colother_" + c.key + "' placeholder='name' " +
+        "value='" + esc(otherVal) + "' style='display:none;margin-top:4px;width:100%'>" +
+      "</td>";
+  });
+  idRow += "</tr>";
+
+  // Sample rows: up to five real values so the user can see the data.
+  var sampleRows = "";
+  var nSamples = columns.length ? columns[0].samples.length : 0;
+  for (var s = 0; s < nSamples; s++) {
+    sampleRows += "<tr><td class='txt' style='color:#5b6570'>row " + (s + 1) + "</td>";
+    columns.forEach(function (c) {
+      sampleRows += "<td class='txt'>" + esc(clip(String(c.samples[s] || ""), 24)) + "</td>";
+    });
+    sampleRows += "</tr>";
+  }
+
+  table.innerHTML = head + idRow + sampleRows;
+
+  // Show or hide the "Other" name box when a column is set to Other.
+  Array.prototype.forEach.call(table.querySelectorAll(".colid"), function (sel) {
+    var key = sel.getAttribute("data-key");
+    var other = document.getElementById("colother_" + key);
+    function sync() { other.style.display = (sel.value === "other") ? "" : "none"; }
+    sel.addEventListener("change", sync);
+    sync();
+  });
 
   document.getElementById("mapCard").style.display = "";
   document.getElementById("controlsCard").style.display = "";
-}
-
-function fillColumnSelect(id) {
-  var sel = document.getElementById(id);
-  sel.innerHTML = "";
-  sel.appendChild(optionEl("", "-- choose --"));
-  STATE.headers.forEach(function (h) { sel.appendChild(optionEl(h, h)); });
 }
 
 function optionEl(value, text) {
@@ -461,12 +639,28 @@ function parseDate(s) {
 // This mirrors the three downtime shapes the desktop tool supports.
 // ---------------------------------------------------------------------------
 function readMapping() {
-  var map = {};
-  ROLE_FIELDS.forEach(function (r) { map[r.key] = document.getElementById("map_" + r.key).value; });
+  var map = {
+    ts_set: "", fault_code: "", description: "", equipment: "",
+    durCol: "", stateCol: ""
+  };
+
+  // Read what each column was tagged as. The first column tagged with a role
+  // wins, so a stray second tag does not overwrite the first.
+  STATE.columns.forEach(function (c) {
+    var sel = document.getElementById("colid_" + c.key);
+    if (!sel) return;
+    var role = sel.value;
+    if (role === "ts_set" && !map.ts_set) map.ts_set = c.key;
+    else if (role === "fault_code" && !map.fault_code) map.fault_code = c.key;
+    else if (role === "description" && !map.description) map.description = c.key;
+    else if (role === "equipment" && !map.equipment) map.equipment = c.key;
+    else if (role === "duration" && !map.durCol) map.durCol = c.key;
+    else if (role === "state" && !map.stateCol) map.stateCol = c.key;
+    // "ignore" and "other" columns are not used by the analysis.
+  });
+
   map.downMode = document.getElementById("downMode").value;
-  map.durCol = document.getElementById("durCol").value;
   map.durScale = +document.getElementById("durUnit").value;
-  map.stateCol = document.getElementById("stateCol").value;
   map.setVal = document.getElementById("setVal").value.trim().toUpperCase();
   map.clearVal = document.getElementById("clearVal").value.trim().toUpperCase();
   return map;
@@ -639,10 +833,10 @@ document.getElementById("runBtn").addEventListener("click", runAnalysis);
 
 function runAnalysis() {
   var map = readMapping();
-  if (!map.ts_set) { setMsg("mapMsg", "err", "Please choose the Timestamp column."); return; }
-  if (!map.fault_code) { setMsg("mapMsg", "err", "Please choose the Fault code column."); return; }
-  if (map.downMode === "duration" && !map.durCol) { setMsg("mapMsg", "err", "Please choose the duration column."); return; }
-  if (map.downMode === "events" && !map.stateCol) { setMsg("mapMsg", "err", "Please choose the state column."); return; }
+  if (!map.ts_set) { setMsg("mapMsg", "err", "Tag one column as Timestamp."); return; }
+  if (!map.fault_code) { setMsg("mapMsg", "err", "Tag one column as Fault code."); return; }
+  if (map.downMode === "duration" && !map.durCol) { setMsg("mapMsg", "err", "Tag one column as Duration, or change the downtime setting."); return; }
+  if (map.downMode === "events" && !map.stateCol) { setMsg("mapMsg", "err", "Tag one column as Alarm state, or change the downtime setting."); return; }
   setMsg("mapMsg", "", "");
 
   var built = buildOccurrences(STATE.rows, map);
