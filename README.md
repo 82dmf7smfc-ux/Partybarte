@@ -48,9 +48,19 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
      and they are joined back together.
    - Pick "Other" to name a column you want to see but not analyze.
 4. Tell it how downtime is stored. A duration column (tag it "Duration"), or
-   separate set and clear rows (tag the marker column "Alarm state"), or none, in
-   which case it ranks by count only. Many elogs have no downtime, so "none" is
-   common.
+   separate set and clear rows (tag the marker column "Alarm state"), or "Derive
+   from messages" (estimate downtime by pairing down and up messages per
+   chamber), or none, in which case it ranks by count only. Many elogs have no
+   downtime column, so "Derive from messages" and "none" are the common picks.
+   - "Derive from messages" reads the chamber name from the message text, then
+     pairs a "went offline" message with the next "back online" message for that
+     chamber. The down and up phrase lists and the chamber-name list are shown
+     right there and can be edited, because vendors word these differently.
+     Downtime found this way is always labelled "estimated". A paired-interval
+     table at the bottom shows each pair so you can check it by eye, with flags
+     for pairs that never came back (unresolved) or ran past a sanity cap (long).
+     It also reports tool-level numbers: "restricted" when any chamber is offline
+     and "full tool down" when every chamber seen is offline at once.
 5. If you mapped a Severity column, choose which severities to include. Use the
    preset buttons "Faults only", "Warnings only", or "Faults + warnings", or tick
    the levels by hand. The default is faults and warnings, so routine trace and
