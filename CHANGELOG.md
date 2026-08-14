@@ -7,6 +7,27 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Browser tool: full column vocabulary for real elogs. Roles now include Date,
+  Time, a combined Timestamp, Severity, Module/equipment, Message ID, and
+  Description. Date and Time in separate columns are combined into one event
+  time. Several columns tagged Description are joined, so a message split by
+  commas across columns is put back together.
+- Browser tool: severity filter. Rank only faults, only warnings, or both, with
+  preset buttons and a checkbox per severity found. Default is faults and
+  warnings, so routine trace and prompt lines are left out.
+- Browser tool: the fault Pareto pairs each Message ID with its most common
+  message text, so bars read "ID - description".
+- Browser tool: "Auto-map columns" guesses every role from the column values
+  (works with no headers), and the column list is now a vertical layout that
+  scrolls down instead of sideways.
+
+### Changed
+- Browser tool: the fault grouping level is now "Fault (ID + text)"; the other
+  levels are "Module" and "Message text".
+
+## [1.1.0] - 2026-08-14
+
+### Added
 - Browser tool: a "First data row" setting. The tool now starts reading at the
   chosen row, skipping any preamble, and reads down until the first blank line.
   The trailing-window date filter then drops older rows.

@@ -135,10 +135,14 @@
         <label style="visibility:hidden">x</label>
         <button class="secondary" id="rescanBtn" type="button">Re-scan</button>
       </div>
+      <div class="field">
+        <label style="visibility:hidden">x</label>
+        <button class="secondary" id="autoMapBtn" type="button">Auto-map columns</button>
+      </div>
     </div>
     <p class="hint">Data is read from that row down until the first blank line. Rows older than the window are dropped later. The same start row is used for every file you import.</p>
 
-    <p class="hint">Set what each column holds. Only Timestamp and Fault code are required. Pick "Other" to name a column you want to keep in view but not analyze.</p>
+    <p class="hint">"Auto-map" guesses each column from its values. Fix any that are wrong. You need a Timestamp (or a Date), plus a Message ID. Tag more than one column as Description to join split message text. Pick "Other" to keep a column in view but not analyze.</p>
     <div class="chartwrap"><table id="previewTable"></table></div>
 
     <div style="margin-top:14px">
@@ -184,6 +188,7 @@
 
   <div class="card" id="controlsCard" style="display:none">
     <h2>3. Settings</h2>
+    <div id="sevFilter" style="display:none; margin-bottom:12px"></div>
     <div class="row">
       <div class="field">
         <label>Trailing window (days)</label>
@@ -256,13 +261,18 @@ var STATE = {
 };
 
 // The standard identities a column can be tagged with. "other" lets the user
-// type a name for a column they want to see but not analyze.
+// type a name for a column they want to see but not analyze. More than one
+// column may be tagged Description; they are joined in order (handy when a
+// message with commas spills into extra columns).
 var COLUMN_ROLES = [
   { value: "ignore",      label: "Ignore" },
-  { value: "ts_set",      label: "Timestamp" },
-  { value: "fault_code",  label: "Fault code" },
+  { value: "date",        label: "Date" },
+  { value: "time",        label: "Time" },
+  { value: "ts_set",      label: "Timestamp (date + time in one column)" },
+  { value: "severity",    label: "Severity" },
+  { value: "equipment",   label: "Module / equipment" },
+  { value: "fault_code",  label: "Message ID" },
   { value: "description", label: "Description" },
-  { value: "equipment",   label: "Equipment" },
   { value: "duration",    label: "Duration" },
   { value: "state",       label: "Alarm state (set/clear)" },
   { value: "other",       label: "Other (type a name)" }
@@ -270,18 +280,31 @@ var COLUMN_ROLES = [
 
 // Keyword hints used to pre-guess an identity from a header name.
 var ROLE_KEYWORDS = {
-  ts_set:      ["time", "date", "stamp", "when"],
-  fault_code:  ["code", "id", "alarm", "fault", "error", "event"],
+  ts_set:      ["timestamp", "datetime", "when"],
+  date:        ["date"],
+  time:        ["time", "clock"],
+  severity:    ["sever", "level", "class", "priority", "type"],
+  fault_code:  ["code", "id", "alarm", "fault", "error", "number", "msgid"],
   description: ["desc", "text", "message", "msg", "name", "detail"],
-  equipment:   ["chamber", "module", "equip", "tool", "unit", "station", "eqp"],
+  equipment:   ["chamber", "module", "equip", "tool", "unit", "station", "eqp", "subsystem", "source"],
   duration:    ["dur", "down", "second", "elapsed", "minute"],
   state:       ["state", "status", "set", "clear", "action"]
 };
 
+// Severity words we recognise by value, so a severity column maps itself even
+// with no header. Upper-cased for comparison.
+var KNOWN_SEVERITIES = [
+  "TRACE", "PROMPT", "DEBUG", "INFO", "INFORMATION", "NOTE", "NOTICE",
+  "WARNING", "WARN", "FAULT", "ERROR", "ERR", "ALARM", "CRITICAL", "FATAL"
+];
+// Which severities count as a real problem. Used to set the filter defaults.
+var FAULT_SEVERITIES = ["FAULT", "ERROR", "ERR", "ALARM", "CRITICAL", "FATAL"];
+var WARN_SEVERITIES = ["WARNING", "WARN"];
+
 var LEVELS = [
-  { key: "fault_code",  nice: "Fault code" },
-  { key: "description", nice: "Description" },
-  { key: "equipment",   nice: "Equipment" }
+  { key: "fault_code",  nice: "Fault (ID + text)" },
+  { key: "equipment",   nice: "Module" },
+  { key: "description", nice: "Message text" }
 ];
 
 // ---------------------------------------------------------------------------
@@ -370,6 +393,7 @@ function reparse() {
 document.getElementById("startRow").addEventListener("change", reparse);
 document.getElementById("hasHeader").addEventListener("change", reparse);
 document.getElementById("rescanBtn").addEventListener("click", reparse);
+document.getElementById("autoMapBtn").addEventListener("click", autoMap);
 
 // ---------------------------------------------------------------------------
 // Delimited text parsing. Handles quoted fields that contain the delimiter.
@@ -449,8 +473,9 @@ function parseFileBlock(text, startRow, hasHeader) {
     rows.push(obj);
   });
 
-  // Keep a few sample values per column for the preview.
-  for (var s = 0; s < Math.min(5, rows.length); s++) {
+  // Keep some sample values per column. These drive both the preview and the
+  // auto-map guess, so we keep a few more than we display.
+  for (var s = 0; s < Math.min(10, rows.length); s++) {
     columns.forEach(function (col) { col.samples.push(rows[s][col.key]); });
   }
 
@@ -503,98 +528,237 @@ function splitLine(line, delim) {
 // it holds. This works whether or not the file has header names.
 // ---------------------------------------------------------------------------
 
-// Guess an identity for every column. Returns a map of column key to role. We
-// try to find one column for each role, so no role is guessed twice.
+// Work out what kind of values a column holds, from its sample rows.
+var RE_DATETIME = /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4})[ T]\d{1,2}:\d{2}/;
+var RE_DATE = /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}\/\d{1,2}\/\d{4})$/;
+var RE_TIME = /^\d{1,2}:\d{2}(:\d{2})?$/;
+var RE_INT = /^-?\d+$/;
+
+function classifyColumn(col) {
+  var counts = { datetime: 0, date: 0, time: 0, integer: 0, severity: 0, text: 0 };
+  var nonEmpty = 0;
+  var totalLen = 0;
+  col.samples.forEach(function (raw) {
+    var v = String(raw == null ? "" : raw).trim();
+    if (v === "") return;
+    nonEmpty += 1;
+    totalLen += v.length;
+    if (RE_DATETIME.test(v)) counts.datetime += 1;
+    else if (RE_DATE.test(v)) counts.date += 1;
+    else if (RE_TIME.test(v)) counts.time += 1;
+    else if (RE_INT.test(v)) counts.integer += 1;
+    else if (KNOWN_SEVERITIES.indexOf(v.toUpperCase()) !== -1) counts.severity += 1;
+    else counts.text += 1;
+  });
+  var avgLen = nonEmpty ? totalLen / nonEmpty : 0;
+  if (!nonEmpty) return { type: "empty", avgLen: 0 };
+  // Pick the most common type among the samples.
+  var best = "text", bestN = -1;
+  Object.keys(counts).forEach(function (t) { if (counts[t] > bestN) { bestN = counts[t]; best = t; } });
+  return { type: best, avgLen: avgLen };
+}
+
+// Guess an identity for every column. Returns a map of column key to role.
+// Pass 1 uses value patterns (works with no header names). Pass 2 fills gaps by
+// header keyword. Pass 3 handles the remaining text columns by shape.
 function guessIdentities(columns) {
   var picked = {};   // column key -> role value
-  var used = {};     // role value -> true once taken
+  var used = {};     // role value -> true once taken (except description, which repeats)
+  var info = columns.map(classifyColumn);
 
+  function take(key, role) { picked[key] = role; if (role !== "description") used[role] = true; }
+  function firstOfType(type, roleFree) {
+    for (var i = 0; i < columns.length; i++) {
+      if (picked[columns[i].key]) continue;
+      if (info[i].type === type && (!roleFree || !used[roleFree])) return i;
+    }
+    return -1;
+  }
+
+  // Pass 1: strong, unambiguous value signals (date/time/severity). The integer
+  // ID is left for pass 3, so header keywords can claim a numeric duration first.
+  var i;
+  if ((i = firstOfType("datetime", "ts_set")) !== -1) take(columns[i].key, "ts_set");
+  if (!used.ts_set) {
+    if ((i = firstOfType("date", "date")) !== -1) take(columns[i].key, "date");
+    if ((i = firstOfType("time", "time")) !== -1) take(columns[i].key, "time");
+  }
+  if ((i = firstOfType("severity", "severity")) !== -1) take(columns[i].key, "severity");
+
+  // Pass 2: header keywords for anything still open.
   function labelHasKeyword(label, words) {
     var low = String(label).toLowerCase();
     return words.some(function (w) { return low.indexOf(w) !== -1; });
   }
-  function columnLooksLikeDate(col) {
-    return col.samples.some(function (v) { return parseDate(v) !== null; });
-  }
-
-  // First, always try to find the timestamp by looking at the values. This is
-  // the one column we can spot even with no header names.
-  columns.forEach(function (col) {
-    if (!used.ts_set && !picked[col.key] && columnLooksLikeDate(col)) {
-      picked[col.key] = "ts_set";
-      used.ts_set = true;
-    }
-  });
-
-  // Then, if the columns have real header names, match the other roles by name.
-  var roleOrder = ["fault_code", "description", "equipment", "duration", "state", "ts_set"];
+  var roleOrder = ["fault_code", "severity", "equipment", "description", "duration", "state", "ts_set", "date", "time"];
   columns.forEach(function (col) {
     if (picked[col.key]) return;
     if (/^Column \d+$/.test(col.label)) return; // no real name to match on
     for (var r = 0; r < roleOrder.length; r++) {
       var role = roleOrder[r];
-      if (used[role]) continue;
-      if (labelHasKeyword(col.label, ROLE_KEYWORDS[role])) {
-        picked[col.key] = role;
-        used[role] = true;
-        return;
-      }
+      if (role !== "description" && used[role]) continue;
+      if (labelHasKeyword(col.label, ROLE_KEYWORDS[role])) { take(col.key, role); return; }
     }
   });
+
+  // Pass 3a: the Message ID is the first still-free integer column.
+  if (!used.fault_code) {
+    var fi = firstOfType("integer", "fault_code");
+    if (fi !== -1) take(columns[fi].key, "fault_code");
+  }
+
+  // Pass 3b: remaining text columns by shape. The longest-text column is the
+  // description; any text column after it is joined as description too; a
+  // remaining shorter text column becomes the module.
+  var textIdx = [];
+  columns.forEach(function (col, idx) {
+    if (picked[col.key]) return;
+    if (info[idx].type === "text") textIdx.push(idx);
+  });
+  if (textIdx.length) {
+    var descIdx = textIdx[0];
+    textIdx.forEach(function (idx) { if (info[idx].avgLen > info[descIdx].avgLen) descIdx = idx; });
+    take(columns[descIdx].key, "description");
+    // Text columns AFTER the description column are overflow: join as description.
+    textIdx.forEach(function (idx) { if (idx > descIdx && !picked[columns[idx].key]) take(columns[idx].key, "description"); });
+    // A remaining text column (usually before the message) becomes the module.
+    if (!used.equipment) {
+      var eqIdx = -1;
+      textIdx.forEach(function (idx) {
+        if (picked[columns[idx].key]) return;
+        if (eqIdx === -1 || info[idx].avgLen < info[eqIdx].avgLen) eqIdx = idx;
+      });
+      if (eqIdx !== -1) take(columns[eqIdx].key, "equipment");
+    }
+  }
 
   return picked;
 }
 
+// Build the column list. One row per column: name, a few sample values, and a
+// role drop-down. This is a vertical list, so it scrolls down not sideways.
 function buildMappingUI() {
   var columns = STATE.columns;
   var guessed = guessIdentities(columns);
 
   var table = document.getElementById("previewTable");
+  var head = "<tr><th class='txt'>Column</th><th class='txt'>Sample values</th><th class='txt'>This column is</th></tr>";
 
-  // Header row: the column labels.
-  var head = "<tr><th class='txt'>Column</th>" +
-    columns.map(function (c) { return "<th class='txt'>" + esc(c.label) + "</th>"; }).join("") + "</tr>";
-
-  // Identity row: a dropdown per column, plus a hidden "Other" name box.
-  var idRow = "<tr><td class='txt'><b>This column is</b></td>";
-  columns.forEach(function (c) {
+  var body = columns.map(function (c) {
     var options = COLUMN_ROLES.map(function (role) {
       var sel = (guessed[c.key] === role.value) ? " selected" : "";
       return "<option value='" + role.value + "'" + sel + ">" + esc(role.label) + "</option>";
     }).join("");
-    var otherVal = guessed[c.key] ? "" : c.label;
-    idRow += "<td class='txt'>" +
-      "<select id='colid_" + c.key + "' data-key='" + c.key + "' class='colid'>" + options + "</select>" +
-      "<input type='text' id='colother_" + c.key + "' placeholder='name' " +
-        "value='" + esc(otherVal) + "' style='display:none;margin-top:4px;width:100%'>" +
-      "</td>";
-  });
-  idRow += "</tr>";
+    var samples = c.samples.slice(0, 4).map(function (v) { return esc(clip(String(v || ""), 28)); }).join("<br>");
+    var otherVal = guessed[c.key] ? "" : "";
+    return "<tr>" +
+      "<td class='txt'><b>" + esc(c.label) + "</b></td>" +
+      "<td class='txt' style='color:#5b6570;font-size:12px'>" + samples + "</td>" +
+      "<td class='txt'>" +
+        "<select id='colid_" + c.key + "' data-key='" + c.key + "' class='colid'>" + options + "</select>" +
+        "<input type='text' id='colother_" + c.key + "' placeholder='name' value='" + otherVal + "' style='display:none;margin-top:4px;width:100%'>" +
+      "</td></tr>";
+  }).join("");
 
-  // Sample rows: up to five real values so the user can see the data.
-  var sampleRows = "";
-  var nSamples = columns.length ? columns[0].samples.length : 0;
-  for (var s = 0; s < nSamples; s++) {
-    sampleRows += "<tr><td class='txt' style='color:#5b6570'>row " + (s + 1) + "</td>";
-    columns.forEach(function (c) {
-      sampleRows += "<td class='txt'>" + esc(clip(String(c.samples[s] || ""), 24)) + "</td>";
-    });
-    sampleRows += "</tr>";
-  }
+  table.innerHTML = head + body;
 
-  table.innerHTML = head + idRow + sampleRows;
-
-  // Show or hide the "Other" name box when a column is set to Other.
+  // Wire each drop-down: show the "Other" box when chosen, and refresh the
+  // severity filter when a Severity column is picked or dropped.
   Array.prototype.forEach.call(table.querySelectorAll(".colid"), function (sel) {
     var key = sel.getAttribute("data-key");
     var other = document.getElementById("colother_" + key);
-    function sync() { other.style.display = (sel.value === "other") ? "" : "none"; }
+    function sync() {
+      other.style.display = (sel.value === "other") ? "" : "none";
+      refreshSeverityFilter();
+    }
     sel.addEventListener("change", sync);
-    sync();
   });
 
+  refreshSeverityFilter();
   document.getElementById("mapCard").style.display = "";
   document.getElementById("controlsCard").style.display = "";
+}
+
+// Re-apply the automatic guesses to the existing drop-downs. Used by the
+// "Auto-map" button after the user has changed things.
+function autoMap() {
+  var guessed = guessIdentities(STATE.columns);
+  STATE.columns.forEach(function (c) {
+    var sel = document.getElementById("colid_" + c.key);
+    if (sel) {
+      sel.value = guessed[c.key] || "ignore";
+      var other = document.getElementById("colother_" + c.key);
+      if (other) other.style.display = (sel.value === "other") ? "" : "none";
+    }
+  });
+  refreshSeverityFilter();
+}
+
+// Find the column key currently tagged as Severity, if any.
+function taggedSeverityKey() {
+  for (var i = 0; i < STATE.columns.length; i++) {
+    var sel = document.getElementById("colid_" + STATE.columns[i].key);
+    if (sel && sel.value === "severity") return STATE.columns[i].key;
+  }
+  return "";
+}
+
+// Build the severity filter: preset buttons plus a checkbox per severity found.
+function refreshSeverityFilter() {
+  var box = document.getElementById("sevFilter");
+  var key = taggedSeverityKey();
+  if (!key) { box.style.display = "none"; box.innerHTML = ""; return; }
+
+  // Count how many rows carry each severity value.
+  var counts = {};
+  STATE.rows.forEach(function (r) {
+    var v = String(r[key] || "").trim().toUpperCase();
+    if (!v) return;
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  var levels = Object.keys(counts).sort();
+
+  var checks = levels.map(function (lv) {
+    var isFault = FAULT_SEVERITIES.indexOf(lv) !== -1 || WARN_SEVERITIES.indexOf(lv) !== -1;
+    return "<label style='display:inline-flex;align-items:center;gap:5px;margin:0 12px 6px 0;font-size:13px;color:var(--ink)'>" +
+      "<input type='checkbox' class='sevchk' value='" + esc(lv) + "'" + (isFault ? " checked" : "") + "> " +
+      esc(lv) + " <span style='color:#5b6570'>(" + counts[lv] + ")</span></label>";
+  }).join("");
+
+  box.innerHTML =
+    "<label>Include which severities?</label>" +
+    "<div style='margin:4px 0 8px'>" +
+      "<button type='button' class='secondary sevpreset' data-preset='faults' style='padding:4px 10px;margin-right:6px'>Faults only</button>" +
+      "<button type='button' class='secondary sevpreset' data-preset='warnings' style='padding:4px 10px;margin-right:6px'>Warnings only</button>" +
+      "<button type='button' class='secondary sevpreset' data-preset='both' style='padding:4px 10px'>Faults + warnings</button>" +
+    "</div>" +
+    "<div id='sevChecks'>" + checks + "</div>";
+  box.style.display = "";
+
+  Array.prototype.forEach.call(box.querySelectorAll(".sevpreset"), function (btn) {
+    btn.addEventListener("click", function () { applySevPreset(btn.getAttribute("data-preset")); });
+  });
+}
+
+function applySevPreset(preset) {
+  Array.prototype.forEach.call(document.querySelectorAll(".sevchk"), function (chk) {
+    var lv = chk.value.toUpperCase();
+    var isFault = FAULT_SEVERITIES.indexOf(lv) !== -1;
+    var isWarn = WARN_SEVERITIES.indexOf(lv) !== -1;
+    if (preset === "faults") chk.checked = isFault;
+    else if (preset === "warnings") chk.checked = isWarn;
+    else chk.checked = isFault || isWarn; // both
+  });
+}
+
+// The set of severities the user has ticked. null means "no severity column".
+function selectedSeverities() {
+  if (!taggedSeverityKey()) return null;
+  var set = {};
+  Array.prototype.forEach.call(document.querySelectorAll(".sevchk"), function (chk) {
+    if (chk.checked) set[chk.value.toUpperCase()] = true;
+  });
+  return set;
 }
 
 function optionEl(value, text) {
@@ -640,20 +804,25 @@ function parseDate(s) {
 // ---------------------------------------------------------------------------
 function readMapping() {
   var map = {
-    ts_set: "", fault_code: "", description: "", equipment: "",
+    tsCol: "", dateCol: "", timeCol: "", sevCol: "",
+    fault_code: "", equipment: "", descCols: [],
     durCol: "", stateCol: ""
   };
 
-  // Read what each column was tagged as. The first column tagged with a role
-  // wins, so a stray second tag does not overwrite the first.
+  // Read what each column was tagged as. The first column tagged with a
+  // single-value role wins. Description may repeat, so every tagged column is
+  // kept in order and joined later.
   STATE.columns.forEach(function (c) {
     var sel = document.getElementById("colid_" + c.key);
     if (!sel) return;
     var role = sel.value;
-    if (role === "ts_set" && !map.ts_set) map.ts_set = c.key;
+    if (role === "ts_set" && !map.tsCol) map.tsCol = c.key;
+    else if (role === "date" && !map.dateCol) map.dateCol = c.key;
+    else if (role === "time" && !map.timeCol) map.timeCol = c.key;
+    else if (role === "severity" && !map.sevCol) map.sevCol = c.key;
     else if (role === "fault_code" && !map.fault_code) map.fault_code = c.key;
-    else if (role === "description" && !map.description) map.description = c.key;
     else if (role === "equipment" && !map.equipment) map.equipment = c.key;
+    else if (role === "description") map.descCols.push(c.key);
     else if (role === "duration" && !map.durCol) map.durCol = c.key;
     else if (role === "state" && !map.stateCol) map.stateCol = c.key;
     // "ignore" and "other" columns are not used by the analysis.
@@ -666,6 +835,26 @@ function readMapping() {
   return map;
 }
 
+// Get the event time for one row. Uses a single Timestamp column if given, or
+// combines the Date and Time columns.
+function rowTimestamp(r, map) {
+  if (map.tsCol) return parseDate(r[map.tsCol]);
+  if (map.dateCol) {
+    var d = String(r[map.dateCol] || "").trim();
+    var t = map.timeCol ? String(r[map.timeCol] || "").trim() : "";
+    return parseDate(t ? (d + " " + t) : d);
+  }
+  return null;
+}
+
+// Join every column tagged Description into one message string.
+function rowDescription(r, map) {
+  if (!map.descCols.length) return "(blank)";
+  var parts = map.descCols.map(function (k) { return String(r[k] || "").trim(); })
+    .filter(function (v) { return v !== ""; });
+  return parts.length ? parts.join(" ") : "(blank)";
+}
+
 function buildOccurrences(rows, map) {
   var problems = [];
   var occ = [];
@@ -673,8 +862,9 @@ function buildOccurrences(rows, map) {
   function baseRec(r) {
     return {
       fault_code: map.fault_code ? (r[map.fault_code] || "(blank)") : "(blank)",
-      description: map.description ? (r[map.description] || "(blank)") : "(blank)",
-      equipment: map.equipment ? (r[map.equipment] || "(blank)") : "(blank)"
+      description: rowDescription(r, map),
+      equipment: map.equipment ? (r[map.equipment] || "(blank)") : "(blank)",
+      severity: map.sevCol ? String(r[map.sevCol] || "").trim().toUpperCase() : ""
     };
   }
 
@@ -683,7 +873,7 @@ function buildOccurrences(rows, map) {
     // shares the same equipment and fault code.
     var withTime = [];
     rows.forEach(function (r) {
-      var t = parseDate(r[map.ts_set]);
+      var t = rowTimestamp(r, map);
       if (t) withTime.push({ r: r, t: t });
     });
     withTime.sort(function (a, b) { return a.t - b.t; });
@@ -712,7 +902,7 @@ function buildOccurrences(rows, map) {
   } else {
     // Duration mode or count-only mode. Each row is one occurrence.
     rows.forEach(function (r) {
-      var t = parseDate(r[map.ts_set]);
+      var t = rowTimestamp(r, map);
       if (!t) { problems.push(1); return; }
       var rec = baseRec(r);
       var durSec = 0;
@@ -735,6 +925,7 @@ function makeOcc(rec, start, end, durSec) {
     fault_code: rec.fault_code,
     description: rec.description,
     equipment: rec.equipment,
+    severity: rec.severity,
     start: start,
     end: (end && end > start) ? end : start,
     durSec: durSec
@@ -775,19 +966,33 @@ function mergedSeconds(intervals) {
 // ---------------------------------------------------------------------------
 function rankLevel(occ, levelKey, method, topN) {
   var groups = {};
+  var pairWithText = (levelKey === "fault_code");
   occ.forEach(function (o) {
     var key = o[levelKey];
-    if (!groups[key]) groups[key] = { key: key, count: 0, attrib: 0, intervals: [] };
+    if (!groups[key]) groups[key] = { key: key, count: 0, attrib: 0, intervals: [], texts: {} };
     var g = groups[key];
     g.count += 1;
     g.attrib += o.durSec;
     g.intervals.push([o.start, o.end]);
+    // For the fault level, remember which message texts go with this ID so we
+    // can label the bar "ID - most common text".
+    if (pairWithText) {
+      var d = o.description || "";
+      if (d && d !== "(blank)") g.texts[d] = (g.texts[d] || 0) + 1;
+    }
   });
 
   var arr = Object.keys(groups).map(function (k) {
     var g = groups[k];
+    var label = g.key;
+    if (pairWithText) {
+      var top = "", topN2 = 0;
+      Object.keys(g.texts).forEach(function (t) { if (g.texts[t] > topN2) { topN2 = g.texts[t]; top = t; } });
+      label = top ? (g.key + " — " + top) : g.key;
+    }
     return {
       key: g.key,
+      label: label,
       count: g.count,
       attributed_s: g.attrib,
       wallclock_s: mergedSeconds(g.intervals)
@@ -805,7 +1010,7 @@ function collapse(sorted, topN, sortField) {
   if (sorted.length > topN) {
     var head = sorted.slice(0, topN);
     var tail = sorted.slice(topN);
-    var other = { key: "Other", count: 0, attributed_s: 0, wallclock_s: 0 };
+    var other = { key: "Other", label: "Other", count: 0, attributed_s: 0, wallclock_s: 0 };
     tail.forEach(function (r) {
       other.count += r.count;
       other.attributed_s += r.attributed_s;
@@ -833,20 +1038,34 @@ document.getElementById("runBtn").addEventListener("click", runAnalysis);
 
 function runAnalysis() {
   var map = readMapping();
-  if (!map.ts_set) { setMsg("mapMsg", "err", "Tag one column as Timestamp."); return; }
-  if (!map.fault_code) { setMsg("mapMsg", "err", "Tag one column as Fault code."); return; }
+  if (!map.tsCol && !map.dateCol) { setMsg("mapMsg", "err", "Tag a Timestamp column, or a Date column (plus a Time column)."); return; }
+  if (!map.fault_code) { setMsg("mapMsg", "err", "Tag one column as Message ID."); return; }
   if (map.downMode === "duration" && !map.durCol) { setMsg("mapMsg", "err", "Tag one column as Duration, or change the downtime setting."); return; }
   if (map.downMode === "events" && !map.stateCol) { setMsg("mapMsg", "err", "Tag one column as Alarm state, or change the downtime setting."); return; }
   setMsg("mapMsg", "", "");
 
   var built = buildOccurrences(STATE.rows, map);
-  if (!built.occ.length) { setMsg("summaryMsg", "err", "No rows had a readable timestamp. Check the Timestamp column."); document.getElementById("results").style.display = ""; return; }
+  if (!built.occ.length) { setMsg("summaryMsg", "err", "No rows had a readable timestamp. Check the Timestamp (or Date/Time) columns."); document.getElementById("results").style.display = ""; return; }
+
+  // Severity filter. Keep only the ticked levels. Skipped when no Severity
+  // column is mapped.
+  var sevSet = selectedSeverities();
+  var beforeCount = built.occ.length;
+  var occ = built.occ;
+  var sevNote = "";
+  if (sevSet) {
+    var picked = Object.keys(sevSet);
+    if (!picked.length) { setMsg("summaryMsg", "err", "No severities are ticked. Choose at least one in Settings."); document.getElementById("results").style.display = ""; return; }
+    occ = built.occ.filter(function (o) { return sevSet[o.severity]; });
+    sevNote = "Kept " + occ.length + " of " + beforeCount + " rows after the severity filter (" + picked.join(", ") + ").";
+    if (!occ.length) { setMsg("summaryMsg", "err", "No rows match the ticked severities."); document.getElementById("results").style.display = ""; return; }
+  }
 
   var windowDays = Math.max(1, parseInt(document.getElementById("windowDays").value, 10) || 30);
   var topN = Math.max(1, parseInt(document.getElementById("topN").value, 10) || 15);
   var method = document.getElementById("method").value;
 
-  var win = applyWindow(built.occ, windowDays);
+  var win = applyWindow(occ, windowDays);
   if (!win.kept.length) { setMsg("summaryMsg", "err", "No rows fall inside the " + windowDays + " day window."); document.getElementById("results").style.display = ""; return; }
 
   var grandAttrib = win.kept.reduce(function (s, o) { return s + o.durSec; }, 0);
@@ -860,7 +1079,7 @@ function runAnalysis() {
     windowStart: win.start, windowEnd: win.end,
     totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
     hasDowntime: (map.downMode !== "none"), levels: levels,
-    unparsed: built.unparsed, kept: win.kept
+    unparsed: built.unparsed, kept: win.kept, sevNote: sevNote
   };
 
   renderResults();
@@ -871,6 +1090,7 @@ function renderResults() {
   document.getElementById("results").style.display = "";
 
   var notes = [];
+  if (R.sevNote) notes.push(R.sevNote);
   if (R.unparsed) notes.push(R.unparsed + " row(s) had no readable timestamp and were skipped.");
   if (!R.hasDowntime) notes.push("No downtime column was mapped, so downtime is shown as zero. Ranking is by count.");
   setMsg("summaryMsg", notes.length ? "warn" : "ok", notes.length ? notes.join(" ") : "Analysis complete.");
@@ -880,7 +1100,7 @@ function renderResults() {
     : "True wall clock (overlaps merged, counted once)";
 
   document.getElementById("statCards").innerHTML =
-    stat(R.totalFaults, "Total faults in window") +
+    stat(R.totalFaults, "Events in window (after filter)") +
     stat(hours(R.grandAttrib), "Attributed downtime (h)") +
     stat(hours(R.grandWall), "True wall-clock downtime (h)") +
     stat(R.windowDays, "Window length (days)");
@@ -961,10 +1181,11 @@ function drawPareto(containerId, rows, valueField, valueLabel, levelNice, valueI
     var h = (v / maxVal) * plotH;
     var x = padL + step * i + (step - bw) / 2;
     var y = padT + plotH - h;
-    svg.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(String(r.key)) + ": " + fmtNum(v) + '</title></rect>');
+    var lab = String(r.label || r.key);
+    svg.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" fill="' + (r.key === "Other" ? "#9bb0c9" : "#305496") + '"><title>' + esc(lab) + ": " + fmtNum(v) + '</title></rect>');
     // x labels, rotated.
     var lx = padL + step * i + step / 2;
-    svg.push('<text x="' + lx.toFixed(1) + '" y="' + (padT + plotH + 12) + '" font-size="9" fill="#1b1f24" transform="rotate(45 ' + lx.toFixed(1) + ' ' + (padT + plotH + 12) + ')">' + esc(clip(String(r.key), 16)) + '</text>');
+    svg.push('<text x="' + lx.toFixed(1) + '" y="' + (padT + plotH + 12) + '" font-size="9" fill="#1b1f24" transform="rotate(45 ' + lx.toFixed(1) + ' ' + (padT + plotH + 12) + ')">' + esc(clip(lab, 22)) + '</text>');
   });
 
   // Cumulative line.
@@ -998,7 +1219,7 @@ function drawTable(data, lv) {
   var body = rows.map(function (r) {
     return "<tr>" +
       "<td>" + r.rank + "</td>" +
-      "<td class='txt'>" + esc(String(r.key)) + "</td>" +
+      "<td class='txt'>" + esc(String(r.label || r.key)) + "</td>" +
       "<td>" + r.count + "</td>" +
       "<td>" + r.pct.toFixed(1) + "</td>" +
       "<td>" + r.cum.toFixed(1) + "</td>" +
@@ -1023,7 +1244,8 @@ function exportCsv() {
   out.push(["Window start", fmt(R.windowStart)]);
   out.push(["Window end", fmt(R.windowEnd)]);
   out.push(["Window days", R.windowDays]);
-  out.push(["Total faults", R.totalFaults]);
+  out.push(["Events in window (after filter)", R.totalFaults]);
+  if (R.sevNote) out.push(["Severity filter", R.sevNote]);
   out.push(["Attributed downtime (h)", hours(R.grandAttrib)]);
   out.push(["True wall-clock downtime (h)", hours(R.grandWall)]);
   out.push(["Downtime method", R.method]);
@@ -1033,7 +1255,7 @@ function exportCsv() {
     out.push(["Level: " + lv.nice]);
     out.push(["Rank", lv.nice, "Count", "Count %", "Cum %", "Attributed (h)", "Wall clock (h)"]);
     R.levels[lv.key].byCount.forEach(function (r) {
-      out.push([r.rank, r.key, r.count, r.pct.toFixed(1), r.cum.toFixed(1), hours(r.attributed_s), hours(r.wallclock_s)]);
+      out.push([r.rank, (r.label || r.key), r.count, r.pct.toFixed(1), r.cum.toFixed(1), hours(r.attributed_s), hours(r.wallclock_s)]);
     });
     out.push([]);
   });
