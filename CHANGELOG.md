@@ -25,7 +25,6 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   report - last 30 days, last 90 days, or all of it - rather than a setting
   hidden behind a panel. It was the one default that could quietly turn a
   six-month log into a one-month report.
-
 - Browser tool: the setup you do for a tool is remembered, so importing that
   tool's log again needs no setup at all. Which column is which, how downtime is
   stored and its settings, the down/up phrase lists, the chamber names, and any
