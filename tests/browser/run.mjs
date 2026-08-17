@@ -378,6 +378,58 @@ async function main() {
   eq("categorize etch3 heat exchanger temp deviation", e3b.htEx, "Heat exchanger temp deviation");
   eq("categorize etch3 high flow cal transducer missing", e3b.hiFlow, "High flow cal transducer missing");
 
+  // 6b-k34. Batch 2, from the real k34 Endura log. Same rule as batch 1: one
+  // check per rule, against the message as transcribed from the photograph.
+  var k34 = await ev("(function(){function c(s){return AP.categorize(s).category;}return {"
+    + "waferIn:c('chamber <S4EXT> chamber_abcd_optset there is a wafer in chamber'),"
+    + "holdVac:c('completed processing of all wafers in elevator holding at vacuum until go pressed'),"
+    + "cryoHot:c('cryo pump temperature is too high - please correct'),"
+    + "cryoRegen:c('cryo pump completed regeneration - you may put it online for processing'),"
+    + "tray:c('tray did not drop on blade from <S4EXT> chamber_name_table func_cut ( <L1>/ <L1> mv)( <L2>/ <L2> mv)'),"
+    + "uwWater:c('chamber <S4EXT> chamber_abcd_optset microwave generator water flow interlock fault'),"
+    + "notChar:c('<S4EXT> cfi_name_table has not had characterization'),"
+    + "mfcTemp:c('remote liquid source <S4> mfc temp less than func_char+char_1 func_char+char_0 above liquid temp'),"
+    + "eChuck:c('ch <S4EXT> chamber_abcd_optset electrostatic chuck current out of range'),"
+    + "orienter:c('secs timeout on wafer orienter channel'),"
+    + "rf2Table:c('ch <S4EXT> chamber_abcd_optset requested rf2 power is outside of rf2 power table limits'),"
+    + "cassOut:c('cassette removed from port <S1EXT> chamber_abcd_optset'),"
+    + "remBoard:c('<S4EXT> cfi_name_table cannot communicate with remote board'),"
+    + "coProc:c('ch <S4EXT> chamber_abcd_optset co - processor endpoint fault func_append+colon <L1>'),"
+    + "cyclePurge:c('chamber <S4EXT> chamber_abcd_optset has completed chamber cycle purge service program'),"
+    + "noWarm:c('ltc ht ex <S4> did not warm up in max allowed time'),"
+    + "procStart:c('<S4EXT> chamber_name_table process has started'),"
+    + "undef:c('undefined event number <ERRNUM> subsystem <S2> param <S4> <L1> <L2> <L3>'),"
+    + "htExWarn:c('ltc ht ex <S4> temperature deviation warning alarm'),"
+    + "htExFault:c('ltc ht ex <S4> temperature deviation fault alarm'),"
+    + "loadLockLeak:c('load lock chamber has completed leak up rate service program'),"
+    + "k34Mfc:c('ch <S4EXT> chamber_abcd_optset service program has flow with mfc func_cut <L1> too high')"
+    + "};})()");
+  eq("categorize k34 wafer in chamber", k34.waferIn, "Wafer in chamber");
+  eq("categorize k34 holding at vacuum for go", k34.holdVac, "Holding at vacuum for go");
+  eq("categorize k34 cryo pump temperature high", k34.cryoHot, "Cryo pump temperature high");
+  eq("categorize k34 cryo pump regeneration complete", k34.cryoRegen, "Cryo pump regeneration complete");
+  eq("categorize k34 tray did not drop on blade", k34.tray, "Tray did not drop on blade");
+  eq("categorize k34 microwave generator water flow", k34.uwWater, "Microwave generator water flow fault");
+  eq("categorize k34 chamber not characterized", k34.notChar, "Chamber not characterized");
+  eq("categorize k34 liquid source MFC temp low", k34.mfcTemp, "Liquid source MFC temp low");
+  eq("categorize k34 electrostatic chuck current", k34.eChuck, "Electrostatic chuck current out of range");
+  eq("categorize k34 wafer orienter timeout", k34.orienter, "Wafer orienter timeout");
+  eq("categorize k34 RF2 power outside table limits", k34.rf2Table, "RF2 power outside table limits");
+  eq("categorize k34 cassette removed from port", k34.cassOut, "Cassette removed from port");
+  eq("categorize k34 no comms with remote board", k34.remBoard, "No comms with remote board");
+  eq("categorize k34 endpoint co-processor fault", k34.coProc, "Endpoint co-processor fault");
+  eq("categorize k34 cycle purge complete", k34.cyclePurge, "Cycle purge complete");
+  eq("categorize k34 heat exchanger did not warm up", k34.noWarm, "Heat exchanger did not warm up");
+  eq("categorize k34 process started", k34.procStart, "Process started");
+  eq("categorize k34 undefined event number", k34.undef, "Undefined event number");
+  // The widened rule has to hold both wordings: etch3 says "fault alarm",
+  // k34 says "warning alarm", and they are the same fault.
+  eq("categorize heat exchanger temp deviation (warning wording)", k34.htExWarn, "Heat exchanger temp deviation");
+  eq("categorize heat exchanger temp deviation (fault wording)", k34.htExFault, "Heat exchanger temp deviation");
+  // Two batch-1 rules meeting a second tool's wording of the same event.
+  eq("categorize leak up rate on the load lock (k34 wording)", k34.loadLockLeak, "Leak up rate check complete");
+  eq("categorize MFC flow too high (k34 wording)", k34.k34Mfc, "MFC flow too high");
+
   check("categorize unmatched falls back to readable label", cat.novel.matched === false && cat.novel.category === "Some brand new message", cat.novel);
   check("categorize user rule wins", cat.override.matched === true && cat.override.category === "Custom PM", cat.override);
   check("normCategory collapses tags and numbers", cat.norm === "step at # #", cat.norm);

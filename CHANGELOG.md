@@ -8,6 +8,19 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ### Added
 
+- Browser tool: eighteen more faults are recognised by name, from a real
+  26,414-row Endura log - a second tool, so these are the faults the first log
+  never showed. Newly recognised: a wafer left in the chamber, the elevator
+  holding at vacuum waiting for GO, cryo pump temperature too high and cryo pump
+  regeneration finished, a tray that did not drop on the blade, microwave
+  generator water flow, a chamber that has not been characterized, liquid source
+  MFC temperature low, electrostatic chuck current out of range, a wafer orienter
+  timeout, RF2 power outside its table limits, a cassette removed from a port,
+  losing communication with a remote board, an endpoint co-processor fault, cycle
+  purge finished, a heat exchanger that did not warm up in time, a process
+  starting, and the undefined event number the elog opens with. The heat
+  exchanger temperature deviation is now recognised whether the log calls it a
+  fault or a warning - one tool words it each way, and it is the same fault.
 - Browser tool: forty-nine more faults are recognised by name, taken from a real
   5,158-row P5000 etch log where everything below the two big built-in rules was
   landing on a label the tool had invented from the wording. The whole tail is
