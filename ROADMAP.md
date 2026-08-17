@@ -35,6 +35,16 @@ keep good ideas so they are not lost between sessions.
   never matched on the owner's re-run, not as a wrong label. Rules were appended
   rather than interleaved, so no already-categorized event changed name.
 
+  **Batch 2 shipped**, from a 26,414-row k34 Endura log at
+  `categorized 26014 of 26414 (98%)`, worklist `top 35 of 35 distinct`. Sixteen
+  of those 35 were events batch 1 already covers, so only eighteen needed new
+  rules; one batch-1 rule was widened after the second tool worded the same
+  fault differently (`temperature deviation fault` against `warning`). That is
+  the lesson worth keeping: the risk in a single-log batch is not only a misread
+  character but a wording that looks invariant until a second tool disagrees.
+  What is left: the 7,324-row log, still untouched, and confirming both batches
+  against a re-run.
+
   Two related things to pick up while in here, both deliberately left alone until
   there is real data to judge them on:
   - The down/up phrase lists for derived downtime are Applied Materials wording.

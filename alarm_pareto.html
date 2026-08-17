@@ -691,8 +691,33 @@ var BUILTIN_CAT_RULES = [
   { re: /temp rate of change too low/i,               label: "Heat-up rate too low" },
   { re: /on time warning level/i,                     label: "Dummy wafer RF time warning" },
   { re: /turbo not at speed/i,                        label: "Turbo not at speed" },
-  { re: /temperature deviation fault/i,               label: "Heat exchanger temp deviation" },
-  { re: /without high flow cal/i,                     label: "High flow cal transducer missing" }
+  // Widened in batch 2: etch3 reports this as "temperature deviation fault
+  // alarm" and the k34 Endura as "temperature deviation warning alarm". Same
+  // fault, and the severity is already carried by the Event Type column.
+  { re: /temperature deviation (fault|warning)/i,     label: "Heat exchanger temp deviation" },
+  { re: /without high flow cal/i,                     label: "High flow cal transducer missing" },
+
+  // Batch 2 from the real k34 Endura log (26414 rows). Appended after batch 1
+  // for the same reason batch 1 was appended after the originals: first hit
+  // wins, so nothing already named can be renamed by what follows.
+  { re: /there is a wafer in chamber/i,               label: "Wafer in chamber" },
+  { re: /in elevator holding at vacuum/i,             label: "Holding at vacuum for go" },
+  { re: /cryo pump temperature is too high/i,         label: "Cryo pump temperature high" },
+  { re: /cryo pump completed regeneration/i,          label: "Cryo pump regeneration complete" },
+  { re: /tray did not drop on blade/i,                label: "Tray did not drop on blade" },
+  { re: /microwave generator water flow/i,            label: "Microwave generator water flow fault" },
+  { re: /has not had characterization/i,              label: "Chamber not characterized" },
+  { re: /mfc temp less than/i,                        label: "Liquid source MFC temp low" },
+  { re: /electrostatic chuck current out of range/i,  label: "Electrostatic chuck current out of range" },
+  { re: /timeout on wafer orienter/i,                 label: "Wafer orienter timeout" },
+  { re: /power table limits/i,                        label: "RF2 power outside table limits" },
+  { re: /cassette removed from port/i,                label: "Cassette removed from port" },
+  { re: /cannot communicate with remote board/i,      label: "No comms with remote board" },
+  { re: /processor endpoint fault/i,                  label: "Endpoint co-processor fault" },
+  { re: /cycle purge service program/i,               label: "Cycle purge complete" },
+  { re: /did not warm up/i,                           label: "Heat exchanger did not warm up" },
+  { re: /process has started/i,                       label: "Process started" },
+  { re: /undefined event number/i,                    label: "Undefined event number" }
 ];
 
 // Collapse the varying parts of a message so similar lines group together.

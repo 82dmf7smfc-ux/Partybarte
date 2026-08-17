@@ -298,3 +298,104 @@ Everything new was appended to the end of `BUILTIN_CAT_RULES`. Because the
 built-in loop is first-hit-wins in array order, appending cannot change how any
 of the 4233 already-categorized events are labelled — the batch can only take
 from the uncategorized 925.
+
+#### Batch 2 — k34 Endura, 26,414 rows, 2026-08-17
+
+Source: five photographs — one of the raw elog in a text editor, four of the
+verbose debug report. Preamble read `P5000 / Etch / E4.70 / tool k34`, header at
+line 11, 26,414 rows, one row on the 1969 pivot, and a saved column setup was
+restored for `k34`. The raw file is `endurak34_elog.txt`, extracted from
+`E:\Backups\k34\Data\ELOG.DAT`.
+
+Coverage: **26014 of 26414 (98%), uncategorized 400** before this batch.
+
+**This run was made with the pre-batch-1 build**, so it is not batch 1's
+verification. Batch 1's rules are absent from its rule-hit list and `448` still
+sits in its worklist. What it *is*, unexpectedly, is independent corroboration
+of batch 1's transcription: sixteen of the IDs in this Endura worklist are the
+same events, worded identically to what was transcribed from the etch3
+photograph — `448`, `005`, `447`, `456`, `577`, `662`/`661`, `428`, `048`,
+`781`, `166`, `490`, `446`, `767`, `725`, `726`. Seeing the same strings on a
+second tool is stronger evidence than re-reading the same picture. Those sixteen
+account for 168 of this log's 400, and they need no new rule — merging batch 1
+covers them.
+
+**One batch-1 rule was too narrow and was widened.** etch3 reports `747` as
+`ltc ht ex <S4> temperature deviation fault alarm`; the k34 reports it as
+`temperature deviation warning alarm`. The rule was `temperature deviation
+fault` and is now `temperature deviation (fault|warning)`. This is the failure
+mode to expect from a single-log batch — not a misread character, but a wording
+that only looked invariant because there was one tool to compare against. Where
+a message embeds its own severity, the Event Type column already carries it, so
+the two wordings belong on one label.
+
+Transcribed examples for the eighteen genuinely new events:
+
+| ID | count | sev | example message as transcribed |
+|---|---|---|---|
+| 1292 | 60 | FAULT | `chamber <S4EXT> chamber_abcd_optset there is a wafer in chamber` |
+| 417 | 52 | PROMPT | `completed processing of all wafers in elevator holding at vacuum until go pressed` |
+| 094 | 41 | FAULT | `cryo pump temperature is too high - please correct` |
+| 099 | 37 | PROMPT | `cryo pump completed regeneration - you may put it online for processing` |
+| 756 | 8 | FAULT | `tray did not drop on blade from <S4EXT> chamber_name_table func_cut ( <L1>/ <L1> mv)( <L2>/ <L2> mv)` |
+| 1296 | 6 | FAULT | `chamber <S4EXT> chamber_abcd_optset microwave generator water flow interlock fault` |
+| 195 | 6 | FAULT | `<S4EXT> cfi_name_table has not had characterization` |
+| 762 | 6 | FAULT | `remote liquid source <S4> mfc temp less than func_char+char_1 func_char+char_0 above liquid temp` |
+| 743 | 3 | FAULT | `ch <S4EXT> chamber_abcd_optset electrostatic chuck current out of range` |
+| 474 | 2 | FAULT | `secs timeout on wafer orienter channel` |
+| 731 | 2 | FAULT | `ch <S4EXT> chamber_abcd_optset requested rf2 power is outside of rf2 power table limits` |
+| 856 | 2 | TRACE | `cassette removed from port <S1EXT> chamber_abcd_optset` |
+| 000 | 1 | FAULT | `undefined event number <ERRNUM> subsystem <S2> param <S4> <L1> <L2> <L3>` |
+| 083 | 1 | TRACE | `<S4EXT> chamber_name_table process has started` |
+| 190 | 1 | FAULT | `<S4EXT> cfi_name_table cannot communicate with remote board` |
+| 466 | 1 | FAULT | `ch <S4EXT> chamber_abcd_optset co - processor endpoint fault func_append+colon <L1>` |
+| 576 | 1 | PROMPT | `chamber <S4EXT> chamber_abcd_optset has completed chamber cycle purge service program` |
+| 745 | 1 | FAULT | `ltc ht ex <S4> did not warm up in max allowed time` |
+| 747 | 1 | WARNING | `ltc ht ex <S4> temperature deviation warning alarm` |
+
+**Characters that were ambiguous, and what was matched instead:**
+
+- `secs` vs `sees` (474) — matched `timeout on wafer orienter`, dropping the
+  token. SECS is the plausible reading in this context but it is not worth
+  betting a rule on.
+- `rf2` vs `rfz` (731) — matched `power table limits`.
+- `cfi_name_table` vs `cf1_name_table` (195, 190) — matched
+  `has not had characterization` and `cannot communicate with remote board`.
+- `func_char+char_1 func_char+char_0` (762) — matched `mfc temp less than`.
+- `ltc ht ex` (745, 747) — matched `did not warm up` and
+  `temperature deviation`.
+- The `( <L1>/ <L1> mv)( <L2>/ <L2> mv)` run (756) — matched
+  `tray did not drop on blade`.
+- `856` carries **`<S1EXT>`** where every other line on this tool carries
+  `<S4EXT>`. This is exactly the pair CLAUDE.md warns about, and it cost nothing
+  because no rule reads the tag.
+
+**Judgement calls:**
+
+- **`417` was kept apart from `446`.** Both mention all the wafers being done,
+  but `446` (`all processing of wafers is complete`) is the finish, and `417` is
+  the elevator sitting at vacuum waiting for someone to press GO. The second is
+  a machine waiting on a person, which is the one worth counting.
+- **`466` was kept apart from `490`.** `490` is a missing endpoint system;
+  `466` is the endpoint co-processor faulting. Missing hardware and broken
+  hardware are different callouts.
+- **`576` was kept apart from `577` and the LFC cal rule.** Three service
+  programs — cycle purge, leak up rate, LFC cal — each with its own follow-up.
+- **`094` and `099` were kept apart.** One is a cryo pump too hot, the other is
+  a cryo pump that finished regenerating and is ready. Same pump, opposite news.
+- **`000` earned a rule rather than being ignored.** It is the sentinel row the
+  elog opens with, dated `00/00/00 00:00:00`, and it is what the `[TS-Y2K]`
+  note is about. Naming it stops it looking like a real fault at the top of a
+  time-sorted list.
+
+**Six built-ins matched nothing on this log:** All wafers completed, Pumpdown
+complete, Pump motor error, Pump running without N2, Remote MFC autofill, and
+Parameter out of spec. Nothing was pruned, and the reason is visible in this
+run: **PM trigger reached (293x) and Wafer not sensed (44x) both fired here
+after matching nothing at all on etch3.** A rule that is dead on one tool is
+routinely alive on the next, which settles the question of whether zero hits
+justifies deletion. It does not.
+
+`All wafers completed` is a special case in that list — it reads as dead only
+because this run predates batch 1. Event `446` is present in this log, and the
+batch-1 rule folds it onto that label, so it should come alive on the next run.
