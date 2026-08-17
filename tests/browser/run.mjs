@@ -25,6 +25,46 @@ const PORT_NUM = 9401;
 const p5000 = readFileSync(join(FIX, "p5000_sample.txt"), "utf8");
 const csv = readFileSync(join(FIX, "delimited_sample.csv"), "utf8");
 
+// Three shapes the downtime guess has to tell apart. None of them has a
+// Duration column or a set/clear column, so the only thing separating them is
+// whether the default phrase lists actually pair up in the text.
+//
+// This one pairs: four chambers go offline and come back.
+const deriveLog = [
+  "When,ID,Message",
+  "2026-02-10 08:00:00,E1,Chamber 1 state changed to offline",
+  "2026-02-10 10:00:00,E2,Chamber 1 state changed to online",
+  "2026-02-10 11:00:00,E3,Chamber 2 offline for maintenance",
+  "2026-02-10 14:30:00,E4,Chamber 2 state changed to online",
+  "2026-02-11 09:00:00,E5,Chamber 1 state changed to offline",
+  "2026-02-11 12:00:00,E6,Chamber 1 state changed to online",
+  "2026-02-12 07:00:00,E7,Load Lock A state changed to offline",
+  "2026-02-12 08:15:00,E8,Load Lock A state changed to online",
+  ""
+].join("\n");
+
+// The same log with every "online" message removed. Derive would cap each
+// interval at the last timestamp and report huge invented downtime, so the
+// guess must refuse it.
+const deriveDownsOnly = [
+  "When,ID,Message",
+  "2026-02-10 08:00:00,E1,Chamber 1 state changed to offline",
+  "2026-02-10 11:00:00,E3,Chamber 2 offline for maintenance",
+  "2026-02-11 09:00:00,E5,Chamber 1 state changed to offline",
+  ""
+].join("\n");
+
+// Chambers named, but wording the default phrase lists have never seen. Derive
+// would find nothing and report no downtime while looking as though it had
+// measured some.
+const deriveNoWording = [
+  "When,ID,Message",
+  "2026-02-10 08:00:00,E1,Chamber 1 pressure out of range",
+  "2026-02-10 10:00:00,E2,Chamber 1 pressure recovered",
+  "2026-02-11 09:00:00,E5,Chamber 2 gas flow deviation",
+  ""
+].join("\n");
+
 // --- Find a Chromium binary ------------------------------------------------
 function findChrome() {
   if (process.env.CHROME_BIN && existsSync(process.env.CHROME_BIN)) return process.env.CHROME_BIN;
@@ -103,7 +143,10 @@ async function main() {
 
   await send("Runtime.enable");
   await new Promise(function (r) { setTimeout(r, 400); });
-  await ev("window.__p = " + JSON.stringify(p5000) + "; window.__csv = " + JSON.stringify(csv) + "; true");
+  await ev("window.__p = " + JSON.stringify(p5000) + "; window.__csv = " + JSON.stringify(csv)
+    + "; window.__derive = " + JSON.stringify(deriveLog)
+    + "; window.__downsOnly = " + JSON.stringify(deriveDownsOnly)
+    + "; window.__noWording = " + JSON.stringify(deriveNoWording) + "; true");
 
   // 1. window.AP exists and is populated.
   var apKeys = await ev("Object.keys(window.AP || {}).length");
@@ -869,6 +912,186 @@ async function main() {
     + "})()");
   check("quick: a mode chosen by hand is stored", q8.saved === "full", q8);
   check("quick: a pinned mode applies without overwriting the stored choice", q8.cls === "mode-quick" && q8.stillSaved === "full", q8);
+
+  // 10. A ranking's percentages belong to that ranking.
+  //
+  // byCount and byDown are two orderings of the same groups. They were built
+  // from the same row objects, so the second call to collapse() overwrote the
+  // rank, pct and cum the first had written: the "Count %" and "Cum %" columns
+  // and the Pareto's cumulative line were showing downtime shares, which are all
+  // zero whenever a log has no downtime column. Every DOM assertion passed while
+  // the cumulative line lay flat along the bottom of the chart.
+  var r1 = await ev("(function(){"
+    + "setMode('full');"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "var L=STATE.lastResult.levels.category;"
+    + "return {pct:L.byCount.map(function(r){return +r.pct.toFixed(1);}),"
+    + " cum:L.byCount.map(function(r){return +r.cum.toFixed(1);}),"
+    + " ranks:L.byCount.map(function(r){return r.rank;}),"
+    + " shared:L.byCount.some(function(r){return L.byDown.indexOf(r)!==-1;})};"
+    + "})()");
+  check("ranking: Count % is the share of the count, not of the downtime",
+    JSON.stringify(r1.pct) === JSON.stringify([62.5, 12.5, 12.5, 12.5]), r1.pct);
+  check("ranking: Cum % climbs to 100", JSON.stringify(r1.cum) === JSON.stringify([62.5, 75, 87.5, 100]), r1.cum);
+  check("ranking: the count ranking is numbered from its own order",
+    JSON.stringify(r1.ranks) === JSON.stringify([1, 2, 3, 4]), r1.ranks);
+  check("ranking: the two rankings do not share row objects", r1.shared === false, r1);
+
+  // The same, on a log that does have downtime: the two rankings must disagree
+  // rather than both reporting the downtime share.
+  // The DownSeconds column is already tagged Duration by the automatic guess,
+  // so nothing here fires a change event: that would save a setup for this
+  // layout and leave the next test restoring it instead of guessing.
+  var r2 = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);"
+    + "document.getElementById('downMode').value='duration';syncDownModeUI();"
+    + "document.getElementById('windowDays').value=36500;"
+    + "document.getElementById('runBtn').click();"
+    + "var L=STATE.lastResult.levels.fault_code;"
+    + "var out={countPct:L.byCount.map(function(r){return +r.pct.toFixed(1);}),"
+    + " downPct:L.byDown.map(function(r){return +r.pct.toFixed(1);}),"
+    + " countKeys:L.byCount.map(function(r){return r.key;}),"
+    + " downKeys:L.byDown.map(function(r){return r.key;}), wiped:__wipe()};"
+    + "return out;"
+    + "})()");
+  // Counts are E101 x2, E202, E303, so 50/25/25. The seconds are 14400, 7200
+  // and 1800 of 23400, so the downtime ranking is a different order and a
+  // different set of shares: 61.5/30.8/7.7.
+  check("ranking: count shares stay count shares when downtime exists",
+    JSON.stringify(r2.countPct) === JSON.stringify([50, 25, 25]), r2.countPct);
+  check("ranking: downtime shares are computed from the downtime",
+    JSON.stringify(r2.downPct) === JSON.stringify([61.5, 30.8, 7.7]), r2.downPct);
+  check("ranking: the two rankings order the same groups differently",
+    JSON.stringify(r2.countKeys) === JSON.stringify(["E101", "E202", "E303"]) &&
+    JSON.stringify(r2.downKeys) === JSON.stringify(["E101", "E303", "E202"]), r2);
+
+  // 11. The ranked table drops the two all-zero downtime columns in the quick
+  // report, the same way the tiles and the empty chart were dropped.
+  await ev("(function(){window.__heads=function(){"
+    + "return Array.prototype.map.call(document.querySelectorAll('#resultTable th'),"
+    + "function(t){return t.textContent;});};"
+    + "window.__cells=function(){var tr=document.querySelectorAll('#resultTable tr')[1];"
+    + "return tr?tr.children.length:0;};return true;})()");
+  var t1 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "var quick={heads:__heads(), cells:__cells()};"
+    + "setMode('full');"
+    + "var full={heads:__heads(), cells:__cells()};"
+    + "return {quick:quick, full:full};"
+    + "})()");
+  check("table: the quick report drops the zero downtime columns",
+    t1.quick.heads.indexOf("Attributed (h)") === -1 && t1.quick.heads.indexOf("Wall clock (h)") === -1, t1.quick.heads);
+  check("table: and the body rows lose the same two cells", t1.quick.cells === t1.quick.heads.length, t1.quick);
+  check("table: the full report keeps them, since its note explains the zeros",
+    t1.full.heads.indexOf("Attributed (h)") !== -1 && t1.full.heads.indexOf("Wall clock (h)") !== -1, t1.full.heads);
+  check("table: flipping the mode redraws the columns", t1.full.cells === t1.full.heads.length, t1.full);
+
+  // A log that does have downtime keeps the columns in the quick report, since
+  // there the numbers say something.
+  var t2 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);"
+    + "document.getElementById('runBtn').click();"
+    + "return {heads:__heads(), mode:STATE.lastResult.map.downMode, cells:__cells()};"
+    + "})()");
+  check("table: a log with real downtime keeps the columns in the quick report",
+    t2.heads.indexOf("Attributed (h)") !== -1 && t2.cells === t2.heads.length, t2);
+
+  // 12. The downtime guess may pick "Derive from messages", but only on
+  // evidence. Choosing it wrongly invents downtime rather than omitting it, so
+  // the guess runs the pairing first and takes the road only if pairs close.
+  var d1 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__derive],1);"
+    + "var pairs=derivePairsAvailable();"
+    + "var guess=guessDownMode();"
+    + "document.getElementById('windowDays').value=36500;"
+    + "document.getElementById('runBtn').click();"
+    + "var R=STATE.lastResult;"
+    + "return {pairs:pairs, guess:guess, mode:R.map.downMode, derived:!!R.isDerived,"
+    + " intervals:R.derived?R.derived.intervals.length:0,"
+    + " hours:+(R.grandAttrib/3600).toFixed(2),"
+    + " note:document.getElementById('quickNote').textContent,"
+    + " phrases:document.getElementById('downPhrases').value.trim().length>0};"
+    + "})()");
+  eq("derive: the default phrases find the pairs in the log", d1.pairs, 4);
+  check("derive: a log whose messages pair up is derived", d1.guess === "derive" && d1.mode === "derive", d1);
+  check("derive: the phrase lists are filled in for the analysis to use", d1.phrases, d1);
+  eq("derive: every pair became an interval", d1.intervals, 4);
+  eq("derive: the estimated downtime is the sum of the pairs", d1.hours, 9.75);
+  check("derive: the note says downtime was estimated by pairing messages",
+    /Downtime estimated by pairing down and up messages/.test(d1.note), d1.note);
+  check("derive: and says how many pairs it found", /\(4 pairs found\)/.test(d1.note), d1.note);
+
+  // Downs with no ups. Every interval would be capped at the last timestamp,
+  // which reads as enormous downtime that never happened.
+  var d2 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__downsOnly],1);"
+    + "return {pairs:derivePairsAvailable(), guess:guessDownMode()};"
+    + "})()");
+  eq("derive: downs that never close are not pairs", d2.pairs, 0);
+  check("derive: a log of downs alone is ranked by count instead", d2.guess === "none", d2);
+
+  // Wording the default lists have never seen.
+  var d3 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__noWording],1);"
+    + "return {pairs:derivePairsAvailable(), guess:guessDownMode()};"
+    + "})()");
+  check("derive: unfamiliar wording is not guessed at", d3.pairs === 0 && d3.guess === "none", d3);
+
+  // A real downtime column still outranks the messages.
+  var d4 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);"
+    + "return guessDownMode();"
+    + "})()");
+  eq("derive: a Duration column still wins over the message text", d4, "duration");
+
+  // 13. What the quick report puts on paper. The hand-out is the summary, the
+  // ranked table and the Pareto; anything whose job is to change the report
+  // rather than to say what it found comes off the page.
+  // A button inside a hidden card still reports its own display, so asking
+  // __shown about it would say it is on the page. This asks whether the element
+  // was laid out at all, which is what "on the paper" actually means.
+  await ev("(function(){window.__visible=function(id){var el=document.getElementById(id);"
+    + "return !!(el && el.getClientRects().length > 0);};return true;})()");
+  await send("Emulation.setEmulatedMedia", { media: "print" });
+  var pr = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('windowDays').value=30;syncWindowChips();"
+    + "document.getElementById('runBtn').click();"
+    + "return {note:__visible('quickNote'), tiles:__visible('statCards'), table:__visible('resultTable'),"
+    + " chart:__visible('countChart'), insights:__visible('insightsCard'), window:__visible('quickWindow'),"
+    + " tabs:__visible('levelTabs'), chartOpts:__visible('chartOpts'), buttons:__visible('printBtn'),"
+    + " header:__visible('modeQuick'), debug:__visible('debugSection'), importCard:__visible('importCard'),"
+    + " toFull:__visible('toFullBtn')};"
+    + "})()");
+  check("print: the quick report keeps the summary, the ranking and the Pareto",
+    pr.note && pr.tiles && pr.table && pr.chart, pr);
+  check("print: the controls come off the page",
+    !pr.window && !pr.tabs && !pr.chartOpts && !pr.buttons && !pr.toFull, pr);
+  check("print: so does everything that is not the hand-out",
+    !pr.insights && !pr.header && !pr.debug && !pr.importCard, pr);
+
+  // The note has to survive printing: it is the only thing on the paper saying
+  // which window and which columns produced these numbers.
+  var prNote = await ev("document.getElementById('quickNote').textContent");
+  check("print: the assumptions are still stated on the paper",
+    /Covering the last 30 days/.test(prNote) && /faults counted by/.test(prNote), prNote);
+
+  // The full report prints as it always has.
+  var prFull = await ev("(function(){setMode('full');"
+    + "return {insights:__visible('insightsCard'), tabs:__visible('levelTabs'), table:__visible('resultTable')};})()");
+  check("print: the full report is left alone", prFull.insights && prFull.tabs && prFull.table, prFull);
+  await send("Emulation.setEmulatedMedia", { media: "" });
 
   // Leave the stored mode and the saved setups as we found them.
   var cleaned = await ev("(function(){localStorage.removeItem('ap_mode');return __wipe()+1;})()");

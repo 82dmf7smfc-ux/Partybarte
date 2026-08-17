@@ -46,7 +46,7 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `220 passed, 0 failed` before any change, more after. It drives
+It should report `248 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
 
@@ -136,6 +136,17 @@ signature.
 rule, so an element's inline `style.display` can still read `""` while nothing is
 on screen. Tests must ask `getComputedStyle(el).display` instead. The harness has
 a `__shown(id)` helper for this.
+
+**Two rankings of the same rows shared their working.** `rankLevel` builds
+`byCount` and `byDown` from one array of group objects. `arr.slice()` copies the
+array but not the objects, so `collapse` writing `rank`, `pct` and `cum` on the
+second pass overwrote what the first pass wrote: the "Count %" and "Cum %"
+columns and the Pareto's cumulative line were showing downtime shares, which are
+all zero when a log has no downtime column. `collapse` now works on copies. The
+lesson is the general one - a function that stamps fields onto rows must own
+those rows - and the way it was caught is the point: every DOM assertion passed,
+and it took looking at a screenshot to notice the cumulative line of a Pareto
+chart lying flat along the bottom.
 
 **A red CI job is not always a red change.** `browser-actions/setup-chrome` has
 failed with 429 and 503 while downloading the action, before a single test ran.

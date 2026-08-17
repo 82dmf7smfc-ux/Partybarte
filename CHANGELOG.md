@@ -39,6 +39,43 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - Browser tool: a `SETUP-RESTORED` debug code records when a saved setup was put
   back, so the debug report says whether the columns on screen were guessed or
   remembered.
+- Browser tool: the quick report can now work out downtime from the messages
+  themselves. If a log has no duration column and no set/clear column, but its
+  messages say a chamber went offline and later came back, the quick report
+  pairs them up and reports the downtime instead of only counting faults. It
+  does this only when the built-in wording actually pairs up in your file: a log
+  the wording does not fit, or one with "offline" messages and no matching
+  "online" ones, is still ranked by count, because a wrong guess here would
+  invent downtime rather than leave it out. The line above the summary says so
+  and gives the number of pairs found: "Downtime estimated by pairing down and
+  up messages (4 pairs found)".
+- Browser tool: "Print / Save as PDF" in the quick report now produces a
+  one-page hand-out - what was read, the ranked table, and the Pareto - with the
+  buttons, chips, tabs and chart picker left off the paper, since none of them
+  can be pressed there. The line saying which columns and which window produced
+  the numbers stays on the page, so a printout handed to someone else still
+  carries its assumptions. The full report prints as it always has.
+
+### Changed
+
+- Browser tool: the results table in the quick report drops the "Attributed (h)"
+  and "Wall clock (h)" columns when the log has no downtime to report, the same
+  way the zero tiles and the empty downtime chart were already dropped. The full
+  report still shows them, where the settings panel and its note explain the
+  zeros.
+
+### Fixed
+
+- Browser tool: the "Count %" and "Cum %" columns, and the rising line on the
+  Pareto chart, were wrong. Both rankings of the same data - by count and by
+  downtime - were sharing their working, so the downtime percentages overwrote
+  the count percentages. On a log with no downtime column that showed as a table
+  of zeros and a cumulative line lying flat along the bottom of the chart; on a
+  log with downtime it quietly showed downtime shares in a column headed
+  "Count %". The counts, the downtime totals, and the ranking order were never
+  affected, so no conclusion drawn from the ranking was wrong - but the
+  percentages beside it were, and now read correctly: 62.5, 75.0, 87.5, 100.0
+  where before they read 0.0.
 
 ## [1.4.0] - 2026-08-17
 

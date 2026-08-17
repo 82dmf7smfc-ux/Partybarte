@@ -13,18 +13,26 @@ keep good ideas so they are not lost between sessions.
 
 ## Near term
 
-- **Quick report and full report.** Shipped. The browser tool now opens as a
-  quick report - import, Analyze, results - and a switch opens the full tool.
-  What is left, in the order it is worth doing:
-  - The results table in the quick report still carries "Attributed (h)" and
-    "Wall clock (h)" columns full of zeros when the log has no downtime column.
-    The zero tiles and the empty downtime chart are already dropped; the table
-    columns are the same noise and should go the same way.
-  - The print stylesheet has not been tuned for the quick report. A one-page
-    print is the natural thing to hand to a supervisor.
-  - The quick report picks the downtime mode from the columns, but never picks
-    "Derive from messages", which needs phrase lists. For an elog whose messages
-    pair up, that is the mode that would tell the truth about downtime.
+- **Quick report and full report.** Shipped, and since tuned on real logs. The
+  browser tool opens as a quick report - import, Analyze, results - and a switch
+  opens the full tool. The three things left after the first pass are all done:
+  - The results table drops the "Attributed (h)" and "Wall clock (h)" columns in
+    the quick report when the log has no downtime, the same as the zero tiles
+    and the empty chart. Done.
+  - The print stylesheet gives the quick report a one-page hand-out: the
+    summary, the ranked table, and the Pareto, with every control off the paper.
+    Done.
+  - The quick report can now pick "Derive from messages", but only when the
+    default phrase lists genuinely pair up in the file. Done, and deliberately
+    cautious: a wrong guess here invents downtime rather than omitting it, so
+    the pairing is run first and derive is taken only if pairs actually close.
+
+  What is left is wording, not machinery: the default down and up phrase lists
+  are Applied Materials wording. A tool whose elog says something else still
+  needs the phrases typed once in the full report, after which the saved setup
+  recalls them. Worth collecting real phrasings from a few more tools and adding
+  the common ones to the defaults, so the quick report recognises more logs
+  without being told.
 
 - **Read Excel files in the browser tool.** Today the browser tool reads CSV and
   delimited text. Many elogs are native `.xlsx`. Add a small offline parser so
