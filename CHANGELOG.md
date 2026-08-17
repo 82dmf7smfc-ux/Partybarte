@@ -6,21 +6,10 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-### Changed
-- Browser tool: the "Show debug log" button moved to the bottom of the page, below
-  the results, with a note that says to run Analyze first (the category metrics and
-  the uncategorized event ID worklist are only built during analysis).
-
-### Fixed
-- Browser tool: the uncategorized event-ID worklist no longer claims "every event
-  matched a category rule" before an analysis has run. The worklist is built during
-  Analyze, so until then "Copy uncategorized IDs" (and the verbose report) now say
-  "run Analyze first". After an analysis, an empty worklist reads "none. Every event
-  matched a real category rule", and it spells out that a message which only gets an
-  auto-generated label from its text still counts as uncategorized and is listed. So
-  "categorized" always means a real rule matched, never a placeholder.
+## [1.4.0] - 2026-08-17
 
 ### Added
+
 - Browser tool: smarter categorization via the debug loop. The verbose debug log
   now lists the uncategorized event IDs (top 100 by count), each with its count,
   severity, and how many distinct message shapes it carries. An ID with one shape
@@ -61,11 +50,6 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   chamber tag, the tool reads one of these names from the message text and uses
   it as the Module, so tool-level events land on a module instead of "(unknown)".
 
-### Changed
-- Browser tool: removed the two demo buttons ("Load built-in sample" and "Load
-  message-log sample").
-
-### Added (earlier in this cycle)
 - Browser tool: an "Unknown events" panel. It ranks the messages that matched no
   category rule, and the events with no chamber tag, by how common each shape is,
   so the biggest unknown groups are obvious. Each uncategorized shape has an "Add
@@ -121,6 +105,25 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   alongside the Python suite.
 - `docs/DEBUG_CODES.md`, a reference for the browser tool's debug codes. The
   harness checks that every code the tool emits is listed in the registry.
+
+### Changed
+
+- Browser tool: the "Show debug log" button moved to the bottom of the page, below
+  the results, with a note that says to run Analyze first (the category metrics and
+  the uncategorized event ID worklist are only built during analysis).
+
+- Browser tool: removed the two demo buttons ("Load built-in sample" and "Load
+  message-log sample").
+
+### Fixed
+
+- Browser tool: the uncategorized event-ID worklist no longer claims "every event
+  matched a category rule" before an analysis has run. The worklist is built during
+  Analyze, so until then "Copy uncategorized IDs" (and the verbose report) now say
+  "run Analyze first". After an analysis, an empty worklist reads "none. Every event
+  matched a real category rule", and it spells out that a message which only gets an
+  auto-generated label from its text still counts as uncategorized and is listed. So
+  "categorized" always means a real rule matched, never a placeholder.
 
 ## [1.3.0] - 2026-08-14
 
