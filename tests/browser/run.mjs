@@ -877,6 +877,29 @@ async function main() {
   ws.close();
   proc.kill("SIGKILL");
 
+  // CLAUDE.md quotes the number this suite should report, and a session reads
+  // that number before touching anything. Left stale it reads as a regression,
+  // which has happened: the count was written down as 138 while the suite was
+  // 176, and again as 215 one commit before it became 220. So the suite checks
+  // its own paperwork rather than trusting anyone to remember.
+  //
+  // This is a gate, not a check: it never adds to `passed`, because the number
+  // it is comparing against is that very count.
+  var notes = join(REPO, "CLAUDE.md");
+  if (existsSync(notes)) {
+    var quoted = readFileSync(notes, "utf8").match(/should report `(\d+) passed/);
+    if (!quoted) {
+      console.log("  FAIL CLAUDE.md no longer states the expected test count");
+      failed += 1;
+    } else if (+quoted[1] !== passed) {
+      console.log("  FAIL CLAUDE.md says " + quoted[1] + " passed; this run counted " + passed +
+        ". Update the number in CLAUDE.md as part of this change.");
+      failed += 1;
+    } else {
+      console.log("  ok   CLAUDE.md test count is current (" + passed + ")");
+    }
+  }
+
   console.log("\n" + passed + " passed, " + failed + " failed");
   process.exit(failed ? 1 : 0);
 }

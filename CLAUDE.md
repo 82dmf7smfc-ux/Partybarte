@@ -20,6 +20,21 @@ the task itself implies.
   once already, with the package reading 1.0.0 while the repo had tagged 1.3.0.
 - **Sweep up after yourself.** Once a PR is merged, its branch is rubbish. Delete
   it if permitted; if not, leave it and move on rather than asking about it.
+- **Update the record in the same commit as the change.** Writing down what
+  happened is part of the work, not a separate errand to be asked for. Every
+  change to the browser tool touches some of these, and the change is not
+  finished until it has:
+  - `CHANGELOG.md`, under Unreleased, in plain prose about what a person can now
+    do. Check the diff is purely additive.
+  - `ROADMAP.md`, if the change ships or moves a backlog item. Edit the entry to
+    say what shipped and what is left, rather than deleting it.
+  - `docs/DEBUG_CODES.md`, for any new debug code.
+  - `README.md`, if the change alters what a user does or sees.
+  - this file, for the test count and for anything a future session would
+    otherwise have to work out again from scratch.
+
+  The last one is the easiest to skip and the most expensive to skip. A trap that
+  cost an hour and was not written down will cost another hour.
 
 Ask first only where the answer genuinely changes the work, or where the action
 is destructive and not obviously implied by the request. Publishing a release is
@@ -31,10 +46,14 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `215 passed, 0 failed` before any change, more after. It drives
+It should report `220 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
-so there is nothing to install. Keep that number current in this file when the
-suite grows; a stale number reads as a regression to the next session.
+so there is nothing to install.
+
+That number is checked by the suite itself, at the end of the run, against this
+file. If it does not match, the run fails and says so. Update the line above as
+part of the change that moved it, the same way a new debug code is registered as
+part of the change that emits it.
 
 **Look at the page, not only at the DOM.** The harness asserts on ids and values,
 and there is a whole class of fault it cannot see. A mode switch shipped with its

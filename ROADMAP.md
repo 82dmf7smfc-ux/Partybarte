@@ -83,6 +83,11 @@ keep good ideas so they are not lost between sessions.
 
 ## Engineering hygiene
 
+- The browser suite checks its own paperwork: the run ends by comparing the test
+  count quoted in `CLAUDE.md` against the count it just reported, and fails if
+  they differ. The number had gone stale twice. The same idea would suit anything
+  else a session is expected to remember to update by hand.
+
 - Add a code formatter and a linter check to CI once the team agrees on a style.
 - Add tests for the set/clear pairing path and the paired-interval path in the
   Python suite, to match the coverage the browser tool already exercises.
