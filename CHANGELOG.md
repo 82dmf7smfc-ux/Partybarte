@@ -76,6 +76,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   affected, so no conclusion drawn from the ranking was wrong - but the
   percentages beside it were, and now read correctly: 62.5, 75.0, 87.5, 100.0
   where before they read 0.0.
+- Browser tool: the debug log no longer follows you into the quick report. If you
+  opened it in the full report and then switched, the whole debug panel stayed on
+  screen at the bottom of the quick report - and could not be put away, because
+  the button that closes it had gone with the rest of the full report. The debug
+  log is two pieces, the button and the panel it opens, and only the button was
+  being hidden. Switching back to the full report still finds the log open where
+  you left it.
 
 ## [1.4.0] - 2026-08-17
 

@@ -913,6 +913,40 @@ async function main() {
   check("quick: a mode chosen by hand is stored", q8.saved === "full", q8);
   check("quick: a pinned mode applies without overwriting the stored choice", q8.cls === "mode-quick" && q8.stillSaved === "full", q8);
 
+  // 9j. An opened debug log does not follow the reader into the quick report.
+  //
+  // The debug log is two blocks: the "Show debug log" button (#debugSection) and
+  // the panel it opens (#debugCard), which is a sibling of it rather than a
+  // child. The mode rule named only the button, so someone who opened the debug
+  // log in the full report and then switched to the quick report kept the whole
+  // panel on screen -- and could not put it away, because the toggle had gone
+  // with the rest of the full report. The check above this one passed the whole
+  // time: it asked about the button, which was correctly hidden.
+  // An earlier test may already have opened the log, so this opens it only if it
+  // is closed rather than clicking blindly and toggling it shut. The button is
+  // checked with getClientRects, not __shown: it sits inside #debugSection, and
+  // an element's own computed display says nothing about a hidden ancestor.
+  var q9 = await ev("(function(){"
+    + "function onScreen(id){var e=document.getElementById(id);return !!(e&&e.getClientRects().length>0);}"
+    + "function openLog(){var c=document.getElementById('debugCard');"
+    + "if(getComputedStyle(c).display==='none') document.getElementById('debugToggle').click();}"
+    + "setMode('full');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "openLog();"
+    + "var open={section:onScreen('debugSection'), card:onScreen('debugCard')};"
+    + "setMode('quick');"
+    + "var quick={section:onScreen('debugSection'), card:onScreen('debugCard'),"
+    + " toggle:onScreen('debugToggle')};"
+    + "setMode('full');"
+    + "var back={card:onScreen('debugCard')};"
+    + "return {open:open, quick:quick, back:back};"
+    + "})()");
+  check("debug: the full report opens the log", q9.open.section && q9.open.card, q9.open);
+  check("debug: an opened log is gone from the quick report", !q9.quick.card, q9.quick);
+  check("debug: and so is the button that opens it", !q9.quick.section && !q9.quick.toggle, q9.quick);
+  check("debug: going back to the full report finds it still open", q9.back.card, q9.back);
+
   // 10. A ranking's percentages belong to that ranking.
   //
   // byCount and byDown are two orderings of the same groups. They were built
