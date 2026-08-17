@@ -8,6 +8,30 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ### Added
 
+- Browser tool: forty-nine more faults are recognised by name, taken from a real
+  5,158-row P5000 etch log where everything below the two big built-in rules was
+  landing on a label the tool had invented from the wording. The whole tail is
+  now named, so a fault reported two different ways lands on one row instead of
+  two. Newly recognised: chamber service state changes, leak up rate and LFC cal
+  service programs finishing, chamber index communication errors, system control
+  state changes, an unresponsive OCR, system constants out of range, a sequence
+  that failed to link to its lot, disk errors, ozone concentration out of range
+  and ozone analyzer gain ratio errors, loader manual homing, magnet coil current
+  not changing, a missing endpoint system, lift steps out of range, GPC events,
+  the blade retracting after a chamber error, a cassette slot already full,
+  chamber interlocks and an open chamber cover, equipment restarts, RF delivered
+  power deviation, orient command errors, auxiliary line pressure high, liquid
+  source temperature out of tolerance and its cleaning cycles, microwave pressure
+  and plasma detector faults, MFC flow too high, backing pump over temperature,
+  foreline pressure high, turbo purge off and turbo not at speed, aborts after a
+  sequencing fault, error recovery prompts, a reboot needed after a config
+  change, the indexer at the wrong level, a storage elevator zero not found, a
+  wafer already on the blade, process gases stopped, the roughing pump not
+  running, state lost across a restart, rotation lost on the chuck, false motion
+  complete, heat-up rate too low, the dummy wafer RF time warning, heat exchanger
+  temperature deviation, and a high flow cal attempted with no transducer fitted.
+  Three of these fold a second wording onto a name that already existed, so the
+  count for that fault is now whole rather than split across two rows.
 - Browser tool: two ways to read the same tool. The **quick report** is the short
   road for anyone who just wants the answer: pick a file, press Analyze, read it.
   It hides the column table, the settings, and the debug log, and works out the

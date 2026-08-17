@@ -158,4 +158,143 @@ apart, an ID that turned out to carry three unrelated messages.
 
 ### Batch log
 
-*(Nothing yet. The first batch of real-log rules goes here.)*
+#### Batch 1 — etch3, 5,158 rows, 2026-08-17
+
+Source: four photographs of the verbose debug report. Tool preamble read
+`P5000 / Etch / E4.70 / tool etch3 (etch)`, header at line 11, 5158 rows, and the
+timestamps used a 2-digit year expanded on the 1969 pivot.
+
+Coverage: **4233 of 5158 (82%), uncategorized 925** before this batch.
+
+The worklist was `top 59 of 59 distinct`, so every uncategorized Event Number was
+in frame and the counts below sum to the whole 925. That is why this batch is
+large: it is not a sample of the tail, it is all of it.
+
+**No `id:` rules were written, deliberately.** `BUILTIN_CAT_RULES` entries are
+`{re, label}` and the built-in loop only tests `re` against the text —
+`categorize()` reads `r.ids` for user rules alone. So a built-in cannot key on an
+Event Number even where the number is the stabler fact. Separately, several IDs
+in the photograph carry leading zeros (`005`, `067`, `068`, `069`, `089`) and an
+`id:` rule compares against `String(id).trim()`, so whether the tool holds them
+as `005` or `5` decides whether the rule fires. Both reasons point the same way.
+
+Transcribed examples, with the count and severity as read:
+
+| ID | count | sev | example message as transcribed |
+|---|---|---|---|
+| 448 | 261 | TRACE | `chamber <S4EXT> chamber_abcd_optset state changed to <L1EXT> service_command_optset` |
+| 572 | 108 | PROMPT | `chamber <S4EXT> chamber_abcd_optset has completed leak up rate service program` |
+| 1029 | 75 | PROMPT | `chamber <S4EXT> chamber_abcd_optset has completed lfc cal service program` |
+| 1156 | 56 | WARNING | `<S4EXT> chx_index_optset bad message byte count func_char+colon <L1>` |
+| 447 | 49 | TRACE | `system control state changed to <L1EXT> system_state_optset` |
+| 1267 | 46 | WARNING | `ocr does not respond check connection` |
+| 005 | 28 | WARNING | `system constant out of range func_cut id <L1> has value <L2>` |
+| 428 | 24 | FAULT | `link sequence to lot for wafers in cassette <S4EXT> chamber_abcd_optset` |
+| 640 | 18 | FAULT | `func_switch undefined_disk_error_text` |
+| 1004 | 17 | WARNING | `ozone concentration out of range in ch <S4EXT> chamber_abcd_optset recipe running` |
+| 166 | 16 | PROMPT | `completed manual home all loader axes` |
+| 456 | 16 | FAULT | `chamber <S4EXT> chamber_abcd_optset detected magnet coil current not changing` |
+| 490 | 15 | FAULT | `required endpoint system not present` |
+| 726 | 13 | WARNING | `chamber <S4EXT> chamber_abcd_optset lift step <L1> out of range, will use limit of <L2>` |
+| 1069 | 12 | PROMPT | `gpc event func_append+colon <S4EXT> gpc_event_optset, status <L1> param <L2> <L3>` |
+| 908 | 11 | WARNING | `afx ozone analyzer has gain ratio error` |
+| 1003 | 10 | FAULT | `blade has been auto retracted due to some errors had occurred to chamber` |
+| 111 | 10 | FAULT | `need to unload to slot func_cut <L1> of cassette <S4EXT> cassette_name_table, is already full` |
+| 778 | 10 | FAULT | `ch <S4EXT> chamber_abcd_optset interlock lamp overtemp or out of pos or cover open` |
+| 848 | 9 | TRACE | `equipment restart` |
+| 1001 | 9 | FAULT | `ch <S4EXT> chamber_abcd_optset crf2 delivered pwr deviation err, delivered pwr <L1> func_char+char_w, limit set <L2> func_char+char_w` |
+| 1002 | 9 | FAULT | `some errors had occurred to ch <S4EXT> chamber_abcd_optset; blade being retracted` |
+| 446 | 9 | PROMPT | `all processing of wafers is complete` |
+| 836 | 9 | FAULT | `orient command error` |
+| 997 | 8 | FAULT | `mainframe aux_final <S4> auxiliary final line pressure high fault func_switch rest_of_311` |
+| 1119 | 6 | FAULT | `chamber <S4EXT> chamber_abcd_optset cvd - func_char+char_1 microwave pressure too high` |
+| 346 | 6 | FAULT | `cover is open error in chamber <S4EXT> chamber_abcd_optset` |
+| 367 | 6 | FAULT | `liquid source <S4> temp out of fault tolerance func_cut func_char+colon func_long_2+3 degreesC func_switch ch_p3_paren` |
+| 725 | 5 | WARNING | `chamber <S4EXT> chamber_abcd_optset service program has flow with mfc func_cut <L1> too high` |
+| 296 | 4 | FAULT | `chamber <S4EXT> chamber_abcd_optset backing pump over temperature fault` |
+| 1120 | 3 | FAULT | `chamber <S4EXT> chamber_abcd_optset cvd - func_char+char_1 microwave plasma detector not operational` |
+| 1155 | 3 | WARNING | `<S4EXT> chx_index_optset bad message function code or exception response func_char+colon <L1>` |
+| 299 | 3 | FAULT | `chamber <S4EXT> chamber_abcd_optset foreline idle pressure is too high` |
+| 342 | 3 | FAULT | `ch <S4EXT> chamber_abcd_optset interlock func_append+colon cover open or out of pos or no coolant flow or lamp over temp` |
+| 307 | 3 | FAULT | `ch <S4EXT> chamber_abcd_optset turbo purge off - high pressure with trapped process gases` |
+| 441 | 3 | TRACE | `func_caps abort selected in reply to a sequencing fault` |
+| 527 | 3 | PROMPT | `check system control screen for error recovery options` |
+| 089 | 2 | FAULT | `reboot the system after a change to the chamber config` |
+| 108 | 2 | FAULT | `cannot extend - indexer not at right level to receive wafer` |
+| 142 | 2 | FAULT | `cannot find storage elevator zero pos - check cap sensors` |
+| 159 | 2 | FAULT | `there is already a wafer on the blade` |
+| 362 | 2 | FAULT | `ch <S4EXT> chamber_abcd_optset process gases stopped - pressure func_cut above func_si_long_1 u_millitorr ...` |
+| 513 | 2 | FAULT | `the load lock ch roughing pump is not running` |
+| 767 | 2 | PROMPT | `remote liquid source <S4> completed required cleaning time` |
+| 866 | 1 | FAULT | `any wafers that were in the sys have been forgotten - inspect and recreate` |
+| 067 | 1 | FAULT | `recipe and sequence func_caps selection , lot sequences and wafer lot names lost` |
+| 068 | 1 | FAULT | `saved mfc leak up, cal and cycle purge valve selection func_append+char_s - data lost` |
+| 069 | 1 | FAULT | `mfc and pressure zero offset func_append+char_s lost, liquid source control will take time` |
+| 1151 | 1 | WARNING | `<S4EXT> chx_index_optset bad message start character` |
+| 1154 | 1 | WARNING | `<S4EXT> chx_index_optset bad message slave address func_char+colon <L1>` |
+| 160 | 1 | FAULT | `rotation lost with wafer on vacuum chuck` |
+| 198 | 1 | TRACE | `false motion complete on <S4EXT> stepper_name_table` |
+| 356 | 1 | FAULT | `ch <S4EXT> chamber_abcd_optset temp rate of change too low at max power func_switch error_temp_data` |
+| 457 | 1 | WARNING | `dummy wafer num. <S4EXT> dummy_wafer_1234_optset reached rf - on time warning level` |
+| 557 | 1 | FAULT | `chamber <S4EXT> chamber_abcd_optset turbo not at speed timeout reached` |
+| 638 | 1 | FAULT | `func_switch undefined_disk_error_text` |
+| 639 | 1 | FAULT | `func_switch undefined_disk_error_text` |
+| 746 | 1 | FAULT | `ltc ht ex <S4> temperature deviation fault alarm` |
+| 781 | 1 | FAULT | `attempt hi flow cal without high flow cal xducer installed ch <S4EXT> chamber_abcd_optset` |
+
+**Characters that were genuinely ambiguous in the photograph.** Each was kept out
+of the regex, so a misreading here cannot produce a dead rule:
+
+- `lfc cal` (1029) — could be `1fc`. Matched on `cal service program`.
+- `crf2` (1001) — could be `cfr2`. Matched on `delivered pwr deviation`.
+- `rest_of_311` and `aux_final` (997) — matched on
+  `auxiliary final line pressure high`.
+- `sr2000` / `sr2088` and the `$ffff "` run (362) — matched on
+  `process gases stopped`.
+- `ltc ht ex` (746) — matched on `temperature deviation fault`.
+- `afx` (908) — matched on `ozone analyzer has gain ratio error`.
+- `func_long_2+3 degreesC` (367) — matched on `temp out of fault tolerance`.
+- Leading zeros on `005`, `067`, `068`, `069`, `089` — irrelevant, no `id:` rules.
+
+The tag placeholders read `<S4EXT>` for chamber and `<L1EXT>` for the optset
+values throughout; `<S4>` (no `EXT`) appears on the mainframe and liquid-source
+lines. No rule depends on telling them apart.
+
+**Judgement calls worth not re-litigating:**
+
+- **Four wordings were folded into existing or shared labels.** `446`
+  (`all processing of wafers is complete`) reuses the built-in **All wafers
+  completed** rather than earning a second name for the same event. `1003` and
+  `1002` are one fault reported from two directions — blade retracted, and errors
+  occurred so the blade is being retracted — and share **Blade retracted after
+  chamber error**. `778` and `342` are the same interlock reported with different
+  member lists and share **Chamber interlock**. `1151`, `1154`, `1155` and `1156`
+  are four framing errors on the same link and share **Chamber index comms
+  error**.
+- **`1001` was kept apart from the built-in RF forward power error.** Delivered
+  power deviating from its setpoint is a different measurement from a forward
+  power read error, and merging them would hide which one a tool is actually
+  doing. Kept as **RF delivered power deviation**.
+- **`346` was kept apart from the interlock rule.** `cover is open error` names
+  one member on its own, where `778`/`342` are the compound interlock. A cover
+  left open is a different thing to chase than an interlock trip.
+- **`572` and `1029` were kept apart.** Both are "a service program finished",
+  but leak-up-rate and LFC cal are different maintenance activities with
+  different follow-ups, and at 108 and 75 events each they are worth separate
+  bars.
+- **`089` was kept apart from the built-in System reboot.** That rule is
+  `system reboot time down`, a reboot that happened; `089` is a prompt asking for
+  one that has not happened yet.
+- **The four data-loss messages share one rule.** `866`, `067`, `068` and `069`
+  are one event each and all describe state lost across a restart, so they fold
+  into **Data lost after restart** rather than four one-row bars.
+
+**Three built-ins matched nothing on this log** and were left in place: PM
+trigger reached, Wafer not sensed, and Parameter out of spec. They are not dead
+rules, they are rules for logs this run did not cover, so they are expected to
+stay on the "rules that never matched" list for this tool.
+
+Everything new was appended to the end of `BUILTIN_CAT_RULES`. Because the
+built-in loop is first-hit-wins in array order, appending cannot change how any
+of the 4233 already-categorized events are labelled — the batch can only take
+from the uncategorized 925.
