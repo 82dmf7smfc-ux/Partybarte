@@ -52,6 +52,10 @@ days, or all of it - because it changes the answer more than anything else on th
 page. If something looks wrong, the button on that same line opens the full
 report on the same data, with nothing to load again.
 
+Every cut between the rows read and the rows reported is named, so the numbers
+can be followed down: what the severity filter dropped, what the filters dropped,
+and what fell outside the window ("Kept 2 of 5 rows inside the 30 day window").
+
 If the log has no downtime column, the quick report leaves out the numbers it
 cannot fill in, rather than showing you columns of zeros: the two downtime tiles,
 the downtime chart, the two downtime columns of the ranked table, and the

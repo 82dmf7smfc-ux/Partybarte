@@ -63,6 +63,12 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   way the zero tiles and the empty downtime chart were already dropped. The full
   report still shows them, where the settings panel and its note explain the
   zeros.
+- Browser tool: the summary now accounts for every row it dropped. The severity
+  filter and the filters each said what they cut, and then the window quietly cut
+  again, so the event count in the tiles could sit below the last number in the
+  summary with nothing on the page explaining the difference. It now says "Kept 2
+  of 5 rows inside the 30 day window." whenever the window drops anything, and
+  stays quiet when it drops nothing.
 - Browser tool: the rest of the zero-downtime talk is gone from the quick report
   too. The by-chamber table in the Insights card carried the same column of
   0.00s; the line under the summary named a downtime ranking method for a

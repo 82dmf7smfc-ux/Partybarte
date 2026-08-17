@@ -13,6 +13,30 @@ keep good ideas so they are not lost between sessions.
 
 ## Near term
 
+- **Grow the category rules from real logs.** In progress, and the current arc.
+  The owner sends the debug uncategorized worklist and real elog rows; those
+  become category rules, so a log lands on named faults instead of labels the
+  tool invented from the message text. `docs/CATEGORY_RULES.md` is the working
+  guide: precedence, how to write a rule that survives a chamber tag change,
+  where each piece lives, and what finishing a batch means.
+
+  Why it is worth doing: on a real 7,324-row etch log, two built-in rules covered
+  about 73% of the events and the whole tail below them read `auto: message
+  shape` - a row per wording rather than a row per fault. Every rule added turns
+  a scatter of near-duplicates into one bar somebody recognises.
+
+  Two related things to pick up while in here, both deliberately left alone until
+  there is real data to judge them on:
+  - The down/up phrase lists for derived downtime are Applied Materials wording.
+    Real phrasings from other tools would widen the defaults so the quick report
+    recognises more logs unprompted.
+  - On that same etch log, 41% of events carried no chamber tag and showed as
+    `(unknown)`. The full report has a "System" bucket for tag-less events, and
+    the module-name list can read a subsystem out of the message text. Whether
+    the quick report should apply either by itself is an open question: it
+    changes what a large slice of the data is called, so it needs the owner's
+    say-so and a sentence in the note if it ever happens.
+
 - **Quick report and full report.** Shipped, and since tuned on real logs. The
   browser tool opens as a quick report - import, Analyze, results - and a switch
   opens the full tool. The three things left after the first pass are all done:

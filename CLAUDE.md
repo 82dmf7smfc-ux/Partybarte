@@ -46,7 +46,7 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `259 passed, 0 failed` before any change, more after. It drives
+It should report `263 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
 
@@ -100,6 +100,37 @@ was covered by CI rather than locally.
 - Anything the quick report decides on the reader's behalf, it says on the page.
   It hides the controls, so a guess it does not confess to is a guess nobody can
   catch. If a new automatic decision is added, add its sentence to the note.
+
+## What is being worked on now
+
+**Growing the category rules from real logs.** The owner sends pictures of the
+debug uncategorized worklist and of real elog rows; those become new category
+rules, so more of a log lands on a named fault instead of an invented label.
+
+Read `docs/CATEGORY_RULES.md` before starting on this. It covers how a message
+gets its category, what to ask for, how to write a rule that survives a chamber
+tag change, where every piece lives, and what finishing a batch means.
+
+The two things that catch a session out:
+
+- **`auto: message shape` in the "Matched by" column means uncategorized.** The
+  row still shows a tidy-looking label, invented from the message text, so a
+  screenshot of the results table looks fully categorized when it is not. Judge
+  coverage from `categorized X of Y (Z%)` in the debug Category metrics, never
+  from how the table reads.
+- **The owner cannot send pasted text. Ever. Do not ask, do not suggest it, do
+  not treat a picture as second best.** The bench machine has no path out for
+  text, so photographs of the screen are the whole channel and always will be.
+  The "Copy uncategorized IDs" button is useless here; ignore it. Asking again
+  wastes a turn and has already been asked once too often.
+
+  Work with pictures properly instead. Read the image, transcribe what is needed,
+  and treat every rule written from a photograph as unverified until the tool
+  confirms it: after a batch is added, the debug report's **"rules that never
+  matched"** list names any rule that fired zero times, which is exactly what a
+  mis-transcribed character produces. That list is the proofreader, so a batch is
+  not finished until the owner has re-run and it comes back clean. Say which
+  strings were uncertain when reporting, so a zero-hit rule is quick to pin.
 
 ## Traps that have already cost time
 
