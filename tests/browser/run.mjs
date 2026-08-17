@@ -54,6 +54,18 @@ const deriveDownsOnly = [
   ""
 ].join("\n");
 
+// A log that outruns a 30-day window. The other fixtures all sit inside one, so
+// nothing they do can show what the window drops.
+const windowLog = [
+  "Stamp,Code,Text",
+  "2026-01-01 08:00:00,W1,Pump motor error",
+  "2026-02-01 08:00:00,W2,Gas flow error",
+  "2026-03-01 08:00:00,W3,Pump motor error",
+  "2026-05-01 08:00:00,W4,Gas flow error",
+  "2026-05-15 08:00:00,W5,Pump motor error",
+  ""
+].join("\n");
+
 // Chambers named, but wording the default phrase lists have never seen. Derive
 // would find nothing and report no downtime while looking as though it had
 // measured some.
@@ -146,7 +158,8 @@ async function main() {
   await ev("window.__p = " + JSON.stringify(p5000) + "; window.__csv = " + JSON.stringify(csv)
     + "; window.__derive = " + JSON.stringify(deriveLog)
     + "; window.__downsOnly = " + JSON.stringify(deriveDownsOnly)
-    + "; window.__noWording = " + JSON.stringify(deriveNoWording) + "; true");
+    + "; window.__noWording = " + JSON.stringify(deriveNoWording)
+    + "; window.__window = " + JSON.stringify(windowLog) + "; true");
 
   // 1. window.AP exists and is populated.
   var apKeys = await ev("Object.keys(window.AP || {}).length");
@@ -1060,6 +1073,30 @@ async function main() {
     !/shown as zero/.test(t3.quick.summary), t3.quick.summary);
   check("summary: the full report still explains its zeros",
     /shown as zero/.test(t3.full.summary), t3.full.summary);
+
+  // 11c. Every cut between the rows read and the rows reported says what it
+  // dropped. The window used to be silent, so the tile count could fall below
+  // the last number in the summary with nothing accounting for the difference.
+  var t4 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__window],1);"
+    + "setWindowDays(0);"                                  // whole log: nothing to drop
+    + "document.getElementById('runBtn').click();"
+    + "var all={note:STATE.lastResult.windowNote, total:STATE.lastResult.totalFaults};"
+    + "setWindowDays(30);"                                 // the fixture runs past 30 days
+    + "document.getElementById('runBtn').click();"
+    + "var cut={note:STATE.lastResult.windowNote, total:STATE.lastResult.totalFaults,"
+    + " summary:document.getElementById('summaryMsg').textContent};"
+    + "return {all:all, cut:cut};"
+    + "})()");
+  check("window: says nothing when it drops nothing", t4.all.note === "", t4.all);
+  check("window: names what it dropped when it does drop",
+    /Kept \d+ of \d+ rows inside the 30 day window\./.test(t4.cut.note), t4.cut.note);
+  check("window: and the reader sees it in the summary",
+    /inside the 30 day window/.test(t4.cut.summary), t4.cut.summary);
+  check("window: the number it kept is the number reported",
+    t4.cut.note === "" || +t4.cut.note.match(/Kept (\d+)/)[1] === t4.cut.total, t4.cut);
 
   // A log that does have downtime keeps the columns in the quick report, since
   // there the numbers say something.

@@ -2934,6 +2934,15 @@ function runAnalysis() {
   var win = applyWindow(occ, windowDays);
   if (!win.kept.length) { setMsg("summaryMsg", "err", "No rows fall inside the " + windowDays + " day window."); document.getElementById("results").style.display = ""; return; }
 
+  // The window is the last cut and it was the only silent one. The severity
+  // filter and the filters each say what they dropped, then the row count in the
+  // tiles could fall again with nothing on the page accounting for it.
+  var windowNote = "";
+  if (win.kept.length !== occ.length) {
+    windowNote = "Kept " + win.kept.length + " of " + occ.length + " rows inside the " +
+      windowDays + " day window.";
+  }
+
   var grandAttrib = win.kept.reduce(function (s, o) { return s + o.durSec; }, 0);
   var grandWall = mergedSeconds(win.kept.map(function (o) { return [o.start, o.end]; }));
 
@@ -2969,6 +2978,7 @@ function runAnalysis() {
     totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
     hasDowntime: (map.downMode !== "none"), levels: levels,
     unparsed: built.unparsed, kept: win.kept, sevNote: sevNote, filterNote: filterNote,
+    windowNote: windowNote,
     isDerived: (map.downMode === "derive"), derived: derived,
     stats: analyzeStats(win.kept, win.start, win.end),
     catSources: catSourcesFrom(win.kept)
@@ -3001,6 +3011,7 @@ function renderResults() {
   var notes = [];
   if (R.sevNote) notes.push(R.sevNote);
   if (R.filterNote) notes.push(R.filterNote);
+  if (R.windowNote) notes.push(R.windowNote);
   if (R.unparsed) notes.push(R.unparsed + " row(s) had no readable timestamp and were skipped.");
   // Only where the zeros are actually on screen. The quick report leaves them out
   // altogether, and its note above the summary has already said why.
