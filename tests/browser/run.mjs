@@ -1025,6 +1025,42 @@ async function main() {
     t1.full.heads.indexOf("Attributed (h)") !== -1 && t1.full.heads.indexOf("Wall clock (h)") !== -1, t1.full.heads);
   check("table: flipping the mode redraws the columns", t1.full.cells === t1.full.heads.length, t1.full);
 
+  // 11b. The rest of the zero-downtime chatter. Dropping the two table columns
+  // left three other places still talking about downtime the quick report is no
+  // longer showing: the Insights chamber table carried the same zero column, the
+  // footer named a ranking method for a ranking that is not on screen, and the
+  // summary said downtime "is shown as zero" when none is shown at all.
+  var t3 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "function heads(){return Array.prototype.map.call("
+    + "document.querySelectorAll('#chamberTable th'),function(t){return t.textContent;});}"
+    + "function cells(){var tr=document.querySelectorAll('#chamberTable tr')[1];return tr?tr.children.length:0;}"
+    + "var quick={heads:heads(), cells:cells(),"
+    + " foot:document.getElementById('rangeFoot').textContent,"
+    + " summary:document.getElementById('summaryMsg').textContent};"
+    + "setMode('full');"
+    + "var full={heads:heads(), cells:cells(),"
+    + " foot:document.getElementById('rangeFoot').textContent,"
+    + " summary:document.getElementById('summaryMsg').textContent};"
+    + "return {quick:quick, full:full};"
+    + "})()");
+  check("insights: the chamber table drops its zero downtime column",
+    t3.quick.heads.indexOf("Downtime (h)") === -1 && t3.quick.cells === t3.quick.heads.length, t3.quick);
+  check("insights: the full report keeps it", t3.full.heads.indexOf("Downtime (h)") !== -1
+    && t3.full.cells === t3.full.heads.length, t3.full);
+  check("footer: no downtime ranking method where no downtime is ranked",
+    !/Downtime ranking method/.test(t3.quick.foot), t3.quick.foot);
+  check("footer: the date range is still there", /Date range/.test(t3.quick.foot), t3.quick.foot);
+  check("footer: the full report still names the method",
+    /Downtime ranking method/.test(t3.full.foot), t3.full.foot);
+  check("summary: does not say zeros are shown when none are",
+    !/shown as zero/.test(t3.quick.summary), t3.quick.summary);
+  check("summary: the full report still explains its zeros",
+    /shown as zero/.test(t3.full.summary), t3.full.summary);
+
   // A log that does have downtime keeps the columns in the quick report, since
   // there the numbers say something.
   var t2 = await ev("(function(){"
