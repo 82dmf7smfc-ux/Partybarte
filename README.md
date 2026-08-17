@@ -55,6 +55,16 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
    - If a message with commas splits across two columns, tag both as Description
      and they are joined back together.
    - Pick "Other" to name a column you want to see but not analyze.
+   - You only do this once per tool. The setup is saved in this browser and comes
+     back the next time you import that tool's log: the column roles, the downtime
+     mode and its settings, the down/up phrase lists, the chamber names, and any
+     filter boxes you unticked. It is saved per tool, so a dep log and an etch log
+     each keep their own answers. A P5000 elog is recognised by the tool name in
+     its preamble; a delimited export, which names no tool, is recognised by its
+     column layout. A line above the table says whose setup was restored, and
+     "Forget saved setup" throws it away and guesses the columns afresh. Nothing
+     is uploaded; this is local storage in your browser, and clearing your browser
+     data clears it.
 4. Tell it how downtime is stored. A duration column (tag it "Duration"), or
    separate set and clear rows (tag the marker column "Alarm state"), or "Derive
    from messages" (estimate downtime by pairing down and up messages per

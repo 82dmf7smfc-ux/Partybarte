@@ -21,13 +21,17 @@ keep good ideas so they are not lost between sessions.
   work is a walk of the ZIP central directory, then `DOMParser` over
   `sharedStrings.xml` and the sheet XML. Scope it before starting; the estimate
   is a few hundred lines.
-- **Remember column mappings.** Save the mapping per tool in the browser using
-  local storage, so a repeat import needs no setup. The scaffolding is already
-  there: a persistence helper near the top of the settings code takes an
-  `{id, key, seed}` entry and today backs `ap_cat_rules` and `ap_module_names`.
-  Key the saved mapping by the detected tool, so a dep log and an etch log each
-  recall their own. The down/up phrase lists, chamber names, and filters are
-  also unsaved today and could ride along.
+- **Remember column mappings.** Shipped. The browser tool saves the whole setup
+  per tool: the column roles, the downtime mode and its settings, the down/up
+  phrase lists, the chamber names, and any filter boxes left unticked. A P5000
+  elog is filed under the tool name from its preamble, so a dep log and an etch
+  log each recall their own; a delimited export names no tool, so it is filed
+  under its column layout instead. What is left: the category rules and the
+  module names are still saved once for every tool, under `ap_cat_rules` and
+  `ap_module_names`. Those are vendor wording as much as the phrase lists are,
+  so they are the obvious next thing to move per tool. Doing it needs a way to
+  carry the lists a user has already typed into the first tool they open, or
+  they will look lost.
 - **More timestamp formats.** Add any date styles that real tools use but the
   current parser misses. Each new format is a small, safe addition.
 - **Shared golden fixtures.** Put the sample log and its expected numbers in one

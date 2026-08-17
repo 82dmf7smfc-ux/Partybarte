@@ -543,6 +543,151 @@ async function main() {
   eq("regression: delimited fixture rows", reg.rows, 4);
   check("regression: CSV headers read", reg.hasAlarmId, reg);
 
+  // 8. Remembered setup. These tests write to local storage, so they run last
+  // and clear every ap_setup_ key at both ends, leaving the page as they found
+  // it. Helpers are installed on the page so each step reads the same way.
+  await ev("(function(){"
+    + "window.__wipe=function(){var kill=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k.indexOf('ap_setup_')===0)kill.push(k);}kill.forEach(function(k){localStorage.removeItem(k);});return kill.length;};"
+    // Read the role drop-down for a column, by the column's name.
+    + "window.__role=function(lbl){for(var i=0;i<STATE.columns.length;i++){if(STATE.columns[i].label===lbl){var s=document.getElementById('colid_'+STATE.columns[i].key);return s?s.value:'?';}}return '?';};"
+    // Set one, the way a person would: change the value, then fire the event.
+    + "window.__setRole=function(lbl,role){for(var i=0;i<STATE.columns.length;i++){if(STATE.columns[i].label===lbl){var s=document.getElementById('colid_'+STATE.columns[i].key);s.value=role;s.dispatchEvent(new Event('change',{bubbles:true}));return true;}}return false;};"
+    + "window.__set=function(id,val,evt){var el=document.getElementById(id);el.value=val;el.dispatchEvent(new Event(evt||'change',{bubbles:true}));};"
+    + "window.__keys=function(){var out=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k.indexOf('ap_setup_')===0)out.push(k);}return out.sort();};"
+    // A second P5000 log, same seven columns but a different tool in its preamble.
+    + "window.__etch='System type:  P5000\\nProcess type: Etch\\n   SCIII+ Event Data File:  E:\\\\Backups\\\\etch4\\\\Data\\\\ELOG.DAT\\nDate  Time  Event Number  Event Type  Description\\n"
+    + "08/07/26  12:00:00  807  FAULT  chamber <S2EXT> chamber minimum gas flow error\\n"
+    + "08/07/26  12:01:00  807  FAULT  chamber <S2EXT> chamber minimum gas flow error\\n';"
+    + "return true;})()");
+
+  // 8a. A fresh tool has nothing saved: the columns are guessed and the Forget
+  // button stays out of the way.
+  var s0 = await ev("(function(){"
+    + "window.__wipe();"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "return {chamber:__role('Chamber'), msg:document.getElementById('setupMsg').textContent,"
+    + " forget:document.getElementById('forgetSetupBtn').style.display, keys:__keys().length};"
+    + "})()");
+  eq("setup: first import guesses the Chamber column", s0.chamber, "equipment");
+  check("setup: nothing saved yet, so no message", s0.msg === "" && s0.keys === 0, s0);
+  eq("setup: Forget button hidden when nothing is saved", s0.forget, "none");
+
+  // 8b. What the user changes is written under a key named for the tool.
+  var s1 = await ev("(function(){"
+    + "__setRole('Chamber','ignore');"
+    + "__set('downMode','events');__set('setVal','ON','input');"
+    + "var sev=document.querySelectorAll('.sevchk')[0];var sevVal=sev.value;"
+    + "sev.checked=false;sev.dispatchEvent(new Event('change',{bubbles:true}));"
+    + "var saved=JSON.parse(localStorage.getItem('ap_setup_tool dep1')||'null');"
+    + "return {keys:__keys(), saved:saved, sevVal:sevVal,"
+    + " forget:document.getElementById('forgetSetupBtn').style.display};"
+    + "})()");
+  check("setup: saved under the tool name", s1.keys.join(",") === "ap_setup_tool dep1", s1.keys);
+  check("setup: saved entry records the column roles", !!s1.saved && s1.saved.columns.some(function (c) { return c.label === "Chamber" && c.role === "ignore"; }), s1.saved);
+  eq("setup: saved entry records the downtime mode", s1.saved && s1.saved.downMode, "events");
+  eq("setup: saved entry records a downtime setting", s1.saved && s1.saved.setVal, "ON");
+  check("setup: saved entry records the unticked severity", !!s1.saved && s1.saved.filters.sevchk.indexOf(s1.sevVal) >= 0, s1.saved && s1.saved.filters);
+  eq("setup: Forget button appears once something is saved", s1.forget, "");
+
+  // 8c. Re-importing the same tool brings all of it back, with no setup work.
+  var s2 = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "var sev=document.querySelectorAll('.sevchk')[0];"
+    + "return {chamber:__role('Chamber'), downMode:document.getElementById('downMode').value,"
+    + " setVal:document.getElementById('setVal').value, sevChecked:sev?sev.checked:null, sevVal:sev?sev.value:null,"
+    + " msg:document.getElementById('setupMsg').textContent, codes:AP.getDebug().order.slice(),"
+    + " eventOpts:document.getElementById('eventOpts').style.display};"
+    + "})()");
+  eq("setup: re-import restores the column role", s2.chamber, "ignore");
+  eq("setup: re-import restores the downtime mode", s2.downMode, "events");
+  eq("setup: re-import restores the set/clear wording", s2.setVal, "ON");
+  check("setup: re-import shows the panel for the restored mode", s2.eventOpts === "", s2);
+  check("setup: re-import restores the unticked severity box", s2.sevChecked === false && s2.sevVal === s1.sevVal, s2);
+  check("setup: re-import says which tool it restored", /dep1/.test(s2.msg) && /Restored/.test(s2.msg), s2.msg);
+  check("setup: re-import records SETUP-RESTORED", s2.codes.indexOf("SETUP-RESTORED") >= 0, s2.codes);
+  check("SETUP-RESTORED is a registered debug code", await ev("!!AP.DEBUG_CODES['SETUP-RESTORED']"), true);
+
+  // 8d. The core of it: an etch log does not inherit the dep log's answers, and
+  // saving one tool's setup leaves the other's alone.
+  var s3 = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__etch],1);"
+    + "var fresh={chamber:__role('Chamber'), downMode:document.getElementById('downMode').value,"
+    + " msg:document.getElementById('setupMsg').textContent};"
+    + "__setRole('Chamber','other');__set('downMode','duration');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "var dep={chamber:__role('Chamber'), downMode:document.getElementById('downMode').value};"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__etch],1);"
+    + "var etch={chamber:__role('Chamber'), downMode:document.getElementById('downMode').value};"
+    + "return {fresh:fresh, dep:dep, etch:etch, keys:__keys()};"
+    + "})()");
+  check("setup: a different tool starts from the guess, not the other tool's setup", s3.fresh.chamber === "equipment" && s3.fresh.downMode === "none", s3.fresh);
+  check("setup: a different tool shows no restore message", s3.fresh.msg === "", s3.fresh.msg);
+  check("setup: the dep log still recalls its own", s3.dep.chamber === "ignore" && s3.dep.downMode === "events", s3.dep);
+  check("setup: the etch log recalls its own", s3.etch.chamber === "other" && s3.etch.downMode === "duration", s3.etch);
+  check("setup: one key per tool", s3.keys.join(",") === "ap_setup_tool dep1,ap_setup_tool etch4", s3.keys);
+
+  // 8e. The derive lists ride along with the rest.
+  var s4 = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__etch],1);"
+    + "__set('downMode','derive');"
+    + "__set('downPhrases','went dark','input');__set('upPhrases','came back','input');"
+    + "__set('chamberNames','Widget Chamber','input');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__etch],1);"
+    + "return {down:document.getElementById('downPhrases').value, up:document.getElementById('upPhrases').value,"
+    + " names:document.getElementById('chamberNames').value, mode:document.getElementById('downMode').value,"
+    + " deriveShown:document.getElementById('deriveOpts').style.display};"
+    + "})()");
+  eq("setup: down phrases ride along", s4.down, "went dark");
+  eq("setup: up phrases ride along", s4.up, "came back");
+  eq("setup: chamber names ride along", s4.names, "Widget Chamber");
+  check("setup: derive panel is shown on restore", s4.mode === "derive" && s4.deriveShown === "", s4);
+
+  // 8f. Forget throws the saved setup away and guesses the columns again.
+  var s5 = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "var before=__role('Chamber');"
+    + "document.getElementById('forgetSetupBtn').click();"
+    + "var after={chamber:__role('Chamber'), msg:document.getElementById('setupMsg').textContent,"
+    + " downMode:document.getElementById('downMode').value,"
+    + " forget:document.getElementById('forgetSetupBtn').style.display, keys:__keys()};"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "after.reimport=__role('Chamber');after.reimportMsg=document.getElementById('setupMsg').textContent;"
+    + "return {before:before, after:after};"
+    + "})()");
+  eq("setup: the dep setup was still there before forgetting", s5.before, "ignore");
+  eq("setup: Forget re-guesses the columns", s5.after.chamber, "equipment");
+  check("setup: Forget says so", /Forgot the saved setup for dep1/.test(s5.after.msg), s5.after.msg);
+  eq("setup: Forget also clears the downtime settings", s5.after.downMode, "none");
+  check("setup: Forget removes only that tool's key", s5.after.keys.join(",") === "ap_setup_tool etch4", s5.after.keys);
+  check("setup: a forgotten setup stays forgotten on re-import", s5.after.reimport === "equipment" && s5.after.reimportMsg === "", s5.after);
+
+  // 8g. A delimited export names no tool, so it is filed by its column layout.
+  var s6 = await ev("(function(){"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);"
+    + "var key=__keys();"                                    // nothing yet
+    + "__setRole('AlarmID','ignore');"
+    + "var saved=__keys().filter(function(k){return k.indexOf('ap_setup_columns')===0;});"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);"
+    + "return {beforeKeys:key.length, savedKey:saved[0]||null, role:__role('AlarmID'),"
+    + " msg:document.getElementById('setupMsg').textContent};"
+    + "})()");
+  eq("setup: the CSV had nothing saved before", s6.beforeKeys, 1);   // only the etch4 key survives
+  check("setup: a delimited file is filed by its columns", /^ap_setup_columns /.test(s6.savedKey || ""), s6.savedKey);
+  eq("setup: the delimited mapping comes back", s6.role, "ignore");
+  check("setup: the delimited restore names the layout", /this column layout/.test(s6.msg), s6.msg);
+
+  // 8h. A damaged entry is treated as absent, not as an error.
+  var s7 = await ev("(function(){"
+    + "localStorage.setItem('ap_setup_tool dep1','{not json at all');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "return {chamber:__role('Chamber'), msg:document.getElementById('setupMsg').textContent, rows:STATE.rows.length};"
+    + "})()");
+  check("setup: a damaged saved entry is ignored", s7.chamber === "equipment" && s7.msg === "" && s7.rows === 12, s7);
+
+  // Leave the browser as we found it, so a second run starts clean.
+  var wiped = await ev("window.__wipe()");
+  check("setup: test keys cleared", wiped >= 1, wiped);
+
   ws.close();
   proc.kill("SIGKILL");
 
