@@ -20,6 +20,21 @@ the task itself implies.
   once already, with the package reading 1.0.0 while the repo had tagged 1.3.0.
 - **Sweep up after yourself.** Once a PR is merged, its branch is rubbish. Delete
   it if permitted; if not, leave it and move on rather than asking about it.
+- **Update the record in the same commit as the change.** Writing down what
+  happened is part of the work, not a separate errand to be asked for. Every
+  change to the browser tool touches some of these, and the change is not
+  finished until it has:
+  - `CHANGELOG.md`, under Unreleased, in plain prose about what a person can now
+    do. Check the diff is purely additive.
+  - `ROADMAP.md`, if the change ships or moves a backlog item. Edit the entry to
+    say what shipped and what is left, rather than deleting it.
+  - `docs/DEBUG_CODES.md`, for any new debug code.
+  - `README.md`, if the change alters what a user does or sees.
+  - this file, for the test count and for anything a future session would
+    otherwise have to work out again from scratch.
+
+  The last one is the easiest to skip and the most expensive to skip. A trap that
+  cost an hour and was not written down will cost another hour.
 
 Ask first only where the answer genuinely changes the work, or where the action
 is destructive and not obviously implied by the request. Publishing a release is
@@ -31,9 +46,31 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `138 passed, 0 failed` before any change, more after. It drives
+It should report `220 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
+
+That number is checked by the suite itself, at the end of the run, against this
+file. If it does not match, the run fails and says so. Update the line above as
+part of the change that moved it, the same way a new debug code is registered as
+part of the change that emits it.
+
+**Look at the page, not only at the DOM.** The harness asserts on ids and values,
+and there is a whole class of fault it cannot see. A mode switch shipped with its
+active button drawn dark blue on the dark blue header, so the *inactive* button
+looked selected; every assertion passed. Another change left the previous mode's
+rendering on screen after a flip; every assertion passed. Both were obvious in a
+screenshot and invisible to the tests.
+
+So for any change to layout, colour, or what is shown when, drive the same
+headless Chromium over CDP, call `Page.captureScreenshot` with
+`captureBeyondViewport: true`, and read the image. It is about forty lines of
+Node using only built-ins, the same plumbing `tests/browser/run.mjs` already
+uses. Then write the test for whatever the picture caught.
+
+**The version check does run here.** `python3 tools/check_version.py` is standard
+library only, so unlike the test suite it works in the container. Run it after
+any edit to `CHANGELOG.md` or `alarm_pareto/__init__.py`.
 
 **The Python suite cannot run in the remote container.** There is no PyPI access,
 so neither `pytest` nor `pandas` can be installed, and `pandas` is what the suite
@@ -55,6 +92,14 @@ was covered by CI rather than locally.
 - Anything changed in the browser tool earns coverage in `tests/browser/run.mjs`.
 - New debug codes go in `docs/DEBUG_CODES.md`. The harness asserts that every
   code the tool emits is listed, so a missing entry fails the build.
+- The page has two modes, a quick report and a full report. A mode hides cards
+  with a class on `<body>` and rules in the stylesheet, never by deleting them.
+  Every element stays in the DOM in both modes, so the pure functions and the
+  harness go on reaching everything. Keep it that way: hiding by removal would
+  break dozens of tests and buy nothing.
+- Anything the quick report decides on the reader's behalf, it says on the page.
+  It hides the controls, so a guess it does not confess to is a guess nobody can
+  catch. If a new automatic decision is added, add its sentence to the note.
 
 ## Traps that have already cost time
 
@@ -70,6 +115,37 @@ trust the pull request state on GitHub over local ancestry.
 and `git push origin --delete`. There is no delete-branch tool in the GitHub MCP
 server either. Do not keep probing at it. Note the branch as stale and carry on;
 the owner clears them from the Branches page.
+
+**Editing the changelog eats the heading below it.** Writing a new Unreleased
+entry by replacing the `## [Unreleased]` block is easy to get wrong: the
+replacement drops the `## [1.4.0] - ...` heading underneath, which silently folds
+a released section back into Unreleased. That happened, and the only thing that
+caught it was `tools/check_version.py` failing in CI, reading 1.3.0 from the
+changelog against 1.4.0 in the package. Run that script locally after any
+changelog edit, and check `git diff` on `CHANGELOG.md` is purely additive.
+
+**A browser test that writes to storage must clean up after itself.** Local
+storage on a `file://` page survives between runs of the harness, so a test that
+saves a setup or a mode leaves the next run in a different starting state. The
+storage tests clear every `ap_setup_` key and `ap_mode` at both ends for exactly
+this reason, and the "page opens in the quick report" check depends on it. Run
+the suite twice after touching those tests; a pass followed by a fail is the
+signature.
+
+**`style.display` lies about a mode-hidden card.** Modes hide with a stylesheet
+rule, so an element's inline `style.display` can still read `""` while nothing is
+on screen. Tests must ask `getComputedStyle(el).display` instead. The harness has
+a `__shown(id)` helper for this.
+
+**A red CI job is not always a red change.** `browser-actions/setup-chrome` has
+failed with 429 and 503 while downloading the action, before a single test ran.
+The same job passed on the same commit in the parallel run. Read the log before
+diagnosing: if it died in setup, re-run the failed jobs and move on.
+
+**Stack a follow-up rather than waiting.** When a PR is open and the next arc
+builds on it, branch from that branch and open the new PR with the open branch as
+its base. The diff stays honest, and GitHub retargets the follow-up to `main`
+when the first one merges. Say the merge order in the PR body.
 
 **An autonomous session needs a stop condition.** A previous session shipped
 "one more feature" for three hours past the point the work was merged, driven by

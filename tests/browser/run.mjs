@@ -109,6 +109,17 @@ async function main() {
   var apKeys = await ev("Object.keys(window.AP || {}).length");
   check("window.AP exposed", apKeys > 10, { keys: apKeys });
 
+  // 1b. The page opens in the quick report. This is read before anything else
+  // touches the mode, and the mode tests at the end clear the stored choice, so
+  // a repeat run sees a first-time visitor again.
+  var firstMode = await ev("({cls:document.body.className, saved:localStorage.getItem('ap_mode')})");
+  check("page opens in the quick report", firstMode.cls === "mode-quick" && firstMode.saved === null, firstMode);
+
+  // Everything from here to section 9 exercises the full report, which is the
+  // whole tool. The mode tests at the end drive the quick report on purpose.
+  await ev("setMode('full', false); true");
+  eq("switched to the full report for the main suite", await ev("document.body.className"), "mode-full");
+
   // 2. 2-digit year handling.
   var yr = await ev("[AP.expandYear(26), AP.expandYear(68), AP.expandYear(69), AP.expandYear(99)]");
   check("expandYear pivot", yr[0] === 2026 && yr[1] === 2068 && yr[2] === 1969 && yr[3] === 1999, yr);
@@ -688,8 +699,206 @@ async function main() {
   var wiped = await ev("window.__wipe()");
   check("setup: test keys cleared", wiped >= 1, wiped);
 
+  // 9. The quick report. Everything above ran in the full report; these drive
+  // the short road a technician takes: pick a file, press Analyze, read it.
+  // A helper reports whether a card is really on screen, since the modes hide
+  // cards with a stylesheet rule rather than by setting display inline.
+  await ev("(function(){window.__shown=function(id){var el=document.getElementById(id);"
+    + "return !!(el && getComputedStyle(el).display!=='none');};return true;})()");
+
+  // 9a. What the quick report shows and hides, once a file is loaded.
+  var q1 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "return {importCard:__shown('importCard'), runCard:__shown('runCard'), runBtn:__shown('runBtn'),"
+    + " window:__shown('quickWindow'), mapCard:__shown('mapCard'), controls:__shown('controlsCard'),"
+    + " debug:__shown('debugSection'), quickBtn:document.getElementById('modeQuick').className,"
+    + " fullBtn:document.getElementById('modeFull').className};"
+    + "})()");
+  check("quick: import card, Analyze, and the window chips are shown", q1.importCard && q1.runCard && q1.runBtn && q1.window, q1);
+  check("quick: the column table and settings are hidden", !q1.mapCard && !q1.controls, q1);
+  check("quick: the debug log is hidden", !q1.debug, q1);
+  check("quick: the mode buttons show which mode is on", q1.quickBtn === "active" && q1.fullBtn === "", q1);
+
+  // 9b. The whole quick road, with nothing set by hand: load, press Analyze,
+  // read the answer. The numbers must match what the full report gets from the
+  // same file (top fault 494, 8 rows kept by the default severity filter).
+  var q2 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('catRules').value='';"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "var R=STATE.lastResult;"
+    + "return {results:__shown('results'), total:R.totalFaults, topFault:R.levels.fault_code.byCount[0].key,"
+    + " downMode:R.map.downMode, note:document.getElementById('quickNote').textContent,"
+    + " unknown:__shown('unknownCard'), noteShown:__shown('quickNote')};"
+    + "})()");
+  check("quick: Analyze produces a report", q2.results && q2.noteShown, q2);
+  eq("quick: same rows kept as the full report", q2.total, 8);
+  eq("quick: same top fault as the full report", q2.topFault, "494");
+  eq("quick: downtime mode guessed as none for this log", q2.downMode, "none");
+  check("quick: the unknown-events panel stays hidden", !q2.unknown, q2);
+
+  // 9c. The note owes the reader an account of every guess it made.
+  check("quick note: names the tool and row count", /Read 12 rows from dep1/.test(q2.note), q2.note);
+  check("quick note: names the timestamp columns", /Timestamp from Date \+ Time/.test(q2.note), q2.note);
+  check("quick note: names the ID column", /counted by Event Number/.test(q2.note), q2.note);
+  check("quick note: says why there is no downtime", /No downtime column was found/.test(q2.note), q2.note);
+  check("quick note: says how much of the log this is", /Covering the last 30 days of the log/.test(q2.note), q2.note);
+  check("quick note: offers the way out", /Something look wrong\? Open the full report/.test(q2.note), q2.note);
+
+  // 9d. That way out flips to the full report with the data and result intact.
+  var q3 = await ev("(function(){"
+    + "document.getElementById('toFullBtn').click();"
+    + "return {cls:document.body.className, rows:STATE.rows.length, results:__shown('results'),"
+    + " map:__shown('mapCard'), debug:__shown('debugSection'), total:STATE.lastResult.totalFaults,"
+    + " saved:localStorage.getItem('ap_mode'), tiles:document.querySelectorAll('#statCards .stat').length,"
+    + " downPanel:__shown('downPanel'), chartOpts:__shown('chartOpts')};"
+    + "})()");
+  check("quick: the way out opens the full report", q3.cls === "mode-full" && q3.map && q3.debug, q3);
+  check("quick: flipping keeps the file and the result", q3.rows === 12 && q3.total === 8 && q3.results, q3);
+  eq("quick: the chosen mode is remembered", q3.saved, "full");
+  // The result on screen was drawn for the quick report, which leaves out the
+  // downtime tiles and the empty downtime chart. Flipping has to redraw it.
+  check("quick: flipping redraws the result for the mode it lands in",
+    q3.tiles === 4 && q3.downPanel && q3.chartOpts, q3);
+
+  // 9d-b. And the other way: a full result flipped to quick loses the noise.
+  var q3b = await ev("(function(){setMode('quick');"
+    + "return {tiles:document.querySelectorAll('#statCards .stat').length,"
+    + " downPanel:__shown('downPanel'), chartType:__shown('chartTypeField'),"
+    + " logScale:__shown('logScaleField'),"
+    + " single:document.getElementById('paretoSplit').className.indexOf('single')>=0};})()");
+  check("quick: no zero-value downtime tiles when there is no downtime column", q3b.tiles === 2, q3b);
+  check("quick: no empty downtime chart, and the chart takes the width", !q3b.downPanel && q3b.single, q3b);
+  check("quick: the chart picker is offered", q3b.chartType, q3b);
+  check("quick: log scale is not, since it changes what the bars appear to say", !q3b.logScale, q3b);
+
+  // 9d-c. The picker is not decoration: each chart type draws in the quick
+  // report, on the same data, with no settings panel to reach for.
+  var q3c = await ev("(function(){"
+    + "setMode('quick');"
+    + "function bars(){return document.querySelectorAll('#countChart svg rect').length;}"
+    + "document.getElementById('chartType').value='pareto';renderLevel();"
+    + "var line=document.querySelectorAll('#countChart svg polyline').length;"
+    + "document.getElementById('chartType').value='hbar';renderLevel();var hbar=bars();"
+    + "document.getElementById('chartType').value='heatmap';renderLevel();var cells=bars();"
+    + "document.getElementById('chartType').value='pareto';renderLevel();"
+    + "return {line:line, hbar:hbar, cells:cells, back:bars()};"
+    + "})()");
+  check("quick: the Pareto draws its cumulative line", q3c.line >= 1, q3c);
+  check("quick: horizontal bars draw", q3c.hbar >= 1, q3c);
+  eq("quick: the heatmap draws its 168 cells", q3c.cells, 168);
+  check("quick: switching back redraws the Pareto", q3c.back >= 1, q3c);
+
+  // 9e. The downtime guess reads the columns. The CSV fixture has a DownSeconds
+  // column, and an inline log with a Status column pairs set and clear rows.
+  var q4 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__csv],1);"
+    + "var csv={guess:guessDownMode(), mode:document.getElementById('downMode').value};"
+    + "var states='When,AlarmID,Message,Status\\n2026-02-10 10:00:00,E1,Pump fault,SET\\n2026-02-10 11:00:00,E1,Pump fault,CLEAR\\n';"
+    + "loadTexts([states],1);"
+    + "var st={guess:guessDownMode(), mode:document.getElementById('downMode').value};"
+    + "return {csv:csv, st:st};"
+    + "})()");
+  check("quick: a duration column is found and used", q4.csv.guess === "duration" && q4.csv.mode === "duration", q4.csv);
+  check("quick: set/clear rows are found and paired", q4.st.guess === "events" && q4.st.mode === "events", q4.st);
+
+  // 9f. The window chips. "All of it" widens the window and re-runs, and the
+  // note says so rather than leaving the reader to guess.
+  var q5 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "var before=STATE.lastResult.windowDays;"
+    + "var all=Array.prototype.filter.call(document.querySelectorAll('.winchip'),function(b){return b.getAttribute('data-days')==='0';})[0];"
+    + "all.click();"
+    + "var after=STATE.lastResult.windowDays;"
+    + "var note=document.getElementById('quickNote').textContent;"
+    + "var active=Array.prototype.filter.call(document.querySelectorAll('.winchip'),function(b){return b.className.indexOf('active')>=0;}).map(function(b){return b.textContent;});"
+    + "var ninety=Array.prototype.filter.call(document.querySelectorAll('.winchip'),function(b){return b.getAttribute('data-days')==='90';})[0];"
+    + "ninety.click();"
+    + "return {before:before, after:after, note:note, active:active,"
+    + " ninety:STATE.lastResult.windowDays, settings:document.getElementById('windowDays').value};"
+    + "})()");
+  eq("quick: the window starts at 30 days", q5.before, 30);
+  eq("quick: All of it widens the window", q5.after, 36500);
+  check("quick: the note says the whole log is covered", /Covering the whole log/.test(q5.note), q5.note);
+  check("quick: the chosen chip is lit, and only that one", q5.active.length === 1 && /All of it/.test(q5.active[0]), q5.active);
+  check("quick: a chip re-runs the analysis and writes through to the settings", q5.ninety === 90 && q5.settings === "90", q5);
+
+  // 9g. A column problem is reported where the reader is looking. In the quick
+  // report the column table is hidden, so the message cannot only go there.
+  var q6 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "__setRole('Event Number','ignore');"
+    + "document.getElementById('runBtn').click();"
+    + "var out={importMsg:document.getElementById('importMsg').textContent,"
+    + " mapMsg:document.getElementById('mapMsg').textContent};"
+    + "__setRole('Event Number','fault_code');"
+    + "return out;"
+    + "})()");
+  check("quick: a missing Message ID is reported above Analyze", /Tag one column as Message ID/.test(q6.importMsg), q6.importMsg);
+  check("quick: and it points at the full report", /Open the full report/.test(q6.importMsg), q6.importMsg);
+  check("quick: the full report still gets the message beside the columns", /Tag one column as Message ID/.test(q6.mapMsg), q6.mapMsg);
+
+  // 9h. A file that partly failed to read says so in the note, since the quick
+  // report has no debug log to find it in.
+  var q7 = await ev("(function(){"
+    + "setMode('quick');"
+    + "document.getElementById('formatSel').value='auto';loadTexts([window.__p],1);"
+    + "document.getElementById('runBtn').click();"
+    + "var clean=document.getElementById('quickNote').innerHTML;"
+    + "dbg('FMT-EMPTY','a second file read as nothing');"
+    + "showQuickNote(STATE.lastResult);"
+    + "var dirty=document.getElementById('quickNote').innerHTML;"
+    + "return {cleanOk:/msg ok/.test(clean), cleanQuiet:!/did not read/.test(clean),"
+    + " dirtyWarn:/msg warn/.test(dirty), dirtyText:/did not read \\(FMT-EMPTY\\)/.test(dirty)};"
+    + "})()");
+  check("quick: a clean read says nothing about errors", q7.cleanOk && q7.cleanQuiet, q7);
+  check("quick: a failed read is named in the note", q7.dirtyWarn && q7.dirtyText, q7);
+
+  // 9i. A pinned #quick or #full on the address wins over the stored choice.
+  var q8 = await ev("(function(){"
+    + "setMode('full');"                               // stored choice: full
+    + "var saved=localStorage.getItem('ap_mode');"
+    + "setMode('quick', false);"                       // a pinned address does not store
+    + "return {saved:saved, stillSaved:localStorage.getItem('ap_mode'), cls:document.body.className};"
+    + "})()");
+  check("quick: a mode chosen by hand is stored", q8.saved === "full", q8);
+  check("quick: a pinned mode applies without overwriting the stored choice", q8.cls === "mode-quick" && q8.stillSaved === "full", q8);
+
+  // Leave the stored mode and the saved setups as we found them.
+  var cleaned = await ev("(function(){localStorage.removeItem('ap_mode');return __wipe()+1;})()");
+  check("quick: mode and setup keys cleared", cleaned >= 1, cleaned);
+
   ws.close();
   proc.kill("SIGKILL");
+
+  // CLAUDE.md quotes the number this suite should report, and a session reads
+  // that number before touching anything. Left stale it reads as a regression,
+  // which has happened: the count was written down as 138 while the suite was
+  // 176, and again as 215 one commit before it became 220. So the suite checks
+  // its own paperwork rather than trusting anyone to remember.
+  //
+  // This is a gate, not a check: it never adds to `passed`, because the number
+  // it is comparing against is that very count.
+  var notes = join(REPO, "CLAUDE.md");
+  if (existsSync(notes)) {
+    var quoted = readFileSync(notes, "utf8").match(/should report `(\d+) passed/);
+    if (!quoted) {
+      console.log("  FAIL CLAUDE.md no longer states the expected test count");
+      failed += 1;
+    } else if (+quoted[1] !== passed) {
+      console.log("  FAIL CLAUDE.md says " + quoted[1] + " passed; this run counted " + passed +
+        ". Update the number in CLAUDE.md as part of this change.");
+      failed += 1;
+    } else {
+      console.log("  ok   CLAUDE.md test count is current (" + passed + ")");
+    }
+  }
 
   console.log("\n" + passed + " passed, " + failed + " failed");
   process.exit(failed ? 1 : 0);

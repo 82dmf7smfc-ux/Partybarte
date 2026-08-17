@@ -31,6 +31,34 @@ Both run fully offline. Neither makes a network call.
 
 Open `alarm_pareto.html` in a browser. There is nothing to install.
 
+### Quick report or full report
+
+A switch at the top of the page picks between the two. The page remembers which
+one you chose, and ending the address with `#quick` or `#full` pins one, which is
+handy for a desktop shortcut.
+
+**Quick report** is the short road, and the one to hand to someone who just wants
+the answer. Pick a file, press Analyze, read it. There is no column table, no
+settings panel, and no debug log. It works out the columns and where downtime
+comes from by itself, and then says what it worked out in one line above the
+summary, so nothing it guessed is hidden from you:
+
+> Read 4,213 rows from etch4. Timestamp from Date + Time, faults counted by Event
+> Number. No downtime column was found, so faults are ranked by how often they
+> happen. Covering the last 30 days of the log, 2026-07-09 to 2026-08-08.
+
+How much of the log to cover is a visible choice there - last 30 days, last 90
+days, or all of it - because it changes the answer more than anything else on the
+page. If something looks wrong, the button on that same line opens the full
+report on the same data, with nothing to load again.
+
+**Full report** is everything below: the column table, all the settings, the
+filters, the unknown-events panel, and the debug log. If a tool has been set up
+once in the full report, the quick report uses that saved setup, so it gets more
+accurate the more you use it.
+
+The numbered steps below describe the full report.
+
 1. Click "Choose Files" and pick one or more elog files. CSV and delimited text
    files work. So do P5000 Etch elogs, which have a text preamble and columns
    separated by spaces. The Format drop-down is set to "Auto detect", or you can

@@ -8,6 +8,25 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ### Added
 
+- Browser tool: two ways to read the same tool. The **quick report** is the short
+  road for anyone who just wants the answer: pick a file, press Analyze, read it.
+  It hides the column table, the settings, and the debug log, and works out the
+  columns and the downtime mode by itself. The **full report** is the whole tool
+  as it has always been. A switch at the top of the page changes between them, it
+  remembers which one you chose, and `#quick` or `#full` on the end of the address
+  pins one for a shortcut. The quick report still lets you switch the chart
+  between a Pareto, horizontal bars, and a heatmap; it is the same data drawn
+  another way, not a setting.
+- Browser tool: the quick report says what it decided for you, in one line above
+  the summary: how many rows it read and from which tool, which columns it took
+  for the timestamp and the message ID, where downtime came from, and how much of
+  the log is covered. If part of a file failed to read, it says so there too,
+  since the quick report has no debug log to find it in. A button on that line
+  opens the full report on the same data, with nothing to load again.
+- Browser tool: how much of the log to cover is a visible choice in the quick
+  report - last 30 days, last 90 days, or all of it - rather than a setting
+  hidden behind a panel. It was the one default that could quietly turn a
+  six-month log into a one-month report.
 - Browser tool: the setup you do for a tool is remembered, so importing that
   tool's log again needs no setup at all. Which column is which, how downtime is
   stored and its settings, the down/up phrase lists, the chamber names, and any
