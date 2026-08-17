@@ -10,6 +10,23 @@ on:
   pull_request:
 
 jobs:
+  # Cheap and dependency-free, so it runs first and fails fast. It catches the
+  # version number drifting apart between the changelog and the package, which
+  # went unnoticed for three releases once.
+  version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the version numbers agree
+        run: python tools/check_version.py
+
   test:
     runs-on: ubuntu-latest
     strategy:

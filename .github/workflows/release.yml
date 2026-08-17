@@ -2,14 +2,19 @@ name: Release
 
 # Builds the two zip packages and publishes them as a GitHub Release.
 #
-# Two ways to start it:
+# Three ways to start it:
 #   1. Push a version tag like v1.0.0.
 #   2. Run it by hand from the Actions tab (workflow_dispatch) and type the
 #      version. This is handy when you cannot push a tag from your machine.
+#   3. Called by the release-on-stamp workflow, which notices a new version
+#      heading landing in CHANGELOG.md on main and cuts the release for you.
 #
 # To cut a release by tag:
 #   git tag v1.0.0
 #   git push origin v1.0.0
+#
+# There is no separate tagging step. "gh release create" makes the tag when it
+# does not exist yet, so routes 2 and 3 do not need push access to a tag.
 
 on:
   push:
@@ -21,6 +26,12 @@ on:
         description: "Version tag to create, for example v1.0.0"
         required: true
         default: "v1.0.0"
+  workflow_call:
+    inputs:
+      version:
+        description: "Version tag to create, for example v1.0.0"
+        required: true
+        type: string
 
 permissions:
   # The job needs to create a release and attach files to it.
@@ -51,8 +62,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           # When started by a tag push, github.ref_name is the tag. When started
-          # by hand, we use the version typed into the form.
-          VERSION: ${{ github.event.inputs.version || github.ref_name }}
+          # by hand or by the release-on-stamp workflow, the version comes in as
+          # an input. The inputs context covers both of those, and is empty on a
+          # tag push, so this one line handles all three routes.
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           # Create the release if it does not exist yet. If it already exists,
           # just upload the zips and overwrite any old copies. This makes a

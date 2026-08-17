@@ -17,4 +17,4 @@ Module order in the pipeline:
     render_pptx-> write the PowerPoint deck
 """
 
-__version__ = "1.0.0"
+__version__ = "1.4.0"

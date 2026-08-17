@@ -1,0 +1,73 @@
+name: Release on stamp
+
+# Cuts the release when a new version heading lands in CHANGELOG.md on main.
+#
+# Stamping the changelog and publishing the release were two steps, and the
+# second one kept getting forgotten. Version 1.4.0 sat stamped and unreleased
+# until somebody noticed. Now the stamp is the trigger: land a heading like
+# "## [1.4.0] - 2026-08-17" on main and the release publishes itself.
+#
+# Nothing happens unless the version is genuinely new. Re-running this after a
+# release exists is a no-op, so an unrelated edit to the changelog is harmless.
+#
+# It calls the Release workflow rather than pushing a tag, on purpose. A tag
+# pushed with the built-in GITHUB_TOKEN does not start other workflows, so the
+# obvious "create the tag and let the tag trigger the release" approach fails
+# silently. workflow_call has no such restriction.
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "CHANGELOG.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      # "true" only when the changelog names a version that has no release yet.
+      needed: ${{ steps.decide.outputs.needed }}
+      version: ${{ steps.decide.outputs.version }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the version numbers agree
+        # If the changelog and the package disagree, stop here rather than
+        # publishing a release under a number that is only half true.
+        run: python tools/check_version.py
+
+      - name: Decide whether a release is needed
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(python tools/check_version.py --print-changelog-version)"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if gh release view "${VERSION}" >/dev/null 2>&1; then
+            echo "Release ${VERSION} already exists. Nothing to do."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release ${VERSION} does not exist yet. Cutting it."
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: check
+    if: needs.check.outputs.needed == 'true'
+    # Reuse the real Release workflow rather than copying its steps. It builds
+    # the zips, runs the Python suite first, and is safe to re-run.
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.check.outputs.version }}
+    permissions:
+      contents: write
