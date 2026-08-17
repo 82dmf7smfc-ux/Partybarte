@@ -53,8 +53,11 @@ page. If something looks wrong, the button on that same line opens the full
 report on the same data, with nothing to load again.
 
 If the log has no downtime column, the quick report leaves out the numbers it
-cannot fill in: the two downtime tiles, the downtime chart, and the two downtime
-columns of the ranked table all go, rather than showing you columns of zeros.
+cannot fill in, rather than showing you columns of zeros: the two downtime tiles,
+the downtime chart, the two downtime columns of the ranked table, and the
+downtime column of the by-chamber table. It also stops talking about downtime it
+is not showing - no ranking method is named, and nothing claims downtime "is
+shown as zero" when none is shown at all.
 
 It can also work downtime out from the messages. If a log has no duration column
 and no set/clear column, but its messages say a chamber went offline and later

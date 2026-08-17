@@ -63,6 +63,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   way the zero tiles and the empty downtime chart were already dropped. The full
   report still shows them, where the settings panel and its note explain the
   zeros.
+- Browser tool: the rest of the zero-downtime talk is gone from the quick report
+  too. The by-chamber table in the Insights card carried the same column of
+  0.00s; the line under the summary named a downtime ranking method for a
+  ranking that is not on the page; and the summary said downtime "is shown as
+  zero" when the quick report shows no downtime at all. All three now appear
+  only where they mean something, which is the full report. The date range stays
+  where it was.
 
 ### Fixed
 

@@ -46,7 +46,7 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `252 passed, 0 failed` before any change, more after. It drives
+It should report `259 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
 

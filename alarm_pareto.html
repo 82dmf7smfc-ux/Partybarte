@@ -3002,7 +3002,11 @@ function renderResults() {
   if (R.sevNote) notes.push(R.sevNote);
   if (R.filterNote) notes.push(R.filterNote);
   if (R.unparsed) notes.push(R.unparsed + " row(s) had no readable timestamp and were skipped.");
-  if (!R.hasDowntime) notes.push("No downtime column was mapped, so downtime is shown as zero. Ranking is by count.");
+  // Only where the zeros are actually on screen. The quick report leaves them out
+  // altogether, and its note above the summary has already said why.
+  if (!R.hasDowntime && downtimeWorthShowing()) {
+    notes.push("No downtime column was mapped, so downtime is shown as zero. Ranking is by count.");
+  }
   setMsg("summaryMsg", notes.length ? "warn" : "ok", notes.length ? notes.join(" ") : "Analysis complete.");
 
   var methodLabel = (R.method === "attributed")
@@ -3035,11 +3039,13 @@ function renderResults() {
   var derivedNote = R.isDerived
     ? " All downtime here is <b>estimated</b> from the messages, not measured. Restricted means one or more chambers offline. Full tool down means every chamber seen was offline at once."
     : "";
+  // With no downtime to rank, naming the ranking method describes something the
+  // reader cannot see. The date range is the part that still means anything.
   document.getElementById("rangeFoot").innerHTML =
     "Date range: <b>" + fmt(R.windowStart) + "</b> to <b>" + fmt(R.windowEnd) + "</b>. " +
-    "Downtime ranking method: <b>" + methodLabel + "</b>. " +
     (downtimeWorthShowing()
-      ? "The two per-item downtime numbers answer different questions and are never mixed." : "") + derivedNote;
+      ? "Downtime ranking method: <b>" + methodLabel + "</b>. " +
+        "The two per-item downtime numbers answer different questions and are never mixed." : "") + derivedNote;
 
   // A chart of downtime that is all zeros is not a chart. The full report keeps
   // it, because the panel and its note explain the zeros; the quick report drops
@@ -3133,10 +3139,15 @@ function renderInsights() {
 
   drawDayBars("perDayChart", S.byDay);
 
-  var head = "<tr><th class='txt'>Chamber / module</th><th>Events</th><th>Share</th><th>Mean gap (h)</th><th>Downtime (h)</th></tr>";
+  // The same zero column the ranked table drops. This one sits in the Insights
+  // card and was missed the first time round.
+  var showDown = downtimeWorthShowing();
+  var head = "<tr><th class='txt'>Chamber / module</th><th>Events</th><th>Share</th><th>Mean gap (h)</th>" +
+    (showDown ? "<th>Downtime (h)</th>" : "") + "</tr>";
   var body = S.perChamber.slice(0, 15).map(function (c) {
     return "<tr><td class='txt'>" + esc(c.key) + "</td><td>" + c.count + "</td><td>" +
-      Math.round(c.share * 100) + "%</td><td>" + hours(c.mtbfSec) + "</td><td>" + hours(c.downSec) + "</td></tr>";
+      Math.round(c.share * 100) + "%</td><td>" + hours(c.mtbfSec) + "</td>" +
+      (showDown ? "<td>" + hours(c.downSec) + "</td>" : "") + "</tr>";
   }).join("");
   document.getElementById("chamberTable").innerHTML = head + body;
 
