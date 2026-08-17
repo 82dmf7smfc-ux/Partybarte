@@ -123,6 +123,40 @@
     header, #importCard, #mapCard, #controlsCard, #runCard, .noprint { display: none !important; }
     body { background: #fff; }
     .card { break-inside: avoid; border: none; padding: 0; }
+
+    /* The quick report prints as a one-page hand-out: what was read, the ranked
+       table, and the Pareto. Anything whose job is to change the report rather
+       than to say what it found comes off the paper -- the window chips, the
+       level tabs, the chart picker -- because on paper they are not controls,
+       just ink that cannot be pressed. The note stays: it is the only thing
+       telling the reader which window and which columns produced these numbers,
+       and a hand-out that has left its assumptions behind is the thing the note
+       exists to prevent. The full report prints as it always has. */
+    body.mode-quick #insightsCard,
+    body.mode-quick #unknownCard,
+    body.mode-quick #validationCard,
+    body.mode-quick #quickWindow,
+    body.mode-quick #levelTabs,
+    body.mode-quick #chartOpts { display: none !important; }
+
+    /* Tightened so the three things that are left reach one page together. */
+    body.mode-quick main { padding: 0; }
+    body.mode-quick #results { font-size: 11px; }
+    body.mode-quick .card { margin: 0 0 8px; }
+    body.mode-quick #results h2 { font-size: 13px; margin: 0 0 4px; }
+    body.mode-quick #results h3 { font-size: 11px; }
+    body.mode-quick .stat { padding: 6px 8px; }
+    body.mode-quick .stat b { font-size: 15px; }
+    body.mode-quick table { font-size: 10px; }
+    body.mode-quick th, body.mode-quick td { padding: 3px 6px; }
+    body.mode-quick .chartwrap { overflow: visible; }
+    /* The charts are viewBox-only SVGs, so they keep their 520x360 shape and a
+       height cap sets the width too. This is the largest that still leaves the
+       ranked table on the same page. */
+    body.mode-quick #countChart svg,
+    body.mode-quick #downChart svg { max-height: 380px; }
+
+    @page { margin: 12mm; }
   }
 </style>
 </head>
@@ -2115,7 +2149,55 @@ function guessDownMode() {
   var map = readMapping();
   if (map.durCol) return "duration";
   if (map.stateCol) return "events";
+  // No column carries downtime, but the messages themselves may. Only take that
+  // road if the default wording genuinely pairs up in this file.
+  if (derivePairsAvailable(map) > 0) return "derive";
   return "none";
+}
+
+// How many down/up pairs the default phrase lists actually close in this log.
+//
+// The quick report may not simply assume derive whenever there is no downtime
+// column: a wrong guess here invents downtime rather than omitting it. A log
+// whose wording never matches would report no downtime while looking as though
+// it had measured some, and a log with "offline" messages but no "online" ones
+// would have every interval capped at the last timestamp and read as enormous
+// downtime. Both are worse than ranking by count.
+//
+// So the guess is earned rather than assumed: this runs the same pairing the
+// analysis runs -- a down opens an interval, the next up for that chamber closes
+// it, repeat downs and unmatched ups are ignored -- and counts only the pairs
+// that genuinely close. Nothing is capped here, so a log of downs alone scores
+// zero and derive is not chosen.
+function derivePairsAvailable(map) {
+  map = map || readMapping();
+  // Derive reads the chamber out of the message text, so there has to be text.
+  if (!map.descCols.length && !map.equipment) return 0;
+
+  var names = DERIVE_DEFAULTS.chamberNames.slice()
+    .sort(function (a, b) { return b.length - a.length; });
+  var downPhrases = DERIVE_DEFAULTS.downPhrases.map(normText);
+  var upPhrases = DERIVE_DEFAULTS.upPhrases.map(normText);
+
+  var timed = [];
+  STATE.rows.forEach(function (r) {
+    var t = rowTimestamp(r, map);
+    if (t) timed.push({ r: r, t: t });
+  });
+  timed.sort(function (a, b) { return a.t - b.t; });
+
+  var openByChamber = {}, pairs = 0;
+  timed.forEach(function (item) {
+    var text = rowDescription(item.r, map);
+    var chamber = findChamber(text, map.equipment ? item.r[map.equipment] : "", names);
+    if (!chamber) return;
+    if (matchesAny(text, upPhrases)) {
+      if (openByChamber[chamber]) { pairs += 1; openByChamber[chamber] = false; }
+    } else if (matchesAny(text, downPhrases)) {
+      openByChamber[chamber] = true;
+    }
+  });
+  return pairs;
 }
 
 // The name of a column, from the key the mapping uses.
@@ -2155,7 +2237,11 @@ function quickNoteText(R) {
   if (map.downMode === "none") parts.push("No downtime column was found, so faults are ranked by how often they happen.");
   else if (map.downMode === "duration") parts.push("Downtime read from the " + columnLabel(map.durCol) + " column.");
   else if (map.downMode === "events") parts.push("Downtime measured by pairing the set and clear rows.");
-  else parts.push("Downtime estimated by pairing down and up messages.");
+  // The reader is told the pair count too. Derive is the one downtime mode the
+  // quick report picks on evidence rather than on a column being present, so
+  // the evidence goes on the page with the decision.
+  else parts.push("Downtime estimated by pairing down and up messages" +
+    (R.derived ? " (" + R.derived.intervals.length + " pairs found)" : "") + ".");
   parts.push(windowSentence(R));
   return parts.join(" ");
 }
@@ -2672,6 +2758,18 @@ function rankLevel(occ, levelKey, method, topN, minCount) {
 // "Other" bucket. minCount defaults to 1, which keeps every group.
 function collapse(sorted, topN, sortField, minCount) {
   minCount = minCount || 1;
+  // Work on copies of the rows. byCount and byDown are two rankings of the same
+  // groups, and the rank, pct and cum written at the bottom of this function
+  // belong to one ranking only. Sharing the row objects between the two calls
+  // let the second one quietly overwrite the first one's percentages, so the
+  // "Count %" and "Cum %" columns and the Pareto's cumulative line were showing
+  // downtime shares -- all zeros whenever a log had no downtime column.
+  sorted = sorted.map(function (r) {
+    return {
+      key: r.key, label: r.label, count: r.count,
+      attributed_s: r.attributed_s, wallclock_s: r.wallclock_s
+    };
+  });
   var big = [], small = [];
   sorted.forEach(function (r) { (r.count >= minCount ? big : small).push(r); });
   var head = big.slice(0, topN);
@@ -2879,6 +2977,17 @@ function runAnalysis() {
   showDebugButton();
 }
 
+// When a log carries no downtime at all, every downtime number on the page is a
+// zero standing in for "we did not measure this". The full report keeps them,
+// because its settings panel and its note explain where they came from. The
+// quick report has neither, so it leaves them out: the tiles, the empty chart,
+// and the two table columns. One rule, asked in all three places, so they can
+// never disagree about what the reader is being shown.
+function downtimeWorthShowing() {
+  var R = STATE.lastResult;
+  return !(MODE === "quick" && R && !R.hasDowntime);
+}
+
 function renderResults() {
   var R = STATE.lastResult;
   document.getElementById("results").style.display = "";
@@ -2903,7 +3012,7 @@ function renderResults() {
       stat(hours(D.restrictedSec), "Est. tool restricted (h, any chamber down)") +
       stat(hours(D.fullDownSec), "Est. full tool down (h, all chambers down)") +
       stat(R.windowDays, "Window length (days)");
-  } else if (MODE === "quick" && !R.hasDowntime) {
+  } else if (!downtimeWorthShowing()) {
     // Two downtime tiles reading 0.00 tell the reader nothing. The note above
     // already says there was no downtime column.
     document.getElementById("statCards").innerHTML =
@@ -2923,13 +3032,13 @@ function renderResults() {
   document.getElementById("rangeFoot").innerHTML =
     "Date range: <b>" + fmt(R.windowStart) + "</b> to <b>" + fmt(R.windowEnd) + "</b>. " +
     "Downtime ranking method: <b>" + methodLabel + "</b>. " +
-    ((MODE === "quick" && !R.hasDowntime) ? ""
-      : "The two per-item downtime numbers answer different questions and are never mixed.") + derivedNote;
+    (downtimeWorthShowing()
+      ? "The two per-item downtime numbers answer different questions and are never mixed." : "") + derivedNote;
 
   // A chart of downtime that is all zeros is not a chart. The full report keeps
   // it, because the panel and its note explain the zeros; the quick report drops
   // it and gives the whole width to the ranking that does say something.
-  var hideDown = (MODE === "quick" && !R.hasDowntime);
+  var hideDown = !downtimeWorthShowing();
   document.getElementById("downPanel").style.display = hideDown ? "none" : "";
   document.getElementById("paretoSplit").classList.toggle("single", hideDown);
 
@@ -3299,11 +3408,14 @@ function drawHeatmap(containerId, occ) {
 function drawTable(data, lv, sources) {
   var rows = data.byCount; // one row per group; we show both measures side by side
   var showSource = !!sources; // the Category level passes a source per category
+  // Two columns of 0.00 are not a measurement. Dropped in the quick report when
+  // the log has no downtime, the same as the tiles and the empty chart.
+  var showDown = downtimeWorthShowing();
   var head =
     "<tr><th>#</th><th class='txt'>" + esc(lv.nice) + "</th>" +
     (showSource ? "<th class='txt'>Matched by</th>" : "") +
     "<th>Count</th><th>Count %</th><th>Cum %</th>" +
-    "<th>Attributed (h)</th><th>Wall clock (h)</th></tr>";
+    (showDown ? "<th>Attributed (h)</th><th>Wall clock (h)</th>" : "") + "</tr>";
   var body = rows.map(function (r) {
     var srcCell = showSource
       ? "<td class='txt' style='color:#5b6570;font-size:12px'>" + esc(r.key === "Other" ? "" : (sources[r.key] || "")) + "</td>"
@@ -3315,8 +3427,7 @@ function drawTable(data, lv, sources) {
       "<td>" + r.count + "</td>" +
       "<td>" + r.pct.toFixed(1) + "</td>" +
       "<td>" + r.cum.toFixed(1) + "</td>" +
-      "<td>" + hours(r.attributed_s) + "</td>" +
-      "<td>" + hours(r.wallclock_s) + "</td>" +
+      (showDown ? "<td>" + hours(r.attributed_s) + "</td><td>" + hours(r.wallclock_s) + "</td>" : "") +
       "</tr>";
   }).join("");
   document.getElementById("resultTable").innerHTML = head + body;

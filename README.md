@@ -52,6 +52,25 @@ days, or all of it - because it changes the answer more than anything else on th
 page. If something looks wrong, the button on that same line opens the full
 report on the same data, with nothing to load again.
 
+If the log has no downtime column, the quick report leaves out the numbers it
+cannot fill in: the two downtime tiles, the downtime chart, and the two downtime
+columns of the ranked table all go, rather than showing you columns of zeros.
+
+It can also work downtime out from the messages. If a log has no duration column
+and no set/clear column, but its messages say a chamber went offline and later
+came back, the quick report pairs them up and reports the downtime - and says so:
+"Downtime estimated by pairing down and up messages (4 pairs found)". It only
+does this when the built-in wording genuinely pairs up in your file. A log the
+wording does not fit, or one with "offline" messages and no matching "online"
+ones, is ranked by count instead, because a wrong guess there would invent
+downtime rather than leave it out. If your tool words these differently, type the
+phrases once in the full report; the saved setup remembers them after that.
+
+"Print / Save as PDF" in the quick report gives a one-page hand-out: the summary,
+the ranked table, and the Pareto. The buttons, chips and tabs are left off the
+paper, and the line saying which columns and which window produced the numbers
+stays on it, so a printout handed to someone else still carries its assumptions.
+
 **Full report** is everything below: the column table, all the settings, the
 filters, the unknown-events panel, and the debug log. If a tool has been set up
 once in the full report, the quick report uses that saved setup, so it gets more
