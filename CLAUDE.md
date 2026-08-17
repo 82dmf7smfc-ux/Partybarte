@@ -118,10 +118,19 @@ The two things that catch a session out:
   screenshot of the results table looks fully categorized when it is not. Judge
   coverage from `categorized X of Y (Z%)` in the debug Category metrics, never
   from how the table reads.
-- **Ask for the clipboard rather than a photograph.** "Copy uncategorized IDs"
-  puts the worklist on the clipboard as text, with exact counts and exact
-  spelling. A rule written from a misread character matches nothing and looks
-  like the rule was simply wrong. Say this once, then work with whatever arrives.
+- **The owner cannot send pasted text. Ever. Do not ask, do not suggest it, do
+  not treat a picture as second best.** The bench machine has no path out for
+  text, so photographs of the screen are the whole channel and always will be.
+  The "Copy uncategorized IDs" button is useless here; ignore it. Asking again
+  wastes a turn and has already been asked once too often.
+
+  Work with pictures properly instead. Read the image, transcribe what is needed,
+  and treat every rule written from a photograph as unverified until the tool
+  confirms it: after a batch is added, the debug report's **"rules that never
+  matched"** list names any rule that fired zero times, which is exactly what a
+  mis-transcribed character produces. That list is the proofreader, so a batch is
+  not finished until the owner has re-run and it comes back clean. Say which
+  strings were uncertain when reporting, so a zero-hit rule is quick to pin.
 
 ## Traps that have already cost time
 
