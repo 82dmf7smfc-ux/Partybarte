@@ -21,6 +21,8 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   back, so the debug report says whether the columns on screen were guessed or
   remembered.
 
+## [1.4.0] - 2026-08-17
+
 ### Added
 
 - Browser tool: smarter categorization via the debug loop. The verbose debug log
