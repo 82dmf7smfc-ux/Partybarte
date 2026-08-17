@@ -109,9 +109,26 @@ rules, so more of a log lands on a named fault instead of an invented label.
 
 Read `docs/CATEGORY_RULES.md` before starting on this. It covers how a message
 gets its category, what to ask for, how to write a rule that survives a chamber
-tag change, where every piece lives, and what finishing a batch means.
+tag change, where every piece lives, and what finishing a batch means. Its batch
+log at the bottom holds every message transcribed so far, the characters that
+were ambiguous in each photograph, and the judgement calls — read it before
+re-arguing a decision or re-transcribing an event that is already recorded.
 
-The two things that catch a session out:
+**Two batches have shipped and both are confirmed on the owner's own re-run.**
+
+| log | before | after |
+|---|---|---|
+| etch3, 5,158 rows | 4233 of 5158 (82%) | 0 uncategorized |
+| k34 Endura, 26,414 rows | 26014 of 26414 (98%) | 0 uncategorized |
+
+67 rules were added across the two, and one was widened. Both logs now report
+`Uncategorized messages (0)`. What is left of the arc: a third log, 7,324 rows,
+which has never been through this and will have its own tail.
+
+Because both logs are at zero, the next batch starts from a different place than
+these two did — there is no backlog to work down, only whatever a new log brings.
+
+The things that catch a session out:
 
 - **`auto: message shape` in the "Matched by" column means uncategorized.** The
   row still shows a tidy-looking label, invented from the message text, so a
@@ -132,6 +149,29 @@ The two things that catch a session out:
   not finished until the owner has re-run and it comes back clean. Say which
   strings were uncertain when reporting, so a zero-hit rule is quick to pin.
 
+- **A built-in rule cannot match on an Event Number.** The guide says to prefer
+  an ID rule where the number is stable, and that advice only reaches the user
+  rules typed into the box. `BUILTIN_CAT_RULES` entries are `{re, label}`, and
+  the built-in pass is `BUILTIN_CAT_RULES[j].re.test(text)`; `categorize()`
+  reads `r.ids` for user rules only. Write built-ins as text rules on the short
+  invariant middle. Leading zeros settle it anyway — IDs like `005` and `089`
+  appear zero-padded in the report, and an `id:` rule compares against
+  `String(id).trim()`, so the stored form would decide whether it fires.
+
+- **A wording can differ between tools even when the fault is identical.** etch3
+  words one event `temperature deviation fault alarm`; the Endura words the same
+  event `temperature deviation warning alarm`. A rule written from one log looked
+  invariant and was not. This is a second failure mode alongside the misread
+  character, and the tell is different: the rule works on the log it came from
+  and dies on the next one. Where a message embeds its own severity, ignore that
+  word — the Event Type column already carries it.
+
+- **Zero hits is not a dead rule.** PM trigger reached and Wafer not sensed
+  matched nothing at all on etch3, then fired 293 and 44 times on the Endura. Do
+  not prune a rule for scoring zero on one tool; check it against another log
+  first. "Rules that never matched" is for catching *newly added* rules that
+  mis-transcribed, not a deletion list.
+
 ## Traps that have already cost time
 
 **Git ancestry lies about merged branches.** The pull requests here are
@@ -141,6 +181,21 @@ call merged branches unmerged, and `git diff main...branch` will invent content
 that looks unique to the branch. Both are artifacts. Compare the files directly
 with `git diff branch main -- <path>` before concluding anything is unmerged, and
 trust the pull request state on GitHub over local ancestry.
+
+**The owner runs a downloaded copy of the tool, not the repo.** The file on the
+bench is something like `alarm_pareto_7208.html` in `Downloads`, saved from a
+previous session, and it does not update when `main` does. A batch of category
+rules was merged and the owner then re-ran the *old* file; the report came back
+with none of the new labels and `448` still in its worklist, which reads exactly
+like every rule having failed. It was only the filename in the address bar that
+gave it away.
+
+So: whenever the tool changes, **send the new `alarm_pareto.html` and say which
+filename to run**, before asking for any screenshot that is meant to verify the
+change. And when a report arrives that looks impossibly wrong, check the filename
+in the picture before diagnosing the code. The build is identifiable from the
+report itself too — a rule added in this session appearing in `rule hits`, or the
+absence of one, tells you which file produced it.
 
 **Branch deletion is blocked.** The permission classifier refuses `git branch -d`
 and `git push origin --delete`. There is no delete-branch tool in the GitHub MCP

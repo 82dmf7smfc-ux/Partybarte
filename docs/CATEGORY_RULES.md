@@ -144,10 +144,24 @@ Then, in the same commit:
 Report coverage as a number the owner can compare against the last batch:
 `categorized X of Y (Z%)` from the Category metrics block, before and after.
 
-And close the loop: ask for the Category metrics screenshot after the owner has
-re-run with the new rules, and check "rules that never matched" for anything just
-added. A rule in that list was almost certainly mis-transcribed from the picture,
-not wrongly conceived.
+And close the loop, in this order:
+
+1. **Send the rebuilt `alarm_pareto.html` and name the file to run.** The owner
+   works from a copy downloaded in an earlier session; it does not update when
+   `main` does. Skipping this produces a verification run against the old build
+   that looks like a total rule failure. See the trap in `CLAUDE.md`.
+2. **Ask for the Category metrics screenshot** — the `categorized X of Y (Z%)`
+   line and "rules that never matched" — and check that list for anything just
+   added. A newly added rule in it was almost certainly mis-transcribed from the
+   picture, not wrongly conceived.
+3. **Check the filename in the returned picture** before believing a bad result.
+
+A results-panel shot reading `Uncategorized messages (0) — None.` answers the
+coverage question on its own: every event found a rule, so nothing can be sitting
+dead for want of a match. It does not rule out one new rule shadowing another and
+stealing its events onto the wrong label — the per-rule tests are what exclude
+that, which is why each rule asserts its exact intended label rather than merely
+that something matched.
 
 ## Keep a record of what was decided
 
@@ -157,6 +171,16 @@ wording that looked general but was tool-specific, two faults deliberately kept
 apart, an ID that turned out to carry three unrelated messages.
 
 ### Batch log
+
+**Both batches below are confirmed.** The owner re-ran with the merged build and
+both logs reported `Uncategorized messages (0) — None.`: etch3 from 82%, and the
+k34 Endura from 98%, each to a full tail. No rule needed fixing after the fact,
+and nothing from either batch is outstanding.
+
+| batch | log | before | after |
+|---|---|---|---|
+| 1 | etch3, 5,158 rows | 4233 of 5158 (82%) | 0 uncategorized |
+| 2 | k34 Endura, 26,414 rows | 26014 of 26414 (98%) | 0 uncategorized |
 
 #### Batch 1 — etch3, 5,158 rows, 2026-08-17
 

@@ -42,8 +42,16 @@ keep good ideas so they are not lost between sessions.
   fault differently (`temperature deviation fault` against `warning`). That is
   the lesson worth keeping: the risk in a single-log batch is not only a misread
   character but a wording that looks invariant until a second tool disagrees.
-  What is left: the 7,324-row log, still untouched, and confirming both batches
-  against a re-run.
+
+  **Both batches are confirmed.** The owner re-ran with the merged build and both
+  logs came back `Uncategorized messages (0) - None.` - etch3 from 82%, the k34
+  from 98%, each to a full tail, with no rule needing a fix afterwards. 67 rules
+  added in total, one widened, and the suite carries a test per rule.
+
+  What is left: the 7,324-row log, still untouched. It is a third tool and will
+  bring its own tail, so expect the same shape of work - and expect a few of the
+  67 to need widening the way `temperature deviation` did, since every one of
+  them has now been seen on at most two tools.
 
   Two related things to pick up while in here, both deliberately left alone until
   there is real data to judge them on:
