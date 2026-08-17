@@ -101,6 +101,28 @@ was covered by CI rather than locally.
   It hides the controls, so a guess it does not confess to is a guess nobody can
   catch. If a new automatic decision is added, add its sentence to the note.
 
+## What is being worked on now
+
+**Growing the category rules from real logs.** The owner sends pictures of the
+debug uncategorized worklist and of real elog rows; those become new category
+rules, so more of a log lands on a named fault instead of an invented label.
+
+Read `docs/CATEGORY_RULES.md` before starting on this. It covers how a message
+gets its category, what to ask for, how to write a rule that survives a chamber
+tag change, where every piece lives, and what finishing a batch means.
+
+The two things that catch a session out:
+
+- **`auto: message shape` in the "Matched by" column means uncategorized.** The
+  row still shows a tidy-looking label, invented from the message text, so a
+  screenshot of the results table looks fully categorized when it is not. Judge
+  coverage from `categorized X of Y (Z%)` in the debug Category metrics, never
+  from how the table reads.
+- **Ask for the clipboard rather than a photograph.** "Copy uncategorized IDs"
+  puts the worklist on the clipboard as text, with exact counts and exact
+  spelling. A rule written from a misread character matches nothing and looks
+  like the rule was simply wrong. Say this once, then work with whatever arrives.
+
 ## Traps that have already cost time
 
 **Git ancestry lies about merged branches.** The pull requests here are
