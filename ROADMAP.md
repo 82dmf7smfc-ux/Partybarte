@@ -69,6 +69,37 @@ keep good ideas so they are not lost between sessions.
 - Add a code formatter and a linter check to CI once the team agrees on a style.
 - Add tests for the set/clear pairing path and the paired-interval path in the
   Python suite, to match the coverage the browser tool already exercises.
+- **Turn on "Automatically delete head branches"** in Settings -> General ->
+  Pull Requests. It clears merged branches without anyone having to remember,
+  which is what the housekeeping list below exists to work around. A session
+  cannot do this; the permission classifier refuses branch deletion.
+- **Turn on auto-merge** so a pull request lands itself once the checks pass.
+  Also an owner-only setting.
+- **Add a permission allowlist** at `.claude/settings.json` so routine git
+  commands stop being refused mid-task. A session should not write this file
+  itself, because that is a tool widening its own permissions, so it stays an
+  owner job. The list wanted is `git add`, `commit`, `push`, `fetch`,
+  `checkout`, `branch`, `tag`, `merge`, `rebase`, plus
+  `node tests/browser/run.mjs` and `python3 tools/check_version.py`.
+
+### Automation already in place
+
+Recording these so nobody rebuilds them or works around them by hand:
+
+- **The release cuts itself from the changelog.** Landing a heading like
+  `## [1.4.0] - 2026-08-17` on `main` triggers `release-on-stamp.yml`, which
+  publishes that version, tag and zips included. It is a no-op when the release
+  already exists, so ordinary changelog edits are safe. Stamping and publishing
+  used to be two steps and the second kept getting dropped.
+- **The version numbers are guarded.** `tools/check_version.py` asserts that the
+  newest changelog heading matches `__version__`, and runs as a `version-check`
+  CI job on every push. It uses the standard library only, so it also runs in a
+  container with no network. The release workflow runs it again before
+  publishing, so a release cannot go out under a half-true number.
+- A note on why `release-on-stamp.yml` calls the release workflow instead of
+  pushing a tag: a tag pushed with the built-in `GITHUB_TOKEN` does not start
+  other workflows. The obvious "push the tag and let the tag trigger it"
+  approach fails silently and looks like it worked. Do not simplify it back.
 
 ## Repo housekeeping
 
