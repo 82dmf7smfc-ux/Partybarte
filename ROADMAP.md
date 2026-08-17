@@ -25,6 +25,16 @@ keep good ideas so they are not lost between sessions.
   shape` - a row per wording rather than a row per fault. Every rule added turns
   a scatter of near-duplicates into one bar somebody recognises.
 
+  **Batch 1 shipped**, from a 5,158-row P5000 etch3 log that started at
+  `categorized 4233 of 5158 (82%)`. Its worklist listed `top 59 of 59 distinct`,
+  so the whole tail was in frame and all 59 got a rule - forty-nine new
+  `BUILTIN_CAT_RULES`, four wordings folded onto labels that already existed, and
+  a test per rule against the transcribed message. What is left: the same pass on
+  the 7,324-row log, which is a different tool and will have its own tail, and
+  whatever batch 1 got wrong - a mis-transcribed pattern shows up as a rule that
+  never matched on the owner's re-run, not as a wrong label. Rules were appended
+  rather than interleaved, so no already-categorized event changed name.
+
   Two related things to pick up while in here, both deliberately left alone until
   there is real data to judge them on:
   - The down/up phrase lists for derived downtime are Applied Materials wording.

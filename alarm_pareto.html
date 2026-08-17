@@ -637,7 +637,62 @@ var BUILTIN_CAT_RULES = [
   { re: /ready to send the cassette/i,                label: "Ready to send cassette" },
   { re: /system reboot time down/i,                   label: "System reboot" },
   { re: /ready to process wafers/i,                   label: "Ready to process" },
-  { re: /out of spec/i,                               label: "Parameter out of spec" }
+  { re: /out of spec/i,                               label: "Parameter out of spec" },
+
+  // Batch 1 from the real etch3 log (5158 rows). These are appended, not
+  // interleaved: the loop below is first-hit-wins in array order, so adding
+  // here cannot change how anything the rules above already match is labelled.
+  // Each pattern deliberately avoids the characters that were hard to read in
+  // the photograph - see the batch log in docs/CATEGORY_RULES.md.
+  { re: /service_command_optset/i,                    label: "Chamber service state change" },
+  { re: /leak up rate service program/i,              label: "Leak up rate check complete" },
+  { re: /cal service program/i,                       label: "LFC calibration complete" },
+  { re: /bad message (byte count|function code|start character|slave address)/i, label: "Chamber index comms error" },
+  { re: /system control state changed to/i,           label: "System control state change" },
+  { re: /ocr does not respond/i,                      label: "OCR not responding" },
+  { re: /system constant out of range/i,              label: "System constant out of range" },
+  { re: /link sequence to lot/i,                      label: "Sequence not linked to lot" },
+  { re: /undefined_disk_error_text/i,                 label: "Disk error" },
+  { re: /ozone concentration out of range/i,          label: "Ozone concentration out of range" },
+  { re: /manual home all loader axes/i,               label: "Loader manual home complete" },
+  { re: /magnet coil current not changing/i,          label: "Magnet coil current not changing" },
+  { re: /endpoint system not present/i,               label: "Endpoint system missing" },
+  { re: /lift step .* out of range/i,                 label: "Lift step out of range" },
+  { re: /gpc_event_optset/i,                          label: "GPC event" },
+  { re: /ozone analyzer has gain ratio error/i,       label: "Ozone analyzer gain ratio error" },
+  { re: /blade has been auto retracted|blade being retracted/i, label: "Blade retracted after chamber error" },
+  { re: /need to unload to slot/i,                    label: "Cassette slot already full" },
+  { re: /\binterlock\b.*(cover open|overtemp|over temp)/i, label: "Chamber interlock" },
+  { re: /equipment restart/i,                         label: "Equipment restart" },
+  { re: /delivered pwr deviation/i,                   label: "RF delivered power deviation" },
+  { re: /all processing of wafers is complete/i,      label: "All wafers completed" },
+  { re: /orient command error/i,                      label: "Orient command error" },
+  { re: /auxiliary final line pressure high/i,        label: "Auxiliary line pressure high" },
+  { re: /cover is open error/i,                       label: "Chamber cover open" },
+  { re: /temp out of fault tolerance/i,               label: "Liquid source temp out of tolerance" },
+  { re: /microwave pressure too high/i,               label: "Microwave pressure too high" },
+  { re: /flow with mfc/i,                             label: "MFC flow too high" },
+  { re: /backing pump over temperature/i,             label: "Backing pump over temperature" },
+  { re: /microwave plasma detector not operational/i, label: "Microwave plasma detector fault" },
+  { re: /foreline idle pressure/i,                    label: "Foreline pressure high" },
+  { re: /turbo purge off/i,                           label: "Turbo purge off" },
+  { re: /in reply to a sequencing fault/i,            label: "Abort after sequencing fault" },
+  { re: /error recovery options/i,                    label: "Error recovery prompt" },
+  { re: /reboot the system after a change/i,          label: "Reboot required after config change" },
+  { re: /indexer not at right level/i,                label: "Indexer not at right level" },
+  { re: /storage elevator zero pos/i,                 label: "Storage elevator zero not found" },
+  { re: /already a wafer on the blade/i,              label: "Wafer already on blade" },
+  { re: /process gases stopped/i,                     label: "Process gases stopped" },
+  { re: /roughing pump is not running/i,              label: "Roughing pump not running" },
+  { re: /completed required cleaning time/i,          label: "Liquid source cleaning complete" },
+  { re: /data lost|wafer lot names lost|have been forgotten|pressure zero offset/i, label: "Data lost after restart" },
+  { re: /rotation lost with wafer/i,                  label: "Rotation lost on chuck" },
+  { re: /false motion complete/i,                     label: "False motion complete" },
+  { re: /temp rate of change too low/i,               label: "Heat-up rate too low" },
+  { re: /on time warning level/i,                     label: "Dummy wafer RF time warning" },
+  { re: /turbo not at speed/i,                        label: "Turbo not at speed" },
+  { re: /temperature deviation fault/i,               label: "Heat exchanger temp deviation" },
+  { re: /without high flow cal/i,                     label: "High flow cal transducer missing" }
 ];
 
 // Collapse the varying parts of a message so similar lines group together.

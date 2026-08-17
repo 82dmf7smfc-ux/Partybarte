@@ -253,6 +253,131 @@ async function main() {
   eq("categorize XEP event string", ecat.xep, "Event string (XEP)");
   eq("categorize ready to send cassette", ecat.cassette, "Ready to send cassette");
   eq("categorize all wafers completed", ecat.allWafers, "All wafers completed");
+
+  // 6b-etch3. Batch 1 from the real etch3 log. Every message below was
+  // transcribed from the owner's photograph of the uncategorized worklist, so
+  // each check is the proof that one rule survived the transcription. If one of
+  // these fails, the pattern is wrong, not the example.
+  var e3a = await ev("(function(){function c(s){return AP.categorize(s).category;}return {"
+    + "svcState:c('chamber <S4EXT> chamber_abcd_optset state changed to <L1EXT> service_command_optset'),"
+    + "leakUp:c('chamber <S4EXT> chamber_abcd_optset has completed leak up rate service program'),"
+    + "lfcCal:c('chamber <S4EXT> chamber_abcd_optset has completed lfc cal service program'),"
+    + "badByte:c('<S4EXT> chx_index_optset bad message byte count func_char+colon <L1>'),"
+    + "badFunc:c('<S4EXT> chx_index_optset bad message function code or exception response func_char+colon <L1>'),"
+    + "badStart:c('<S4EXT> chx_index_optset bad message start character'),"
+    + "badSlave:c('<S4EXT> chx_index_optset bad message slave address func_char+colon <L1>'),"
+    + "sysState:c('system control state changed to <L1EXT> system_state_optset'),"
+    + "ocr:c('ocr does not respond check connection'),"
+    + "sysConst:c('system constant out of range func_cut id <L1> has value <L2>'),"
+    + "linkSeq:c('link sequence to lot for wafers in cassette <S4EXT> chamber_abcd_optset'),"
+    + "disk:c('func_switch undefined_disk_error_text'),"
+    + "ozoneConc:c('ozone concentration out of range in ch <S4EXT> chamber_abcd_optset recipe running'),"
+    + "manualHome:c('completed manual home all loader axes'),"
+    + "magnet:c('chamber <S4EXT> chamber_abcd_optset detected magnet coil current not changing'),"
+    + "endpoint:c('required endpoint system not present'),"
+    + "liftStep:c('chamber <S4EXT> chamber_abcd_optset lift step <L1> out of range, will use limit of <L2>'),"
+    + "gpc:c('gpc event func_append+colon <S4EXT> gpc_event_optset, status <L1> param <L2> <L3>'),"
+    + "ozoneGain:c('afx ozone analyzer has gain ratio error'),"
+    + "bladeAuto:c('blade has been auto retracted due to some errors had occurred to chamber'),"
+    + "bladeErr:c('some errors had occurred to ch <S4EXT> chamber_abcd_optset; blade being retracted'),"
+    + "slotFull:c('need to unload to slot func_cut <L1> of cassette <S4EXT> cassette_name_table, is already full'),"
+    + "ilkLamp:c('ch <S4EXT> chamber_abcd_optset interlock lamp overtemp or out of pos or cover open'),"
+    + "ilkCover:c('ch <S4EXT> chamber_abcd_optset interlock func_append+colon cover open or out of pos or no coolant flow or lamp over temp')"
+    + "};})()");
+  eq("categorize etch3 chamber service state change", e3a.svcState, "Chamber service state change");
+  eq("categorize etch3 leak up rate complete", e3a.leakUp, "Leak up rate check complete");
+  eq("categorize etch3 LFC cal complete", e3a.lfcCal, "LFC calibration complete");
+  eq("categorize etch3 bad message byte count", e3a.badByte, "Chamber index comms error");
+  eq("categorize etch3 bad message function code", e3a.badFunc, "Chamber index comms error");
+  eq("categorize etch3 bad message start character", e3a.badStart, "Chamber index comms error");
+  eq("categorize etch3 bad message slave address", e3a.badSlave, "Chamber index comms error");
+  eq("categorize etch3 system control state change", e3a.sysState, "System control state change");
+  eq("categorize etch3 OCR not responding", e3a.ocr, "OCR not responding");
+  eq("categorize etch3 system constant out of range", e3a.sysConst, "System constant out of range");
+  eq("categorize etch3 sequence not linked to lot", e3a.linkSeq, "Sequence not linked to lot");
+  eq("categorize etch3 disk error", e3a.disk, "Disk error");
+  eq("categorize etch3 ozone concentration out of range", e3a.ozoneConc, "Ozone concentration out of range");
+  eq("categorize etch3 loader manual home", e3a.manualHome, "Loader manual home complete");
+  eq("categorize etch3 magnet coil current", e3a.magnet, "Magnet coil current not changing");
+  eq("categorize etch3 endpoint system missing", e3a.endpoint, "Endpoint system missing");
+  eq("categorize etch3 lift step out of range", e3a.liftStep, "Lift step out of range");
+  eq("categorize etch3 GPC event", e3a.gpc, "GPC event");
+  eq("categorize etch3 ozone analyzer gain ratio", e3a.ozoneGain, "Ozone analyzer gain ratio error");
+  eq("categorize etch3 blade auto retracted", e3a.bladeAuto, "Blade retracted after chamber error");
+  eq("categorize etch3 blade being retracted (same label)", e3a.bladeErr, "Blade retracted after chamber error");
+  eq("categorize etch3 cassette slot already full", e3a.slotFull, "Cassette slot already full");
+  eq("categorize etch3 interlock lamp overtemp", e3a.ilkLamp, "Chamber interlock");
+  eq("categorize etch3 interlock cover open (same label)", e3a.ilkCover, "Chamber interlock");
+
+  var e3b = await ev("(function(){function c(s){return AP.categorize(s).category;}return {"
+    + "restart:c('equipment restart'),"
+    + "pwrDev:c('ch <S4EXT> chamber_abcd_optset crf2 delivered pwr deviation err, delivered pwr <L1> func_char+char_w, limit set <L2> func_char+char_w'),"
+    + "allProc:c('all processing of wafers is complete'),"
+    + "orient:c('orient command error'),"
+    + "auxLine:c('mainframe aux_final <S4> auxiliary final line pressure high fault func_switch rest_of_311'),"
+    + "coverOpen:c('cover is open error in chamber <S4EXT> chamber_abcd_optset'),"
+    + "lsTemp:c('liquid source <S4> temp out of fault tolerance func_cut func_char+colon func_long_2+3 degreesC func_switch ch_p3_paren'),"
+    + "uwPress:c('chamber <S4EXT> chamber_abcd_optset cvd - func_char+char_1 microwave pressure too high'),"
+    + "mfcFlow:c('chamber <S4EXT> chamber_abcd_optset service program has flow with mfc func_cut <L1> too high'),"
+    + "backing:c('chamber <S4EXT> chamber_abcd_optset backing pump over temperature fault'),"
+    + "uwDet:c('chamber <S4EXT> chamber_abcd_optset cvd - func_char+char_1 microwave plasma detector not operational'),"
+    + "foreline:c('chamber <S4EXT> chamber_abcd_optset foreline idle pressure is too high'),"
+    + "turboPurge:c('ch <S4EXT> chamber_abcd_optset turbo purge off - high pressure with trapped process gases'),"
+    + "abortSeq:c('func_caps abort selected in reply to a sequencing fault'),"
+    + "recovery:c('check system control screen for error recovery options'),"
+    + "rebootCfg:c('reboot the system after a change to the chamber config'),"
+    + "indexer:c('cannot extend - indexer not at right level to receive wafer'),"
+    + "elevator:c('cannot find storage elevator zero pos - check cap sensors'),"
+    + "onBlade:c('there is already a wafer on the blade'),"
+    + "gasStop:c('ch <S4EXT> chamber_abcd_optset process gases stopped - pressure func_cut above func_si_long_1 u_millitorr'),"
+    + "roughing:c('the load lock ch roughing pump is not running'),"
+    + "cleaning:c('remote liquid source <S4> completed required cleaning time'),"
+    + "forgotten:c('any wafers that were in the sys have been forgotten - inspect and recreate'),"
+    + "namesLost:c('recipe and sequence func_caps selection , lot sequences and wafer lot names lost'),"
+    + "dataLost:c('saved mfc leak up, cal and cycle purge valve selection func_append+char_s - data lost'),"
+    + "zeroLost:c('mfc and pressure zero offset func_append+char_s lost, liquid source control will take time'),"
+    + "rotation:c('rotation lost with wafer on vacuum chuck'),"
+    + "falseMotion:c('false motion complete on <S4EXT> stepper_name_table'),"
+    + "rateLow:c('ch <S4EXT> chamber_abcd_optset temp rate of change too low at max power func_switch error_temp_data'),"
+    + "dummyRf:c('dummy wafer num. <S4EXT> dummy_wafer_1234_optset reached rf - on time warning level'),"
+    + "turboSpeed:c('chamber <S4EXT> chamber_abcd_optset turbo not at speed timeout reached'),"
+    + "htEx:c('ltc ht ex <S4> temperature deviation fault alarm'),"
+    + "hiFlow:c('attempt hi flow cal without high flow cal xducer installed ch <S4EXT> chamber_abcd_optset')"
+    + "};})()");
+  eq("categorize etch3 equipment restart", e3b.restart, "Equipment restart");
+  eq("categorize etch3 RF delivered power deviation", e3b.pwrDev, "RF delivered power deviation");
+  eq("categorize etch3 all processing complete reuses All wafers completed", e3b.allProc, "All wafers completed");
+  eq("categorize etch3 orient command error", e3b.orient, "Orient command error");
+  eq("categorize etch3 auxiliary line pressure high", e3b.auxLine, "Auxiliary line pressure high");
+  eq("categorize etch3 chamber cover open", e3b.coverOpen, "Chamber cover open");
+  eq("categorize etch3 liquid source temp out of tolerance", e3b.lsTemp, "Liquid source temp out of tolerance");
+  eq("categorize etch3 microwave pressure too high", e3b.uwPress, "Microwave pressure too high");
+  eq("categorize etch3 MFC flow too high", e3b.mfcFlow, "MFC flow too high");
+  eq("categorize etch3 backing pump over temperature", e3b.backing, "Backing pump over temperature");
+  eq("categorize etch3 microwave plasma detector", e3b.uwDet, "Microwave plasma detector fault");
+  eq("categorize etch3 foreline pressure high", e3b.foreline, "Foreline pressure high");
+  eq("categorize etch3 turbo purge off", e3b.turboPurge, "Turbo purge off");
+  eq("categorize etch3 abort after sequencing fault", e3b.abortSeq, "Abort after sequencing fault");
+  eq("categorize etch3 error recovery prompt", e3b.recovery, "Error recovery prompt");
+  eq("categorize etch3 reboot required after config change", e3b.rebootCfg, "Reboot required after config change");
+  eq("categorize etch3 indexer not at right level", e3b.indexer, "Indexer not at right level");
+  eq("categorize etch3 storage elevator zero not found", e3b.elevator, "Storage elevator zero not found");
+  eq("categorize etch3 wafer already on blade", e3b.onBlade, "Wafer already on blade");
+  eq("categorize etch3 process gases stopped", e3b.gasStop, "Process gases stopped");
+  eq("categorize etch3 roughing pump not running", e3b.roughing, "Roughing pump not running");
+  eq("categorize etch3 liquid source cleaning complete", e3b.cleaning, "Liquid source cleaning complete");
+  eq("categorize etch3 wafers forgotten", e3b.forgotten, "Data lost after restart");
+  eq("categorize etch3 lot names lost (same label)", e3b.namesLost, "Data lost after restart");
+  eq("categorize etch3 valve selection data lost (same label)", e3b.dataLost, "Data lost after restart");
+  eq("categorize etch3 zero offset lost (same label)", e3b.zeroLost, "Data lost after restart");
+  eq("categorize etch3 rotation lost on chuck", e3b.rotation, "Rotation lost on chuck");
+  eq("categorize etch3 false motion complete", e3b.falseMotion, "False motion complete");
+  eq("categorize etch3 heat-up rate too low", e3b.rateLow, "Heat-up rate too low");
+  eq("categorize etch3 dummy wafer RF time warning", e3b.dummyRf, "Dummy wafer RF time warning");
+  eq("categorize etch3 turbo not at speed", e3b.turboSpeed, "Turbo not at speed");
+  eq("categorize etch3 heat exchanger temp deviation", e3b.htEx, "Heat exchanger temp deviation");
+  eq("categorize etch3 high flow cal transducer missing", e3b.hiFlow, "High flow cal transducer missing");
+
   check("categorize unmatched falls back to readable label", cat.novel.matched === false && cat.novel.category === "Some brand new message", cat.novel);
   check("categorize user rule wins", cat.override.matched === true && cat.override.category === "Custom PM", cat.override);
   check("normCategory collapses tags and numbers", cat.norm === "step at # #", cat.norm);
