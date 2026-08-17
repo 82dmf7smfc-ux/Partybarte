@@ -90,11 +90,37 @@
   .chartwrap { overflow-x: auto; }
   svg { max-width: 100%; height: auto; display: block; }
   .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  /* One chart on its own should not stretch to twice its drawn size, so the
+     single-column layout keeps a readable width and sits to the left. */
+  .split.single { grid-template-columns: 1fr; max-width: 680px; }
   @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
   .foot { color: var(--muted); font-size: 12px; margin-top: 8px; }
   code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; }
+  /* The two modes. Quick shows the short road: import, Analyze, results. Full
+     shows everything. Hiding is done here, by a class on the body, so the rest
+     of the code can go on showing and hiding cards as it always has. */
+  .modes { display: flex; gap: 6px; margin-top: 10px; }
+  .modes button {
+    background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.55);
+    padding: 5px 12px; font-size: 13px;
+  }
+  .modes button.active { background: #fff; color: var(--bar); border-color: #fff; font-weight: 600; }
+  body.mode-quick #mapCard,
+  body.mode-quick #controlsCard,
+  body.mode-quick #unknownCard,
+  body.mode-quick #validationCard,
+  body.mode-quick #debugSection { display: none !important; }
+  body.mode-quick #chartOpts { display: none !important; }
+  body.mode-full #quickNote,
+  body.mode-full #quickWindow { display: none !important; }
+  .chips { display: flex; gap: 6px; }
+  .chips button {
+    background: #eef1f5; color: var(--ink); border: 1px solid var(--line);
+    padding: 5px 12px; font-size: 13px;
+  }
+  .chips button.active { background: var(--bar); color: #fff; border-color: var(--bar); }
   @media print {
-    header, #importCard, #mapCard, #controlsCard, .noprint { display: none !important; }
+    header, #importCard, #mapCard, #controlsCard, #runCard, .noprint { display: none !important; }
     body { background: #fff; }
     .card { break-inside: avoid; border: none; padding: 0; }
   }
@@ -104,6 +130,10 @@
 <header>
   <h1>Alarm Log Pareto</h1>
   <p>Import one or more elog files for a tool. See the most frequent faults and the biggest downtime. Runs fully offline in your browser.</p>
+  <div class="modes noprint">
+    <button type="button" id="modeQuick">Quick report</button>
+    <button type="button" id="modeFull">Full report</button>
+  </div>
 </header>
 
 <main>
@@ -296,16 +326,35 @@
           <option value="wallclock">True wall clock (overlaps merged)</option>
         </select>
       </div>
+    </div>
+    <p class="hint">The window ends at the latest timestamp found in your files, not today's date.</p>
+  </div>
+
+  <!-- Analyze sits in its own strip, outside the settings card, because the
+       quick report hides the settings but still needs the button. The window
+       chips show only in the quick report: it is the one setting that can
+       quietly mislead, since a six-month log would otherwise be cut to its
+       last 30 days with nothing on screen saying so. -->
+  <div class="card" id="runCard" style="display:none">
+    <div class="row">
       <div class="field">
         <button id="runBtn" type="button">Analyze</button>
       </div>
+      <div class="field" id="quickWindow">
+        <label>How much of the log?</label>
+        <div class="chips">
+          <button type="button" class="winchip" data-days="30">Last 30 days</button>
+          <button type="button" class="winchip" data-days="90">Last 90 days</button>
+          <button type="button" class="winchip" data-days="0">All of it</button>
+        </div>
+      </div>
     </div>
-    <p class="hint">The window ends at the latest timestamp found in your files, not today's date.</p>
   </div>
 
   <div id="results" style="display:none">
     <div class="card">
       <h2>Summary</h2>
+      <div id="quickNote"></div>
       <div id="summaryMsg"></div>
       <div class="cards" id="statCards"></div>
       <div class="foot" id="rangeFoot"></div>
@@ -350,7 +399,7 @@
     <div class="card">
       <h2>Pareto</h2>
       <div class="tabs" id="levelTabs"></div>
-      <div class="row" style="margin-bottom:10px">
+      <div class="row" id="chartOpts" style="margin-bottom:10px">
         <div class="field">
           <label>Chart</label>
           <select id="chartType">
@@ -366,12 +415,12 @@
           </label>
         </div>
       </div>
-      <div class="split">
+      <div class="split" id="paretoSplit">
         <div>
           <h3 style="font-size:13px;margin:0 0 6px" id="countTitle">Ranked by occurrence count</h3>
           <div class="chartwrap"><div id="countChart"></div></div>
         </div>
-        <div>
+        <div id="downPanel">
           <h3 style="font-size:13px;margin:0 0 6px" id="dtTitle">Ranked by downtime</h3>
           <div class="chartwrap"><div id="downChart"></div></div>
         </div>
@@ -1491,10 +1540,19 @@ function buildMappingUI() {
   // built, because the filters are built from the column roles.
   restoreSetup();
 
+  // The quick report has no downtime setting to offer, so it picks one from
+  // the columns it found. A saved setup outranks the guess: that is a real
+  // answer from a person, given for this tool.
+  if (MODE === "quick" && !SETUP_APPLIED) {
+    document.getElementById("downMode").value = guessDownMode();
+    syncDownModeUI();
+  }
+
   refreshSeverityFilter();
   refreshFilters();
   document.getElementById("mapCard").style.display = "";
   document.getElementById("controlsCard").style.display = "";
+  document.getElementById("runCard").style.display = "";
 }
 
 // Re-apply the automatic guesses to the existing drop-downs. Used by the
@@ -1976,6 +2034,154 @@ SETUP_FIELDS.forEach(function (f) {
   var box = document.getElementById(id);
   if (box) box.addEventListener("change", saveSetup);
 });
+
+// ---------------------------------------------------------------------------
+// Quick report and full report.
+//
+// The quick report is the short road: pick a file, press Analyze, read the
+// answer. It hides the column table, the settings, and the debug log, works
+// everything else out for itself, and then says on the page what it worked
+// out, because a report that hides its assumptions cannot be trusted.
+//
+// The full report is the whole tool, exactly as it was.
+//
+// Which cards a mode hides is done with a class on the body, up in the
+// stylesheet, so every card goes on showing and hiding itself as it always
+// has and nothing else in here has to know about modes.
+// ---------------------------------------------------------------------------
+var MODE = "quick";
+
+function setMode(mode, remember) {
+  MODE = (mode === "full") ? "full" : "quick";
+  document.body.classList.remove("mode-quick", "mode-full");
+  document.body.classList.add("mode-" + MODE);
+  document.getElementById("modeQuick").classList.toggle("active", MODE === "quick");
+  document.getElementById("modeFull").classList.toggle("active", MODE === "full");
+  if (remember !== false) storeSet("ap_mode", MODE);
+  // A result already on screen was drawn for the mode we just left -- the quick
+  // report leaves out the downtime tiles and the empty downtime chart -- so draw
+  // it again for the mode we are now in.
+  if (ANALYZED && STATE.lastResult) {
+    renderResults();
+    showQuickNote(STATE.lastResult);
+  }
+}
+
+document.getElementById("modeQuick").addEventListener("click", function () { setMode("quick"); });
+document.getElementById("modeFull").addEventListener("click", function () { setMode("full"); });
+
+// The mode the page opens in. A #quick or #full on the address wins, so a
+// shortcut can pin one; otherwise it is whichever was last chosen, and a
+// first-time visitor gets the quick report.
+(function () {
+  var hash = String(location.hash || "").toLowerCase();
+  var pinned = (hash === "#quick" || hash === "#full") ? hash.slice(1) : "";
+  var saved = storeGet("ap_mode");
+  setMode(pinned || (saved === "full" ? "full" : "quick"), false);
+})();
+
+// "All of it" is a hundred years, which is every log anyone has.
+var WINDOW_ALL_DAYS = 36500;
+
+function setWindowDays(days) {
+  document.getElementById("windowDays").value = days ? days : WINDOW_ALL_DAYS;
+  syncWindowChips();
+}
+
+// Light the chip that matches the window in the settings, so the two controls
+// never disagree about what is being reported.
+function syncWindowChips() {
+  var now = Math.max(1, parseInt(document.getElementById("windowDays").value, 10) || 30);
+  Array.prototype.forEach.call(document.querySelectorAll(".winchip"), function (b) {
+    var days = parseInt(b.getAttribute("data-days"), 10) || WINDOW_ALL_DAYS;
+    b.classList.toggle("active", days === now);
+  });
+}
+
+Array.prototype.forEach.call(document.querySelectorAll(".winchip"), function (b) {
+  b.addEventListener("click", function () {
+    setWindowDays(parseInt(b.getAttribute("data-days"), 10));
+    if (ANALYZED) runAnalysis();
+  });
+});
+document.getElementById("windowDays").addEventListener("change", syncWindowChips);
+syncWindowChips();
+
+// What the quick report assumes about downtime when nobody has said. A
+// Duration column means every row carries its own downtime; a set/clear column
+// means the rows pair up; otherwise there is nothing to measure, and faults are
+// ranked by how often they happen.
+function guessDownMode() {
+  var map = readMapping();
+  if (map.durCol) return "duration";
+  if (map.stateCol) return "events";
+  return "none";
+}
+
+// The name of a column, from the key the mapping uses.
+function columnLabel(key) {
+  for (var i = 0; i < STATE.columns.length; i++) {
+    if (STATE.columns[i].key === key) return STATE.columns[i].label;
+  }
+  return "";
+}
+
+// Any error-level codes this parse recorded. The quick report has no debug log,
+// so it has to mention these in plain words or the reader never learns of them.
+function errorCodes() {
+  return DEBUG.order.filter(function (c) { return (DEBUG_CODES[c] || {}).level === "error"; });
+}
+
+function windowSentence(R) {
+  var span = fmt(R.windowStart) + " to " + fmt(R.windowEnd);
+  return (R.windowDays >= WINDOW_ALL_DAYS)
+    ? "Covering the whole log, " + span + "."
+    : "Covering the last " + R.windowDays + " days of the log, " + span + ".";
+}
+
+// The account the quick report owes its reader: what was read, which columns
+// were taken for what, where downtime came from, and how much of the log this
+// is. Every one of those was decided without asking.
+function quickNoteText(R) {
+  var map = R.map;
+  var source = STATE.tools.length ? STATE.tools.join(" + ") : (STATE.fileCount + " file(s)");
+  var when = map.tsCol
+    ? columnLabel(map.tsCol)
+    : columnLabel(map.dateCol) + (map.timeCol ? " + " + columnLabel(map.timeCol) : "");
+  var parts = [
+    "Read " + STATE.rows.length + " rows from " + source + ".",
+    "Timestamp from " + when + ", faults counted by " + columnLabel(map.fault_code) + "."
+  ];
+  if (map.downMode === "none") parts.push("No downtime column was found, so faults are ranked by how often they happen.");
+  else if (map.downMode === "duration") parts.push("Downtime read from the " + columnLabel(map.durCol) + " column.");
+  else if (map.downMode === "events") parts.push("Downtime measured by pairing the set and clear rows.");
+  else parts.push("Downtime estimated by pairing down and up messages.");
+  parts.push(windowSentence(R));
+  return parts.join(" ");
+}
+
+// Draw that account above the summary, with the way out of it. Built after
+// every analysis whatever the mode, so flipping to the quick report shows the
+// note for the result already on screen.
+function showQuickNote(R) {
+  var el = document.getElementById("quickNote");
+  if (!R) { el.innerHTML = ""; return; }
+  var bad = errorCodes();
+  var text = quickNoteText(R);
+  if (bad.length) text += " Some of the file did not read (" + bad.join(", ") + ").";
+  el.innerHTML = '<div class="msg ' + (bad.length ? "warn" : "ok") + '">' + esc(text) +
+    ' <button type="button" class="secondary noprint" id="toFullBtn" style="margin-left:6px;padding:3px 10px">' +
+    'Something look wrong? Open the full report</button></div>';
+  document.getElementById("toFullBtn").addEventListener("click", function () { setMode("full"); });
+}
+
+// A problem with the columns. In the full report it belongs beside the column
+// table. The quick report hides that table, so the same words also go above the
+// Analyze button, where the reader is actually looking.
+function mapError(text) {
+  setMsg("mapMsg", "err", text);
+  if (MODE === "quick") setMsg("importMsg", "err", text + " Open the full report to set the columns by hand.");
+}
 
 // The System bucket changes what the chamber filter should show, so rebuild it.
 document.getElementById("systemBucket").addEventListener("change", function () {
@@ -2570,12 +2776,13 @@ function analyzeStats(occ, start, end) {
 
 function runAnalysis() {
   var map = readMapping();
-  if (!map.tsCol && !map.dateCol) { setMsg("mapMsg", "err", "Tag a Timestamp column, or a Date column (plus a Time column)."); return; }
-  if (!map.fault_code) { setMsg("mapMsg", "err", "Tag one column as Message ID."); return; }
-  if (map.downMode === "duration" && !map.durCol) { setMsg("mapMsg", "err", "Tag one column as Duration, or change the downtime setting."); return; }
-  if (map.downMode === "events" && !map.stateCol) { setMsg("mapMsg", "err", "Tag one column as Alarm state, or change the downtime setting."); return; }
-  if (map.downMode === "derive" && !map.descCols.length && !map.equipment) { setMsg("mapMsg", "err", "Tag a Description column so chambers can be read from the message text."); return; }
-  if (map.downMode === "derive" && (!map.downPhrases.length || !map.upPhrases.length || !map.chamberNames.length)) { setMsg("mapMsg", "err", "The derive mode needs at least one down phrase, one up phrase, and one chamber name."); return; }
+  showQuickNote(null);
+  if (!map.tsCol && !map.dateCol) { mapError("Tag a Timestamp column, or a Date column (plus a Time column)."); return; }
+  if (!map.fault_code) { mapError("Tag one column as Message ID."); return; }
+  if (map.downMode === "duration" && !map.durCol) { mapError("Tag one column as Duration, or change the downtime setting."); return; }
+  if (map.downMode === "events" && !map.stateCol) { mapError("Tag one column as Alarm state, or change the downtime setting."); return; }
+  if (map.downMode === "derive" && !map.descCols.length && !map.equipment) { mapError("Tag a Description column so chambers can be read from the message text."); return; }
+  if (map.downMode === "derive" && (!map.downPhrases.length || !map.upPhrases.length || !map.chamberNames.length)) { mapError("The derive mode needs at least one down phrase, one up phrase, and one chamber name."); return; }
   setMsg("mapMsg", "", "");
 
   // Drop analysis codes from a previous run so they do not double count.
@@ -2665,6 +2872,9 @@ function runAnalysis() {
 
   ANALYZED = true;
   renderResults();
+  // Say what this report was built on. Written whatever the mode, so flipping
+  // to the quick report shows the note for the result already on screen.
+  showQuickNote(STATE.lastResult);
   // Analysis may have added codes (bad timestamps). Refresh the debug button.
   showDebugButton();
 }
@@ -2693,6 +2903,12 @@ function renderResults() {
       stat(hours(D.restrictedSec), "Est. tool restricted (h, any chamber down)") +
       stat(hours(D.fullDownSec), "Est. full tool down (h, all chambers down)") +
       stat(R.windowDays, "Window length (days)");
+  } else if (MODE === "quick" && !R.hasDowntime) {
+    // Two downtime tiles reading 0.00 tell the reader nothing. The note above
+    // already says there was no downtime column.
+    document.getElementById("statCards").innerHTML =
+      stat(R.totalFaults, "Events in window (after filter)") +
+      stat(R.windowDays, "Window length (days)");
   } else {
     document.getElementById("statCards").innerHTML =
       stat(R.totalFaults, "Events in window (after filter)") +
@@ -2707,7 +2923,15 @@ function renderResults() {
   document.getElementById("rangeFoot").innerHTML =
     "Date range: <b>" + fmt(R.windowStart) + "</b> to <b>" + fmt(R.windowEnd) + "</b>. " +
     "Downtime ranking method: <b>" + methodLabel + "</b>. " +
-    "The two per-item downtime numbers answer different questions and are never mixed." + derivedNote;
+    ((MODE === "quick" && !R.hasDowntime) ? ""
+      : "The two per-item downtime numbers answer different questions and are never mixed.") + derivedNote;
+
+  // A chart of downtime that is all zeros is not a chart. The full report keeps
+  // it, because the panel and its note explain the zeros; the quick report drops
+  // it and gives the whole width to the ranking that does say something.
+  var hideDown = (MODE === "quick" && !R.hasDowntime);
+  document.getElementById("downPanel").style.display = hideDown ? "none" : "";
+  document.getElementById("paretoSplit").classList.toggle("single", hideDown);
 
   renderValidation();
   renderInsights();

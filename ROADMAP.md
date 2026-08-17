@@ -13,6 +13,19 @@ keep good ideas so they are not lost between sessions.
 
 ## Near term
 
+- **Quick report and full report.** Shipped. The browser tool now opens as a
+  quick report - import, Analyze, results - and a switch opens the full tool.
+  What is left, in the order it is worth doing:
+  - The results table in the quick report still carries "Attributed (h)" and
+    "Wall clock (h)" columns full of zeros when the log has no downtime column.
+    The zero tiles and the empty downtime chart are already dropped; the table
+    columns are the same noise and should go the same way.
+  - The print stylesheet has not been tuned for the quick report. A one-page
+    print is the natural thing to hand to a supervisor.
+  - The quick report picks the downtime mode from the columns, but never picks
+    "Derive from messages", which needs phrase lists. For an elog whose messages
+    pair up, that is the mode that would tell the truth about downtime.
+
 - **Read Excel files in the browser tool.** Today the browser tool reads CSV and
   delimited text. Many elogs are native `.xlsx`. Add a small offline parser so
   those import directly, with no export step. This does not need a bundled
