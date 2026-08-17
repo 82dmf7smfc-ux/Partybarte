@@ -72,11 +72,9 @@ keep good ideas so they are not lost between sessions.
 
 ## Repo housekeeping
 
-- **Stale branches, safe to delete.** Every feature branch below is fully merged
-  into `main` and is kept only because nobody has swept them up yet. None is a
-  base for an open pull request, and none affects CI or a release. Deleting them
-  loses nothing. GitHub's "Delete merged branches" button on the Branches page
-  clears the lot in one pass.
+- **Stale branches, safe to delete.** Each branch below shipped through a pull
+  request that has been merged. None is a base for an open pull request, and
+  none affects CI or a release.
   - `claude/add-license`
   - `claude/html-elog-severity-idtext`
   - `claude/html-start-row-headerless`
@@ -85,7 +83,14 @@ keep good ideas so they are not lost between sessions.
   - `claude/partybarte-downtime-estimation-3vxd16`
   - `claude/reconcile-release-workflow`
   - `claude/release-v1.3.0-stamp`
-  - `claude/pareto-html-recovery-i3xa1i` — this one is not merged, it is an
-    abandoned pre-recovery snapshot. Its one unique commit only enables manual
-    dispatch on the release workflow, which `main` already has. Treat it as
-    stale, not as work in progress.
+
+  A warning about how to check this, because plain `git` will mislead you here.
+  These pull requests were squash-merged, so the commit on `main` has a
+  different hash and a different parent than the branch tip it came from.
+  That makes `git merge-base --is-ancestor` report four of these branches as
+  "not merged", and it makes `git diff main...branch` list content that looks
+  unique to the branch. Both readings are artifacts of squash-merging, not lost
+  work. Compare the files directly (`git diff branch main -- <path>`) and `main`
+  turns out to be strictly ahead in every case. The honest signal is the pull
+  request state on GitHub, which is what the Branches page uses when it offers
+  to delete a merged branch.
