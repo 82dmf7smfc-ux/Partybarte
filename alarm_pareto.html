@@ -110,7 +110,7 @@
   body.mode-quick #unknownCard,
   body.mode-quick #validationCard,
   body.mode-quick #debugSection { display: none !important; }
-  body.mode-quick #chartOpts { display: none !important; }
+  body.mode-quick #logScaleField { display: none !important; }
   body.mode-full #quickNote,
   body.mode-full #quickWindow { display: none !important; }
   .chips { display: flex; gap: 6px; }
@@ -400,7 +400,7 @@
       <h2>Pareto</h2>
       <div class="tabs" id="levelTabs"></div>
       <div class="row" id="chartOpts" style="margin-bottom:10px">
-        <div class="field">
+        <div class="field" id="chartTypeField">
           <label>Chart</label>
           <select id="chartType">
             <option value="pareto">Pareto (bars + cumulative line)</option>
@@ -408,7 +408,7 @@
             <option value="heatmap">Heatmap (hour of day x weekday)</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field" id="logScaleField">
           <label style="visibility:hidden">x</label>
           <label style="display:flex;align-items:center;gap:6px;color:var(--ink);font-size:13px">
             <input type="checkbox" id="logScale"> Log scale

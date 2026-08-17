@@ -14,7 +14,9 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   columns and the downtime mode by itself. The **full report** is the whole tool
   as it has always been. A switch at the top of the page changes between them, it
   remembers which one you chose, and `#quick` or `#full` on the end of the address
-  pins one for a shortcut.
+  pins one for a shortcut. The quick report still lets you switch the chart
+  between a Pareto, horizontal bars, and a heatmap; it is the same data drawn
+  another way, not a setting.
 - Browser tool: the quick report says what it decided for you, in one line above
   the summary: how many rows it read and from which tool, which columns it took
   for the timestamp and the message ID, where downtime came from, and how much of

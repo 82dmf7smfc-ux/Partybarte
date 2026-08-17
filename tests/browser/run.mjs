@@ -766,11 +766,30 @@ async function main() {
   // 9d-b. And the other way: a full result flipped to quick loses the noise.
   var q3b = await ev("(function(){setMode('quick');"
     + "return {tiles:document.querySelectorAll('#statCards .stat').length,"
-    + " downPanel:__shown('downPanel'), chartOpts:__shown('chartOpts'),"
+    + " downPanel:__shown('downPanel'), chartType:__shown('chartTypeField'),"
+    + " logScale:__shown('logScaleField'),"
     + " single:document.getElementById('paretoSplit').className.indexOf('single')>=0};})()");
   check("quick: no zero-value downtime tiles when there is no downtime column", q3b.tiles === 2, q3b);
   check("quick: no empty downtime chart, and the chart takes the width", !q3b.downPanel && q3b.single, q3b);
-  check("quick: no chart-type or log-scale controls", !q3b.chartOpts, q3b);
+  check("quick: the chart picker is offered", q3b.chartType, q3b);
+  check("quick: log scale is not, since it changes what the bars appear to say", !q3b.logScale, q3b);
+
+  // 9d-c. The picker is not decoration: each chart type draws in the quick
+  // report, on the same data, with no settings panel to reach for.
+  var q3c = await ev("(function(){"
+    + "setMode('quick');"
+    + "function bars(){return document.querySelectorAll('#countChart svg rect').length;}"
+    + "document.getElementById('chartType').value='pareto';renderLevel();"
+    + "var line=document.querySelectorAll('#countChart svg polyline').length;"
+    + "document.getElementById('chartType').value='hbar';renderLevel();var hbar=bars();"
+    + "document.getElementById('chartType').value='heatmap';renderLevel();var cells=bars();"
+    + "document.getElementById('chartType').value='pareto';renderLevel();"
+    + "return {line:line, hbar:hbar, cells:cells, back:bars()};"
+    + "})()");
+  check("quick: the Pareto draws its cumulative line", q3c.line >= 1, q3c);
+  check("quick: horizontal bars draw", q3c.hbar >= 1, q3c);
+  eq("quick: the heatmap draws its 168 cells", q3c.cells, 168);
+  check("quick: switching back redraws the Pareto", q3c.back >= 1, q3c);
 
   // 9e. The downtime guess reads the columns. The CSV fixture has a DownSeconds
   // column, and an inline log with a Status column pairs set and clear rows.
