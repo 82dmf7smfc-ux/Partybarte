@@ -109,7 +109,13 @@
   body.mode-quick #controlsCard,
   body.mode-quick #unknownCard,
   body.mode-quick #validationCard,
-  body.mode-quick #debugSection { display: none !important; }
+  /* The debug log is two blocks, not one: #debugSection is the "Show debug log"
+     button, and #debugCard is the panel it opens, a sibling rather than a child.
+     Hiding only the button left an opened panel on screen in the quick report
+     with nothing left to close it, since its own toggle had just gone. Both
+     names have to be here. */
+  body.mode-quick #debugSection,
+  body.mode-quick #debugCard { display: none !important; }
   body.mode-quick #logScaleField { display: none !important; }
   body.mode-full #quickNote,
   body.mode-full #quickWindow { display: none !important; }

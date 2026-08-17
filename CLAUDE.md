@@ -46,7 +46,7 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `248 passed, 0 failed` before any change, more after. It drives
+It should report `252 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
 
@@ -147,6 +147,15 @@ lesson is the general one - a function that stamps fields onto rows must own
 those rows - and the way it was caught is the point: every DOM assertion passed,
 and it took looking at a screenshot to notice the cumulative line of a Pareto
 chart lying flat along the bottom.
+
+**Hiding a container is not hiding what it opens.** The mode rules hid
+`#debugSection`, which is only the "Show debug log" button. The panel it opens,
+`#debugCard`, is its *sibling*, so an opened debug log stayed on screen in the
+quick report with no way to close it - its toggle had just been hidden. The test
+asserted on `#debugSection` and passed throughout. Before trusting a mode rule,
+list what is actually on screen rather than what the rule names: walk
+`main > *` and `.card` and ask `getClientRects().length > 0` for each. That audit
+is a few lines and it settles the question for every card at once.
 
 **A red CI job is not always a red change.** `browser-actions/setup-chrome` has
 failed with 429 and 503 while downloading the action, before a single test ran.
