@@ -6,7 +6,20 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-08-17
+### Added
+
+- Browser tool: the setup you do for a tool is remembered, so importing that
+  tool's log again needs no setup at all. Which column is which, how downtime is
+  stored and its settings, the down/up phrase lists, the chamber names, and any
+  filter boxes you unticked all come back. It is saved per tool, so a dep log and
+  an etch log each recall their own: a P5000 elog is filed under the tool name in
+  its preamble, and a delimited export, which names no tool, is filed under its
+  column layout. A line above the column table says whose setup was restored, and
+  a "Forget saved setup" button throws it away and guesses the columns afresh.
+  Nothing leaves the machine; this is local storage in the browser.
+- Browser tool: a `SETUP-RESTORED` debug code records when a saved setup was put
+  back, so the debug report says whether the columns on screen were guessed or
+  remembered.
 
 ### Added
 

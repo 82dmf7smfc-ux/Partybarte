@@ -20,6 +20,7 @@ means a file produced nothing.
 | `FMT-OVERRIDE` | info | The format was forced by the Format drop-down. | Nothing. You picked the format by hand. |
 | `FMT-MIXED` | warn | The batch mixed formats. Columns were matched by position. | Prefer loading one format at a time for the cleanest result. |
 | `PRE-META` | info | Tool details (system, process, software, and the tool name from the backup path) were read from the P5000 preamble. | Nothing. Confirms which tool the file came from. |
+| `SETUP-RESTORED` | info | A column setup saved for this tool was put back, so a repeat import needs no setup. | Nothing. Press "Forget saved setup" if you want the columns guessed afresh. |
 | `HDR-NOTFOUND` | warn | The P5000 header row was not found, so every date line was read. | Check the file has a `Date Time Event Number Event Type Description` header. |
 | `ROW-NOMATCH` | warn | A line did not match the P5000 row pattern and was skipped. | Look at the sample lines. If real data was dropped, share the report. |
 | `ROW-CONT` | info | A line with no leading date was joined to the record above it. | Usually a wrapped line. Check the samples if a count looks high. |

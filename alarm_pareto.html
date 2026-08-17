@@ -146,10 +146,15 @@
         <label style="visibility:hidden">x</label>
         <button class="secondary" id="autoMapBtn" type="button">Auto-map columns</button>
       </div>
+      <div class="field">
+        <label style="visibility:hidden">x</label>
+        <button class="secondary" id="forgetSetupBtn" type="button" style="display:none">Forget saved setup</button>
+      </div>
     </div>
     <p class="hint">Data is read from that row down until the first blank line. Rows older than the window are dropped later. The same start row is used for every file you import.</p>
 
     <p class="hint">"Auto-map" guesses each column from its values. Fix any that are wrong. You need a Timestamp (or a Date), plus a Message ID. Tag more than one column as Description to join split message text. Pick "Other" to keep a column in view but not analyze.</p>
+    <div id="setupMsg"></div>
     <div class="chartwrap"><table id="previewTable"></table></div>
 
     <div style="margin-top:14px">
@@ -418,6 +423,7 @@ var STATE = {
   fileCount: 0,
   columns: [],       // [{key, label, samples:[...]}] detected in the current parse
   rows: [],          // array of objects, one per data row, keyed by column key
+  tools: [],         // tool names read from the files, like ["dep1"], sorted
   lastResult: null,  // the most recent analysis, used by the CSV export
   activeLevel: "category"
 };
@@ -788,6 +794,7 @@ var DEBUG_CODES = {
   "FMT-OVERRIDE": { level: "info",  meaning: "The format was forced by the Format drop-down." },
   "FMT-MIXED":    { level: "warn",  meaning: "The batch mixed formats. Columns were matched by position." },
   "PRE-META":     { level: "info",  meaning: "Tool details were read from the P5000 preamble." },
+  "SETUP-RESTORED": { level: "info", meaning: "A column setup saved for this tool was put back." },
   "HDR-NOTFOUND": { level: "warn",  meaning: "The P5000 header row was not found. Every date line was read." },
   "ROW-NOMATCH":  { level: "warn",  meaning: "A line did not match the P5000 row pattern and was skipped." },
   "ROW-CONT":     { level: "info",  meaning: "A line with no leading date was joined to the record above it." },
@@ -979,7 +986,8 @@ function reparse() {
   var rows = [];
   var warnings = [];
   var formats = [];
-  var tools = [];
+  var tools = [];      // labels for the import message, like "dep1 (dep)"
+  var toolNames = [];  // bare tool names, used to file the saved setup
 
   STATE.texts.forEach(function (text, i) {
     var fmt = currentFormat(text);
@@ -991,6 +999,7 @@ function reparse() {
     if (fmt === "p5000" && parsed.tool) {
       var lab = parsed.tool + (parsed.kind && parsed.kind !== "other" ? " (" + parsed.kind + ")" : "");
       if (tools.indexOf(lab) === -1) tools.push(lab);
+      if (toolNames.indexOf(parsed.tool) === -1) toolNames.push(parsed.tool);
     }
     if (!parsed.columns.length) return;
     if (columns === null) {
@@ -1013,6 +1022,8 @@ function reparse() {
 
   STATE.columns = columns;
   STATE.rows = rows;
+  // Sorted, so the same two tools loaded in either order find the same setup.
+  STATE.tools = toolNames.slice().sort();
 
   var fmtTag = mixed ? ("mixed (" + formats.map(fmtName).join(", ") + ")") : fmtName(formats[0]);
   var extra = warnings.length ? " " + warnings.join(" ") : "";
@@ -1470,9 +1481,15 @@ function buildMappingUI() {
       other.style.display = (sel.value === "other") ? "" : "none";
       refreshSeverityFilter();
       refreshFilters();
+      saveSetup();
     }
     sel.addEventListener("change", sync);
+    other.addEventListener("input", saveSetup);
   });
+
+  // Bring back the setup last used for these files, before the filters are
+  // built, because the filters are built from the column roles.
+  restoreSetup();
 
   refreshSeverityFilter();
   refreshFilters();
@@ -1535,6 +1552,7 @@ function refreshSeverityFilter() {
     "</div>" +
     "<div id='sevChecks'>" + checks + "</div>";
   box.style.display = "";
+  applyUnticked("sevchk");
 
   Array.prototype.forEach.call(box.querySelectorAll(".sevpreset"), function (btn) {
     btn.addEventListener("click", function () { applySevPreset(btn.getAttribute("data-preset")); });
@@ -1550,6 +1568,8 @@ function applySevPreset(preset) {
     else if (preset === "warnings") chk.checked = isWarn;
     else chk.checked = isFault || isWarn; // both
   });
+  // A preset ticks the boxes in code, which fires no change event, so save here.
+  saveSetup();
 }
 
 // The set of severities the user has ticked. null means "no severity column".
@@ -1673,6 +1693,7 @@ function buildCheckGroup(containerId, cls, label, counts) {
   }).join("");
   var more = keys.length > 40 ? " <span style='color:#5b6570'>(showing 40 of " + keys.length + ")</span>" : "";
   el.innerHTML = "<label>" + esc(label) + more + "</label><div style='margin-top:4px'>" + checks + "</div>";
+  applyUnticked(cls);
 }
 
 function optionEl(value, text) {
@@ -1682,6 +1703,23 @@ function optionEl(value, text) {
 }
 
 document.getElementById("downMode").addEventListener("change", syncDownModeUI);
+
+// ---------------------------------------------------------------------------
+// Remembering what you set up. Nothing here leaves the browser; it is all
+// local storage on this machine.
+//
+// Two layers. The lists that hold for every tool, the category rules and the
+// module names, are saved once under a fixed key. Everything that belongs to
+// one tool -- which column is which, how downtime is stored, the down and up
+// wording, the chamber names, and which filter boxes are ticked -- is saved
+// per tool, so a dep log and an etch log each get their own answers back.
+// ---------------------------------------------------------------------------
+
+// Storage can be switched off, and some browsers refuse it for a page opened
+// from a file, so every call is wrapped and a failure is simply forgetting.
+function storeGet(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+function storeSet(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
+function storeDel(key) { try { localStorage.removeItem(key); } catch (e) {} }
 
 // Remember the user's editable lists in this browser, so they survive a reload.
 // The module names seed with defaults the first time.
@@ -1693,16 +1731,251 @@ document.getElementById("downMode").addEventListener("change", syncDownModeUI);
   pairs.forEach(function (p) {
     var ta = document.getElementById(p.id);
     if (!ta) return;
-    var saved = null;
-    try { saved = localStorage.getItem(p.key); } catch (e) {}
+    var saved = storeGet(p.key);
     if (saved != null) ta.value = saved;
     else if (p.seed != null) ta.value = p.seed;
     ta.addEventListener("input", function () {
-      try { localStorage.setItem(p.key, ta.value); } catch (e) {}
+      storeSet(p.key, ta.value);
       if (STATE.rows.length) refreshFilters();
     });
   });
 })();
+
+// The single controls that describe one tool's log rather than the person
+// reading it. Saved and restored together with the column roles.
+var SETUP_FIELDS = [
+  { id: "downMode",     kind: "value" },
+  { id: "durUnit",      kind: "value" },
+  { id: "setVal",       kind: "value" },
+  { id: "clearVal",     kind: "value" },
+  { id: "downPhrases",  kind: "value" },
+  { id: "upPhrases",    kind: "value" },
+  { id: "chamberNames", kind: "value" },
+  { id: "faultAsDown",  kind: "checked" },
+  { id: "capHours",     kind: "value" },
+  { id: "systemBucket", kind: "checked" }
+];
+
+// The filter checkbox groups. We remember the boxes that were unticked, not
+// the ones left ticked, so a chamber or category that only shows up in a later
+// log still starts included.
+var SETUP_FILTERS = ["sevchk", "chamberchk", "categorychk", "toolchk"];
+
+// What those controls start out as, read once before anything is restored.
+// A tool with no saved setup is put back to these, so one tool's answers never
+// leak into the next tool's import.
+var SETUP_DEFAULTS = (function () {
+  var out = {};
+  SETUP_FIELDS.forEach(function (f) {
+    var el = document.getElementById(f.id);
+    if (el) out[f.id] = (f.kind === "checked") ? el.checked : el.value;
+  });
+  return out;
+})();
+
+// The setup restored for the files now loaded, or null. Filter groups are
+// rebuilt from the data several times, so they read their unticked list here
+// each time rather than being set once.
+var SETUP_APPLIED = null;
+// True while a saved setup is being put back, so restoring does not save over
+// the very thing it is reading.
+var RESTORING = false;
+
+// What this batch of files is filed under, in words. A P5000 elog names its
+// tool in the preamble, which is the best key we have: dep1 and etch4 are
+// different tools with differently worded logs. A delimited export names no
+// tool, so it is filed by its column layout instead, which is the same for
+// every export out of the same system.
+function setupName() {
+  if (STATE.tools.length) return "tool " + STATE.tools.join(" + ");
+  if (STATE.columns.length) {
+    return "columns " + STATE.columns.map(function (c) { return c.label; }).join(", ");
+  }
+  return "";
+}
+
+// The storage key for that name, or "" when there is nothing loaded to key on.
+function setupKey() {
+  var name = setupName();
+  return name ? "ap_setup_" + name.toLowerCase() : "";
+}
+
+// A short label for the message line: the tool name, or the file layout.
+function setupLabel() {
+  return STATE.tools.length ? STATE.tools.join(" + ") : "this column layout";
+}
+
+// The values of the boxes the user unticked in one filter group.
+function untickedValues(cls) {
+  var off = [];
+  Array.prototype.forEach.call(document.querySelectorAll("." + cls), function (b) {
+    if (!b.checked) off.push(b.value);
+  });
+  return off;
+}
+
+// Gather everything worth remembering about the current setup.
+function collectSetup() {
+  var setup = { version: 1, columns: [], filters: {} };
+  STATE.columns.forEach(function (c) {
+    var sel = document.getElementById("colid_" + c.key);
+    if (!sel) return;
+    var other = document.getElementById("colother_" + c.key);
+    setup.columns.push({ label: c.label, role: sel.value, other: other ? other.value : "" });
+  });
+  SETUP_FIELDS.forEach(function (f) {
+    var el = document.getElementById(f.id);
+    if (el) setup[f.id] = (f.kind === "checked") ? el.checked : el.value;
+  });
+  SETUP_FILTERS.forEach(function (cls) { setup.filters[cls] = untickedValues(cls); });
+  return setup;
+}
+
+// Write the current setup under this batch's key. Called after any change the
+// user makes to the mapping, the downtime settings, or the filters.
+function saveSetup() {
+  if (RESTORING) return;
+  var key = setupKey();
+  if (!key || !STATE.columns.length) return;
+  storeSet(key, JSON.stringify(collectSetup()));
+  showForgetButton(true);
+}
+
+// Read back the setup saved for this batch, or null if there is none or it is
+// unreadable. A damaged entry is treated as absent rather than as an error.
+function loadSetup() {
+  var key = setupKey();
+  if (!key) return null;
+  var raw = storeGet(key);
+  if (!raw) return null;
+  var parsed = null;
+  try { parsed = JSON.parse(raw); } catch (e) { return null; }
+  return (parsed && typeof parsed === "object") ? parsed : null;
+}
+
+function isKnownRole(role) {
+  return COLUMN_ROLES.some(function (r) { return r.value === role; });
+}
+
+// Put a saved setup back on the page. Columns are matched by name, so a column
+// that moved still gets its role back, and a column the saved setup never saw
+// keeps the automatic guess.
+function applySetup(setup) {
+  if (!setup) return;
+  RESTORING = true;
+  var saved = setup.columns || [];
+  var used = {};
+  STATE.columns.forEach(function (c) {
+    var hit = null;
+    for (var i = 0; i < saved.length; i++) {
+      if (used[i] || saved[i].label !== c.label) continue;
+      hit = saved[i]; used[i] = true; break;
+    }
+    if (!hit) return;
+    var sel = document.getElementById("colid_" + c.key);
+    var other = document.getElementById("colother_" + c.key);
+    if (sel && isKnownRole(hit.role)) sel.value = hit.role;
+    if (other) {
+      other.value = hit.other || "";
+      other.style.display = (sel && sel.value === "other") ? "" : "none";
+    }
+  });
+  SETUP_FIELDS.forEach(function (f) {
+    if (!(f.id in setup)) return;
+    var el = document.getElementById(f.id);
+    if (!el) return;
+    if (f.kind === "checked") el.checked = !!setup[f.id];
+    else el.value = setup[f.id];
+  });
+  SETUP_APPLIED = setup;
+  syncDownModeUI();
+  RESTORING = false;
+}
+
+// Put the downtime and derive controls back to how the page starts. Used when
+// a restored setup is thrown away or replaced by a tool that has none saved.
+function resetSetupFields() {
+  RESTORING = true;
+  SETUP_FIELDS.forEach(function (f) {
+    if (!(f.id in SETUP_DEFAULTS)) return;
+    var el = document.getElementById(f.id);
+    if (!el) return;
+    if (f.kind === "checked") el.checked = SETUP_DEFAULTS[f.id];
+    else el.value = SETUP_DEFAULTS[f.id];
+  });
+  syncDownModeUI();
+  RESTORING = false;
+}
+
+// Untick a freshly built filter group to match what was saved. Values that are
+// new to this log are left ticked.
+function applyUnticked(cls) {
+  var off = (SETUP_APPLIED && SETUP_APPLIED.filters) ? SETUP_APPLIED.filters[cls] : null;
+  if (!off || !off.length) return;
+  Array.prototype.forEach.call(document.querySelectorAll("." + cls), function (b) {
+    if (off.indexOf(b.value) !== -1) b.checked = false;
+  });
+}
+
+function showForgetButton(on) {
+  var btn = document.getElementById("forgetSetupBtn");
+  if (btn) btn.style.display = on ? "" : "none";
+}
+
+// Restore the setup for the files just loaded, and say what happened. Called
+// from buildMappingUI, after the drop-downs exist and before the filters are
+// built from them.
+function restoreSetup() {
+  // Whether the settings now on screen came from another log's saved setup
+  // rather than from the person sitting in front of it.
+  var borrowed = !!SETUP_APPLIED;
+  SETUP_APPLIED = null;
+  var setup = loadSetup();
+  if (setup) {
+    applySetup(setup);
+    dbg("SETUP-RESTORED", "Saved setup for " + setupLabel() + ".");
+    setMsg("setupMsg", "ok", "Restored the column setup you last used for " + setupLabel() +
+      ". Change anything below and it is remembered again.");
+  } else {
+    // Nothing saved for this log. Clear anything left over from the last log's
+    // saved setup, so a dep log's answers do not turn up on an etch log. A page
+    // the user set up by hand is left exactly as they left it.
+    if (borrowed) resetSetupFields();
+    setMsg("setupMsg", "", "");
+  }
+  showForgetButton(!!setup);
+}
+
+// Throw away the saved setup for this batch and guess the columns afresh. The
+// next change the user makes starts a new saved setup.
+document.getElementById("forgetSetupBtn").addEventListener("click", function () {
+  var key = setupKey();
+  if (key) storeDel(key);
+  SETUP_APPLIED = null;
+  showForgetButton(false);
+  RESTORING = true;
+  autoMap();
+  RESTORING = false;
+  resetSetupFields();
+  refreshFilters();
+  setMsg("setupMsg", "warn", "Forgot the saved setup for " + setupLabel() + ". The columns were guessed again.");
+});
+
+// Save whenever one of the per-tool controls changes. Text boxes save as they
+// are typed in; the rest save on change.
+SETUP_FIELDS.forEach(function (f) {
+  var el = document.getElementById(f.id);
+  if (!el) return;
+  var evt = (el.tagName === "TEXTAREA" || el.type === "text" || el.type === "number") ? "input" : "change";
+  el.addEventListener(evt, saveSetup);
+});
+
+// Save when a filter box is ticked or unticked. The boxes are rebuilt from the
+// data, so the listener sits on the container that holds them.
+["sevFilter", "chamberFilter", "categoryFilter", "toolFilter"].forEach(function (id) {
+  var box = document.getElementById(id);
+  if (box) box.addEventListener("change", saveSetup);
+});
 
 // The System bucket changes what the chamber filter should show, so rebuild it.
 document.getElementById("systemBucket").addEventListener("change", function () {
