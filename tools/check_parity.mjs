@@ -21,7 +21,7 @@ import { summarize, builtInSample } from "./browser_summary.mjs";
 const DATA = join(ROOT, "tests", "data");
 
 // Keys in a golden file that are notes for a human, not values to compare.
-const IGNORED_KEYS = new Set(["_note", "_by_hand"]);
+const IGNORED_KEYS = new Set(["_note", "_by_hand", "_ranking_note"]);
 
 // The two logs we check, and how the browser tool should be told to read them.
 // The first is the duration case, where the log already says how long each
@@ -61,6 +61,23 @@ const SCENARIOS = [
       setVal: "SET",
       clearVal: "CLEAR"
     }
+  },
+  {
+    name: "daylight saving log",
+    csv: join(DATA, "sample_dst_log.csv"),
+    golden: join(DATA, "expected_dst.json"),
+    mapping: {
+      ts_set: "EventTime",
+      fault_code: "AlarmID",
+      description: "AlarmText",
+      equipment: "ChamberID",
+      downMode: "events",
+      durCol: "",
+      durScale: 1,
+      stateCol: "EventState",
+      setVal: "SET",
+      clearVal: "CLEAR"
+    }
   }
 ];
 
@@ -75,7 +92,22 @@ function compare(actual, expected, path) {
     const exp = expected[key];
     const act = actual === undefined ? undefined : actual[key];
 
-    if (exp !== null && typeof exp === "object" && !Array.isArray(exp)) {
+    if (Array.isArray(exp)) {
+      if (!Array.isArray(act)) {
+        problems.push(`${where}: expected a list of ${exp.length} rows, browser tool gave none`);
+        continue;
+      }
+      checks += 1;
+      if (act.length !== exp.length) {
+        problems.push(`${where}: expected ${exp.length} rows, browser tool gave ${act.length}`);
+      }
+      for (let i = 0; i < exp.length; i++) {
+        compare(act[i], exp[i], `${where}[${i}]`);
+      }
+      continue;
+    }
+
+    if (exp !== null && typeof exp === "object") {
       if (act === undefined) {
         problems.push(`${where}: the browser tool produced nothing here`);
         continue;
@@ -138,5 +170,8 @@ if (problems.length) {
   process.exit(1);
 }
 
-const names = SCENARIOS.map((s) => s.name).join(" and ");
-console.log(`Parity check passed. ${checks} values agree across the ${names}.`);
+const names = SCENARIOS.map((s) => s.name).join(", ");
+console.log(
+  `Parity check passed. ${checks} values agree between the browser tool and the ` +
+  `golden numbers, across ${SCENARIOS.length} logs: ${names}.`
+);

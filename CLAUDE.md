@@ -65,6 +65,21 @@ code in the project. Two downtime numbers exist and must never be mixed:
 It must stay identical to `tests/data/sample_alarm_log.csv`. The parity check
 verifies this.
 
+Two rules about time. Both were bugs once.
+
+- **Timestamps are read as UTC, never as local time.** An alarm log carries no
+  timezone, so both tools treat the times as plain clock numbers. If the browser
+  tool used local time, an alarm spanning a daylight saving change would measure
+  differently depending on where the laptop is. Never use `getHours` and friends
+  in the browser tool. Use the `getUTC` versions.
+- **An impossible date is rejected, not nudged.** JavaScript turns month 13 into
+  January and February 30th into March 2nd. That invents alarms. `utcDate` reads
+  the pieces back out and returns null if they changed.
+
+Ties in a ranking are broken by name, in both tools. Without that the order
+depends on how each tool happened to group the rows, and a Pareto chart is read
+top to bottom.
+
 ## Writing style
 
 Match the existing voice. It is written for a smart reader who is not a

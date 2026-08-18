@@ -432,8 +432,22 @@ document.getElementById("downMode").addEventListener("change", function () {
 });
 
 // ---------------------------------------------------------------------------
-// Date parsing. Browsers parse many formats. We add a couple of common ones
-// that they do not handle so logs parse the same everywhere.
+// Date parsing.
+//
+// Two rules here, and both exist because of real ways the numbers went wrong.
+//
+// 1. Timestamps are read as UTC, never as the machine's local time. An alarm
+//    log has no timezone in it, so the desktop tool treats the times as plain
+//    numbers on a clock. If this page used local time, a browser in a timezone
+//    that observes daylight saving would measure an alarm spanning the spring
+//    change as an hour shorter than the desktop tool measures it. Same log,
+//    two answers, depending on where the laptop is. Reading as UTC keeps the
+//    arithmetic plain, so the two tools agree everywhere.
+//
+// 2. An impossible date is rejected, not nudged. Left alone, JavaScript turns
+//    month 13 into January of the next year and the 30th of February into the
+//    2nd of March. That silently invents data. A rejected row is counted and
+//    reported to you as unreadable, which is the honest answer.
 // ---------------------------------------------------------------------------
 function parseDate(s) {
   if (!s) return null;
@@ -441,19 +455,39 @@ function parseDate(s) {
 
   // Try "YYYY-MM-DD HH:MM:SS" and "YYYY/MM/DD HH:MM:SS".
   var m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  if (m) return utcDate(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0));
 
   // Try "MM/DD/YYYY HH:MM:SS" (United States style).
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) return new Date(+m[3], +m[1] - 1, +m[2], +m[4], +m[5], +(m[6] || 0));
+  if (m) return utcDate(+m[3], +m[1], +m[2], +m[4], +m[5], +(m[6] || 0));
 
   // Date only, no time.
   m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  if (m) return utcDate(+m[1], +m[2], +m[3], 0, 0, 0);
 
-  // Fall back to the browser. This handles ISO strings and many others.
-  var d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
+  // ISO 8601, for logs that write a full machine timestamp. If the text says
+  // nothing about a timezone we add a Z, so it is read as UTC like everything
+  // else rather than shifting with the machine.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+    var iso = /([Zz]|[+-]\d{2}:?\d{2})$/.test(s) ? s : s + "Z";
+    var parsed = new Date(iso);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  return null;
+}
+
+// Build a UTC timestamp, and return null if the pieces do not describe a real
+// date. Reading the pieces back out is the check. If February 30th went in,
+// March 2nd comes back, the numbers disagree, and we reject the row.
+function utcDate(year, month, day, hour, minute, second) {
+  var d = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 ||
+      d.getUTCDate() !== day || d.getUTCHours() !== hour ||
+      d.getUTCMinutes() !== minute || d.getUTCSeconds() !== second) {
+    return null;
+  }
+  return d;
 }
 
 // ---------------------------------------------------------------------------
@@ -600,10 +634,23 @@ function rankLevel(occ, levelKey, method, topN) {
     };
   });
 
-  var byCount = collapse(arr.slice().sort(function (a, b) { return b.count - a.count; }), topN, "count");
   var metric = (method === "attributed") ? "attributed_s" : "wallclock_s";
-  var byDown = collapse(arr.slice().sort(function (a, b) { return b[metric] - a[metric]; }), topN, metric);
+  var byCount = collapse(arr.slice().sort(rankOrder("count")), topN, "count");
+  var byDown = collapse(arr.slice().sort(rankOrder(metric)), topN, metric);
   return { byCount: byCount, byDown: byDown, metric: metric };
+}
+
+// Sort biggest first, and break a tie by name.
+//
+// Without the tie-break the order would depend on the order groups happened to
+// appear in the file, while the desktop tool would use its own order. Two tools
+// would then show the same tied faults in a different order, and a Pareto chart
+// is read top to bottom, so that looks like a real difference when it is not.
+function rankOrder(field) {
+  return function (a, b) {
+    if (b[field] !== a[field]) return b[field] - a[field];
+    return a.key < b.key ? -1 : (a.key > b.key ? 1 : 0);
+  };
 }
 
 function collapse(sorted, topN, sortField) {
@@ -621,6 +668,24 @@ function collapse(sorted, topN, sortField) {
   } else {
     rows = sorted.slice();
   }
+
+  // Work on fresh copies of each row.
+  //
+  // The count ranking and the downtime ranking are built from the same group
+  // objects. Writing rank, percent and cumulative percent straight onto those
+  // objects let whichever ranking was built second overwrite the first one's
+  // numbers. The result was a wrong percent in the table and the CSV export,
+  // and a wrong cumulative line on the count Pareto chart, for any fault that
+  // was near the top of both rankings.
+  rows = rows.map(function (r) {
+    return {
+      key: r.key,
+      count: r.count,
+      attributed_s: r.attributed_s,
+      wallclock_s: r.wallclock_s
+    };
+  });
+
   var total = rows.reduce(function (s, r) { return s + r[sortField]; }, 0) || 1;
   var run = 0;
   rows.forEach(function (r, i) {
@@ -865,11 +930,13 @@ function exportCsv() {
 // ---------------------------------------------------------------------------
 function hours(sec) { return (sec / 3600).toFixed(2); }
 function fmtNum(v) { return (Math.abs(v) >= 100 || v === Math.round(v)) ? String(Math.round(v)) : v.toFixed(1); }
+// Show a timestamp the same way it was read, in UTC. Using local time here
+// would print a different clock time than the log file says.
 function fmt(d) {
   if (!d) return "n/a";
   function pad(x) { return (x < 10 ? "0" : "") + x; }
-  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " +
-    pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()) + " " +
+    pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()) + ":" + pad(d.getUTCSeconds());
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
 function clip(s, n) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }

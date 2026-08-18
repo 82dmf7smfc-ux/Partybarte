@@ -1,6 +1,5 @@
 {
   "_note": "Golden values for sample_alarm_log.csv. All downtime is in seconds. These numbers were worked out by hand. If a code change makes a test fail here, the change altered the analysis. That is the point. Confirm the new numbers are correct before updating this file.",
-
   "window": {
     "window_days": 30,
     "window_start": "2026-01-22 20:00:00",
@@ -8,28 +7,251 @@
     "windowed_row_count": 14,
     "raw_row_count": 15
   },
-
   "grand": {
     "total_faults": 14,
     "attributed_downtime_s": 66600,
     "wallclock_downtime_s": 59400
   },
-
   "fault_code": {
-    "count": {"E101": 5, "E202": 4, "E303": 3, "E404": 2},
-    "attributed_s": {"E101": 39600, "E202": 9000, "E303": 14400, "E404": 3600},
-    "wallclock_s": {"E101": 32400, "E202": 9000, "E303": 14400, "E404": 3600}
+    "count": {
+      "E101": 5,
+      "E202": 4,
+      "E303": 3,
+      "E404": 2
+    },
+    "attributed_s": {
+      "E101": 39600,
+      "E202": 9000,
+      "E303": 14400,
+      "E404": 3600
+    },
+    "wallclock_s": {
+      "E101": 32400,
+      "E202": 9000,
+      "E303": 14400,
+      "E404": 3600
+    }
   },
-
   "description": {
-    "count": {"Chamber over temperature": 5, "Gas flow deviation": 4, "RF power fault": 3, "Vacuum pump warning": 2},
-    "attributed_s": {"Chamber over temperature": 39600, "Gas flow deviation": 9000, "RF power fault": 14400, "Vacuum pump warning": 3600},
-    "wallclock_s": {"Chamber over temperature": 32400, "Gas flow deviation": 9000, "RF power fault": 14400, "Vacuum pump warning": 3600}
+    "count": {
+      "Chamber over temperature": 5,
+      "Gas flow deviation": 4,
+      "RF power fault": 3,
+      "Vacuum pump warning": 2
+    },
+    "attributed_s": {
+      "Chamber over temperature": 39600,
+      "Gas flow deviation": 9000,
+      "RF power fault": 14400,
+      "Vacuum pump warning": 3600
+    },
+    "wallclock_s": {
+      "Chamber over temperature": 32400,
+      "Gas flow deviation": 9000,
+      "RF power fault": 14400,
+      "Vacuum pump warning": 3600
+    }
   },
-
   "equipment": {
-    "count": {"CH-A": 6, "CH-B": 4, "CH-C": 4},
-    "attributed_s": {"CH-A": 36000, "CH-B": 10800, "CH-C": 19800},
-    "wallclock_s": {"CH-A": 28800, "CH-B": 10800, "CH-C": 19800}
+    "count": {
+      "CH-A": 6,
+      "CH-B": 4,
+      "CH-C": 4
+    },
+    "attributed_s": {
+      "CH-A": 36000,
+      "CH-B": 10800,
+      "CH-C": 19800
+    },
+    "wallclock_s": {
+      "CH-A": 28800,
+      "CH-B": 10800,
+      "CH-C": 19800
+    }
+  },
+  "_ranking_note": "The ranking is checked at top_n 2 so the Other bucket is exercised. Order, percent and cumulative percent are all compared, because a Pareto chart is read top to bottom and the cumulative line is the point of it. Ties are broken by name in both tools on purpose.",
+  "ranking": {
+    "top_n": 2,
+    "method": "attributed",
+    "fault_code": {
+      "by_count": [
+        {
+          "rank": 1,
+          "key": "E101",
+          "count": 5,
+          "attributed_s": 39600,
+          "wallclock_s": 32400,
+          "pct": 35.714286,
+          "cum": 35.714286
+        },
+        {
+          "rank": 2,
+          "key": "E202",
+          "count": 4,
+          "attributed_s": 9000,
+          "wallclock_s": 9000,
+          "pct": 28.571429,
+          "cum": 64.285714
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 5,
+          "attributed_s": 18000,
+          "wallclock_s": 18000,
+          "pct": 35.714286,
+          "cum": 100
+        }
+      ],
+      "by_downtime": [
+        {
+          "rank": 1,
+          "key": "E101",
+          "count": 5,
+          "attributed_s": 39600,
+          "wallclock_s": 32400,
+          "pct": 59.459459,
+          "cum": 59.459459
+        },
+        {
+          "rank": 2,
+          "key": "E303",
+          "count": 3,
+          "attributed_s": 14400,
+          "wallclock_s": 14400,
+          "pct": 21.621622,
+          "cum": 81.081081
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 6,
+          "attributed_s": 12600,
+          "wallclock_s": 12600,
+          "pct": 18.918919,
+          "cum": 100
+        }
+      ]
+    },
+    "description": {
+      "by_count": [
+        {
+          "rank": 1,
+          "key": "Chamber over temperature",
+          "count": 5,
+          "attributed_s": 39600,
+          "wallclock_s": 32400,
+          "pct": 35.714286,
+          "cum": 35.714286
+        },
+        {
+          "rank": 2,
+          "key": "Gas flow deviation",
+          "count": 4,
+          "attributed_s": 9000,
+          "wallclock_s": 9000,
+          "pct": 28.571429,
+          "cum": 64.285714
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 5,
+          "attributed_s": 18000,
+          "wallclock_s": 18000,
+          "pct": 35.714286,
+          "cum": 100
+        }
+      ],
+      "by_downtime": [
+        {
+          "rank": 1,
+          "key": "Chamber over temperature",
+          "count": 5,
+          "attributed_s": 39600,
+          "wallclock_s": 32400,
+          "pct": 59.459459,
+          "cum": 59.459459
+        },
+        {
+          "rank": 2,
+          "key": "RF power fault",
+          "count": 3,
+          "attributed_s": 14400,
+          "wallclock_s": 14400,
+          "pct": 21.621622,
+          "cum": 81.081081
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 6,
+          "attributed_s": 12600,
+          "wallclock_s": 12600,
+          "pct": 18.918919,
+          "cum": 100
+        }
+      ]
+    },
+    "equipment": {
+      "by_count": [
+        {
+          "rank": 1,
+          "key": "CH-A",
+          "count": 6,
+          "attributed_s": 36000,
+          "wallclock_s": 28800,
+          "pct": 42.857143,
+          "cum": 42.857143
+        },
+        {
+          "rank": 2,
+          "key": "CH-B",
+          "count": 4,
+          "attributed_s": 10800,
+          "wallclock_s": 10800,
+          "pct": 28.571429,
+          "cum": 71.428571
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 4,
+          "attributed_s": 19800,
+          "wallclock_s": 19800,
+          "pct": 28.571429,
+          "cum": 100
+        }
+      ],
+      "by_downtime": [
+        {
+          "rank": 1,
+          "key": "CH-A",
+          "count": 6,
+          "attributed_s": 36000,
+          "wallclock_s": 28800,
+          "pct": 54.054054,
+          "cum": 54.054054
+        },
+        {
+          "rank": 2,
+          "key": "CH-C",
+          "count": 4,
+          "attributed_s": 19800,
+          "wallclock_s": 19800,
+          "pct": 29.72973,
+          "cum": 83.783784
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 4,
+          "attributed_s": 10800,
+          "wallclock_s": 10800,
+          "pct": 16.216216,
+          "cum": 100
+        }
+      ]
+    }
   }
 }

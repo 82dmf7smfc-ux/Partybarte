@@ -1,0 +1,259 @@
+{
+  "_note": "Golden values for sample_dst_log.csv. Worked out by hand. This log exists to catch two bugs that both tools have to stay clear of. Downtime is in seconds.",
+  "_by_hand": {
+    "why this log exists": "The browser tool used to read timestamps in the machine's local time while the Python tool read them as plain clock numbers. On a laptop set to a timezone that observes daylight saving, the two tools gave different downtime for the same log. This log spans both daylight saving changes in the United States in 2026, so a tool that gets it wrong cannot pass.",
+    "E101 on CH-A": "01:30 to 03:30 on March 8, the spring change. Two hours of clock time, so 7200 s. Read as local time it would come out as 3600 s.",
+    "E202 on CH-B": "01:00 to 02:30 on November 1, the autumn change. Ninety minutes of clock time, so 5400 s. Read as local time the 01:00 hour happens twice and it could come out as 9000 s.",
+    "E303 on CH-C": "February 30th does not exist. The row is rejected. JavaScript used to turn it into March 2nd, which invents an alarm that never happened.",
+    "E404 on CH-C": "10:00 to 11:00 on March 9, an ordinary hour away from any change. 3600 s.",
+    "the window": "Set to 365 days so all three real alarms stay in it. The newest onset is the November 1 set.",
+    "the ties": "All three faults have a count of one, so the count ranking is a three way tie. Both tools break it by name, so the order is E101, E202, E404."
+  },
+  "window": {
+    "window_days": 365,
+    "window_start": "2025-11-01 01:00:00",
+    "window_end": "2026-11-01 01:00:00",
+    "windowed_row_count": 3
+  },
+  "grand": {
+    "total_faults": 3,
+    "attributed_downtime_s": 16200,
+    "wallclock_downtime_s": 16200
+  },
+  "fault_code": {
+    "count": {
+      "E101": 1,
+      "E202": 1,
+      "E404": 1
+    },
+    "attributed_s": {
+      "E101": 7200,
+      "E202": 5400,
+      "E404": 3600
+    },
+    "wallclock_s": {
+      "E101": 7200,
+      "E202": 5400,
+      "E404": 3600
+    }
+  },
+  "description": {
+    "count": {
+      "Chamber over temperature": 1,
+      "Gas flow deviation": 1,
+      "Vacuum pump warning": 1
+    },
+    "attributed_s": {
+      "Chamber over temperature": 7200,
+      "Gas flow deviation": 5400,
+      "Vacuum pump warning": 3600
+    },
+    "wallclock_s": {
+      "Chamber over temperature": 7200,
+      "Gas flow deviation": 5400,
+      "Vacuum pump warning": 3600
+    }
+  },
+  "equipment": {
+    "count": {
+      "CH-A": 1,
+      "CH-B": 1,
+      "CH-C": 1
+    },
+    "attributed_s": {
+      "CH-A": 7200,
+      "CH-B": 5400,
+      "CH-C": 3600
+    },
+    "wallclock_s": {
+      "CH-A": 7200,
+      "CH-B": 5400,
+      "CH-C": 3600
+    }
+  },
+  "_ranking_note": "Checked at top_n 2 so the Other bucket is exercised. Every count is one, so the count ranking is a three way tie that both tools must break by name.",
+  "ranking": {
+    "top_n": 2,
+    "method": "attributed",
+    "fault_code": {
+      "by_count": [
+        {
+          "rank": 1,
+          "key": "E101",
+          "count": 1,
+          "attributed_s": 7200,
+          "wallclock_s": 7200,
+          "pct": 33.333333,
+          "cum": 33.333333
+        },
+        {
+          "rank": 2,
+          "key": "E202",
+          "count": 1,
+          "attributed_s": 5400,
+          "wallclock_s": 5400,
+          "pct": 33.333333,
+          "cum": 66.666667
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 1,
+          "attributed_s": 3600,
+          "wallclock_s": 3600,
+          "pct": 33.333333,
+          "cum": 100
+        }
+      ],
+      "by_downtime": [
+        {
+          "rank": 1,
+          "key": "E101",
+          "count": 1,
+          "attributed_s": 7200,
+          "wallclock_s": 7200,
+          "pct": 44.444444,
+          "cum": 44.444444
+        },
+        {
+          "rank": 2,
+          "key": "E202",
+          "count": 1,
+          "attributed_s": 5400,
+          "wallclock_s": 5400,
+          "pct": 33.333333,
+          "cum": 77.777778
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 1,
+          "attributed_s": 3600,
+          "wallclock_s": 3600,
+          "pct": 22.222222,
+          "cum": 100
+        }
+      ]
+    },
+    "description": {
+      "by_count": [
+        {
+          "rank": 1,
+          "key": "Chamber over temperature",
+          "count": 1,
+          "attributed_s": 7200,
+          "wallclock_s": 7200,
+          "pct": 33.333333,
+          "cum": 33.333333
+        },
+        {
+          "rank": 2,
+          "key": "Gas flow deviation",
+          "count": 1,
+          "attributed_s": 5400,
+          "wallclock_s": 5400,
+          "pct": 33.333333,
+          "cum": 66.666667
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 1,
+          "attributed_s": 3600,
+          "wallclock_s": 3600,
+          "pct": 33.333333,
+          "cum": 100
+        }
+      ],
+      "by_downtime": [
+        {
+          "rank": 1,
+          "key": "Chamber over temperature",
+          "count": 1,
+          "attributed_s": 7200,
+          "wallclock_s": 7200,
+          "pct": 44.444444,
+          "cum": 44.444444
+        },
+        {
+          "rank": 2,
+          "key": "Gas flow deviation",
+          "count": 1,
+          "attributed_s": 5400,
+          "wallclock_s": 5400,
+          "pct": 33.333333,
+          "cum": 77.777778
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 1,
+          "attributed_s": 3600,
+          "wallclock_s": 3600,
+          "pct": 22.222222,
+          "cum": 100
+        }
+      ]
+    },
+    "equipment": {
+      "by_count": [
+        {
+          "rank": 1,
+          "key": "CH-A",
+          "count": 1,
+          "attributed_s": 7200,
+          "wallclock_s": 7200,
+          "pct": 33.333333,
+          "cum": 33.333333
+        },
+        {
+          "rank": 2,
+          "key": "CH-B",
+          "count": 1,
+          "attributed_s": 5400,
+          "wallclock_s": 5400,
+          "pct": 33.333333,
+          "cum": 66.666667
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 1,
+          "attributed_s": 3600,
+          "wallclock_s": 3600,
+          "pct": 33.333333,
+          "cum": 100
+        }
+      ],
+      "by_downtime": [
+        {
+          "rank": 1,
+          "key": "CH-A",
+          "count": 1,
+          "attributed_s": 7200,
+          "wallclock_s": 7200,
+          "pct": 44.444444,
+          "cum": 44.444444
+        },
+        {
+          "rank": 2,
+          "key": "CH-B",
+          "count": 1,
+          "attributed_s": 5400,
+          "wallclock_s": 5400,
+          "pct": 33.333333,
+          "cum": 77.777778
+        },
+        {
+          "rank": 3,
+          "key": "Other",
+          "count": 1,
+          "attributed_s": 3600,
+          "wallclock_s": 3600,
+          "pct": 22.222222,
+          "cum": 100
+        }
+      ]
+    }
+  }
+}

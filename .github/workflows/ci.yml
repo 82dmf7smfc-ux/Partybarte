@@ -42,9 +42,22 @@ jobs:
         # This runs the real JavaScript out of alarm_pareto.html and compares its
         # results to the same golden files the Python tests use. It is listed
         # before the test suite so a parity failure is easy to spot in the log.
-        run: node tools/check_parity.mjs
+        #
+        # It runs three times, under three timezones. The browser tool reads
+        # timestamps as UTC on purpose, so that the same log gives the same
+        # downtime on every laptop. Running only under UTC would let a change
+        # that reintroduces local time slip through green.
+        run: |
+          for zone in UTC America/Los_Angeles Australia/Sydney; do
+            echo "Timezone: $zone"
+            TZ="$zone" node tools/check_parity.mjs
+          done
 
-      - name: Run the tests
+      - name: Run the tests under a daylight saving timezone
+        # The Python tool works in plain clock time, so its answers must not
+        # move either. Running the suite outside UTC keeps that honest.
+        env:
+          TZ: America/Los_Angeles
         run: pytest -q
 
       - name: Build the distributable zips

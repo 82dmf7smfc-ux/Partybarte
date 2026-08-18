@@ -15,6 +15,9 @@ of the list makes sense.
   same numbers the Python tests use. See `docs/claude-system.md`.
 - **Tests for the set/clear pairing path and the paired-interval path.** See
   `tests/test_pairing.py`.
+- **The ranking itself is checked, not just the totals.** Order, percent,
+  cumulative percent and the "Other" bucket are compared between the two tools.
+  See `tests/test_ranking.py`.
 
 ## Guiding goals
 
@@ -54,7 +57,7 @@ fixing either changes numbers users have already seen.
 - The window is applied at a different point. Python filters raw rows and then
   pairs set and clear rows. The browser tool pairs first and then filters. On a
   log where a set falls outside the window and its clear falls inside, the two
-  would disagree. Nothing has hit this yet.
+  would disagree. Nothing has hit this yet, and no fixture covers it.
 
 ## Longer term
 

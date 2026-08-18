@@ -209,8 +209,17 @@ def _rank_table(occ, level, downtime_method, top_n):
 
 
 def _sorted_with_other(merged, level, sort_col, top_n, pct_from):
-    """Sort a table, keep the top rows, and bucket the rest into 'Other'."""
-    ordered = merged.sort_values(sort_col, ascending=False, kind="stable").reset_index(drop=True)
+    """Sort a table, keep the top rows, and bucket the rest into 'Other'.
+
+    Ties are broken by name, on purpose. Without that, the order of two faults
+    with equal counts would depend on how pandas happened to group them, while
+    the browser tool would use the order they appeared in the file. Both would
+    be defensible and they would disagree. A Pareto chart is read top to bottom,
+    so a different order looks like a real difference when it is not.
+    """
+    ordered = merged.sort_values(
+        [sort_col, level], ascending=[False, True], kind="stable"
+    ).reset_index(drop=True)
 
     if len(ordered) > top_n:
         head = ordered.iloc[:top_n].copy()

@@ -30,11 +30,17 @@ const SAMPLE_MAPPING = {
 
 const LEVELS = ["fault_code", "description", "equipment"];
 
-// A top-N big enough that nothing is folded into an "Other" bucket. The golden
-// file lists every group, so the comparison must see every group.
+// A top-N big enough that nothing is folded into an "Other" bucket. Used for
+// the per-group totals, where the golden file lists every group.
 const NO_COLLAPSE = 100000;
 
-export function summarize(csvText, windowDays = 30, mapping = SAMPLE_MAPPING) {
+// The ranking block is checked at a deliberately small top-N so the "Other"
+// bucket is exercised. That bucket is real code that users hit at the default
+// of 15 whenever a tool has more than 15 distinct faults, and comparing only
+// the uncollapsed totals would never touch it.
+const RANKING_TOP_N = 2;
+
+export function summarize(csvText, windowDays = 30, mapping = SAMPLE_MAPPING, method = "attributed") {
   const core = loadBrowserCore();
 
   const parsed = core.parseDelimited(csvText);
@@ -72,7 +78,41 @@ export function summarize(csvText, windowDays = 30, mapping = SAMPLE_MAPPING) {
     summary[level] = { count, attributed_s, wallclock_s };
   }
 
+  // The ranking. Order, percent and cumulative percent all matter here. A
+  // Pareto chart is read top to bottom, and the cumulative line is the whole
+  // point of it, so comparing group totals alone would miss the thing users
+  // actually look at.
+  const ranking = { top_n: RANKING_TOP_N, method };
+  for (const level of LEVELS) {
+    const ranked = core.rankLevel(kept, level, method, RANKING_TOP_N);
+    ranking[level] = {
+      by_count: ranked.byCount.map(rankedRow),
+      by_downtime: ranked.byDown.map(rankedRow)
+    };
+  }
+  summary.ranking = ranking;
+
   return summary;
+}
+
+/** Flatten one ranked row into the shape the golden files use. */
+function rankedRow(row) {
+  return {
+    rank: row.rank,
+    key: row.key,
+    count: row.count,
+    attributed_s: round(row.attributed_s),
+    wallclock_s: round(row.wallclock_s),
+    pct: round6(row.pct),
+    cum: round6(row.cum)
+  };
+}
+
+// Percentages are compared to six decimal places. That is far tighter than
+// anything a chart shows, and loose enough that the last bit of floating point
+// does not cause a false alarm.
+function round6(n) {
+  return Math.round(n * 1e6) / 1e6;
 }
 
 // Seconds are whole numbers in practice. Rounding keeps floating point noise

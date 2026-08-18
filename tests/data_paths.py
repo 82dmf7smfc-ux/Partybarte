@@ -12,6 +12,11 @@ EXPECTED_JSON = DATA_DIR / "expected_summary.json"
 SETCLEAR_CSV = DATA_DIR / "sample_setclear_log.csv"
 EXPECTED_SETCLEAR_JSON = DATA_DIR / "expected_setclear.json"
 
+# A log that spans both daylight saving changes and carries one impossible
+# date. It exists to keep the two tools reading timestamps the same way.
+DST_CSV = DATA_DIR / "sample_dst_log.csv"
+EXPECTED_DST_JSON = DATA_DIR / "expected_dst.json"
+
 # The vendor config that ships inside the package.
 CONFIG_PATH = Path(__file__).parents[1] / "alarm_pareto" / "config" / "vendor_columns.json"
 

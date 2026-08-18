@@ -95,7 +95,11 @@ is copied and nothing is rewritten, so the check cannot go stale. If someone
 edits the math in the HTML, the check sees the edit.
 
 `tools/check_parity.mjs` then runs the real browser code over the sample logs and
-compares every number to the same golden files the Python tests use. Run it with:
+compares every number to the same golden files the Python tests use. That means
+the group totals, and also the ranking itself: the order rows appear in, the
+percent each carries, the running cumulative percent, and the "Other" bucket
+that holds everything past the top N. Comparing only the totals would miss the
+part of the output people actually read. Run it with:
 
     node tools/check_parity.mjs
 
@@ -133,10 +137,22 @@ nobody rediscovers them the hard way.
    rows to the trailing window and then pairs set and clear rows. The browser
    tool pairs first and then filters occurrences. On the sample logs both give
    the same answer. On a log where a set falls outside the window and its clear
-   falls inside, they would not. Nothing has hit this yet.
+   falls inside, they would not. Nothing has hit this yet, and no fixture covers
+   it, so the parity check would not notice.
 
 Neither is fixed here, because fixing either one changes numbers users have
 seen. That is a decision for the person who owns the tool, not for a cleanup.
+
+## What the parity check still does not cover
+
+Worth knowing, so the green tick is not read as more than it is.
+
+- Only three logs are checked. A vendor format nobody has written a fixture for
+  is not covered.
+- The Excel and PowerPoint output is checked for structure by the end to end
+  test, not compared number by number against the browser tool.
+- The window difference above has no fixture, on purpose, because writing one
+  would fail and the fix is a decision, not a cleanup.
 
 ## Moving this to another project
 

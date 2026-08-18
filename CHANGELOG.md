@@ -6,6 +6,27 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+- **The browser tool measured downtime differently depending on the timezone of
+  the machine reading the log.** It built timestamps in local time, so an alarm
+  spanning a daylight saving change came out an hour short next to the Python
+  tool. Timestamps are now read as UTC, which is plain clock time and matches
+  the Python tool everywhere. Only logs spanning a daylight saving change are
+  affected, and those numbers were wrong before.
+- **The browser tool turned impossible dates into real ones.** February 30th
+  became March 2nd and month 13 became January of the next year, inventing
+  alarms that never happened. Those rows are now rejected and reported as
+  unreadable, which is what the Python tool already did.
+- **The browser tool showed a wrong percent and a wrong cumulative line on the
+  count Pareto chart.** The count ranking and the downtime ranking were built
+  from the same objects, so whichever was built second overwrote the first one's
+  rank, percent and cumulative percent. Any fault near the top of both rankings
+  was affected, in the on-screen table and in the CSV export. The chart bars
+  were right. The cumulative line was not.
+- **Faults with equal counts could rank in a different order in each tool.**
+  Python ordered them by however pandas grouped them, the browser tool by the
+  order they appeared in the file. Both tools now break ties by name.
+
 ### Added
 - Parity check between the browser tool and the Python tool. `tools/check_parity.mjs`
   runs the real JavaScript out of `alarm_pareto.html` on plain Node and compares
@@ -18,7 +39,16 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - `tests/data/sample_setclear_log.csv` and `tests/data/expected_setclear.json`,
   a hand-worked golden case covering a simple pair, two alarms open at once, a
   clear with no matching set, and a set that never clears.
-- CI now runs the parity check on every push and pull request.
+- The parity check now compares the ranking itself, not only the group totals.
+  Order, percent, cumulative percent and the "Other" bucket past the top N are
+  all checked, at a top N small enough to force that bucket. This is what caught
+  the percent bug above. The check grew from 76 compared values to 512.
+- `tests/data/sample_dst_log.csv` and `tests/data/expected_dst.json`, a log
+  spanning both daylight saving changes and carrying one impossible date. It
+  exists to keep the two tools reading timestamps the same way.
+- CI now runs the parity check on every push and pull request, three times,
+  under three timezones, and runs the Python suite under a timezone that
+  observes daylight saving.
 - A working agreement for Claude Code. `CLAUDE.md` holds the project rules,
   `.claude/hooks/` enforces the ones that must never be broken, and
   `.claude/skills/` holds step by step procedures for recurring jobs.
