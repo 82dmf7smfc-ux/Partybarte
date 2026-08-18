@@ -7,6 +7,11 @@ DATA_DIR = Path(__file__).parent / "data"
 SAMPLE_CSV = DATA_DIR / "sample_alarm_log.csv"
 EXPECTED_JSON = DATA_DIR / "expected_summary.json"
 
+# The set and clear log, and its golden numbers. The browser tool is checked
+# against this same file by tools/check_parity.mjs.
+SETCLEAR_CSV = DATA_DIR / "sample_setclear_log.csv"
+EXPECTED_SETCLEAR_JSON = DATA_DIR / "expected_setclear.json"
+
 # The vendor config that ships inside the package.
 CONFIG_PATH = Path(__file__).parents[1] / "alarm_pareto" / "config" / "vendor_columns.json"
 
@@ -14,3 +19,8 @@ CONFIG_PATH = Path(__file__).parents[1] / "alarm_pareto" / "config" / "vendor_co
 def load_expected():
     """Return the golden expected values as a dictionary."""
     return json.loads(EXPECTED_JSON.read_text(encoding="utf-8"))
+
+
+def load_expected_setclear():
+    """Return the golden values for the set and clear sample log."""
+    return json.loads(EXPECTED_SETCLEAR_JSON.read_text(encoding="utf-8"))

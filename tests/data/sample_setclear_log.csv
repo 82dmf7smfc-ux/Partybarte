@@ -1,0 +1,9 @@
+EventTime,AlarmID,AlarmText,ChamberID,EventState
+2026-02-10 08:00:00,E101,Chamber over temperature,CH-A,SET
+2026-02-10 10:00:00,E101,Chamber over temperature,CH-A,CLEAR
+2026-02-11 08:00:00,E202,Gas flow deviation,CH-B,SET
+2026-02-11 09:00:00,E101,Chamber over temperature,CH-A,SET
+2026-02-11 11:00:00,E202,Gas flow deviation,CH-B,CLEAR
+2026-02-11 12:00:00,E101,Chamber over temperature,CH-A,CLEAR
+2026-02-12 06:00:00,E303,RF power fault,CH-C,CLEAR
+2026-02-13 07:00:00,E404,Vacuum pump warning,CH-C,SET

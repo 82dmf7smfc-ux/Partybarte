@@ -1,0 +1,43 @@
+{
+  "_note": "Golden values for sample_setclear_log.csv, the set and clear pairing case. Worked out by hand. Both the Python tool and the browser tool are checked against this file. Downtime is in seconds. The log exercises four things on purpose: a simple pair, two alarms open at the same time on different chambers, a clear with no matching set, and a set that never clears.",
+
+  "_by_hand": {
+    "E101 on CH-A, first": "08:00 to 10:00 on Feb 10 is 7200 s",
+    "E101 on CH-A, second": "09:00 to 12:00 on Feb 11 is 10800 s",
+    "E202 on CH-B": "08:00 to 11:00 on Feb 11 is 10800 s",
+    "E303 on CH-C": "a clear with no open set. Skipped on purpose, so E303 does not appear at all",
+    "E404 on CH-C": "a set that never clears. Counted as one occurrence with zero downtime",
+    "grand wallclock": "On Feb 11 the E202 interval 08:00 to 11:00 overlaps the E101 interval 09:00 to 12:00. Merged they cover 08:00 to 12:00, which is 14400 s. Add the 7200 s on Feb 10 for 21600 s total. Attributed does not merge, so it stays at 28800 s."
+  },
+
+  "window": {
+    "window_days": 30,
+    "window_start": "2026-01-14 07:00:00",
+    "window_end": "2026-02-13 07:00:00",
+    "windowed_row_count": 4
+  },
+
+  "grand": {
+    "total_faults": 4,
+    "attributed_downtime_s": 28800,
+    "wallclock_downtime_s": 21600
+  },
+
+  "fault_code": {
+    "count": {"E101": 2, "E202": 1, "E404": 1},
+    "attributed_s": {"E101": 18000, "E202": 10800, "E404": 0},
+    "wallclock_s": {"E101": 18000, "E202": 10800, "E404": 0}
+  },
+
+  "description": {
+    "count": {"Chamber over temperature": 2, "Gas flow deviation": 1, "Vacuum pump warning": 1},
+    "attributed_s": {"Chamber over temperature": 18000, "Gas flow deviation": 10800, "Vacuum pump warning": 0},
+    "wallclock_s": {"Chamber over temperature": 18000, "Gas flow deviation": 10800, "Vacuum pump warning": 0}
+  },
+
+  "equipment": {
+    "count": {"CH-A": 2, "CH-B": 1, "CH-C": 1},
+    "attributed_s": {"CH-A": 18000, "CH-B": 10800, "CH-C": 0},
+    "wallclock_s": {"CH-A": 18000, "CH-B": 10800, "CH-C": 0}
+  }
+}

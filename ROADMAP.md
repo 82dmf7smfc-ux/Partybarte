@@ -4,6 +4,18 @@ This file captures ideas for later work. It is a living list. Add to it as you
 learn what the bench actually needs. Nothing here is a promise. It is a place to
 keep good ideas so they are not lost between sessions.
 
+## Done
+
+These were on the list and are now in place. They are kept here so the history
+of the list makes sense.
+
+- **Shared golden fixtures.** `tests/data/expected_summary.json` and
+  `tests/data/expected_setclear.json` now govern both tools.
+  `tools/check_parity.mjs` runs the real browser code and compares it to the
+  same numbers the Python tests use. See `docs/claude-system.md`.
+- **Tests for the set/clear pairing path and the paired-interval path.** See
+  `tests/test_pairing.py`.
+
 ## Guiding goals
 
 - Keep both tools fully offline. No network calls at runtime.
@@ -20,9 +32,6 @@ keep good ideas so they are not lost between sessions.
   local storage, so a repeat import needs no setup.
 - **More timestamp formats.** Add any date styles that real tools use but the
   current parser misses. Each new format is a small, safe addition.
-- **Shared golden fixtures.** Put the sample log and its expected numbers in one
-  place that both the Python tests and a browser self-test read. This proves the
-  two tools agree, forever.
 
 ## Medium term
 
@@ -34,6 +43,18 @@ keep good ideas so they are not lost between sessions.
   repair per fault and per module. These are common asks in tool health reviews.
 - **Pareto knee callout.** Mark the fault where the cumulative line crosses 80
   percent, so the "vital few" are obvious at a glance.
+
+## Known differences between the two tools
+
+Written down so nobody rediscovers them the hard way. Neither is fixed, because
+fixing either changes numbers users have already seen.
+
+- The browser tool has no paired-interval mode. It handles a duration column or
+  separate set and clear rows, and nothing else.
+- The window is applied at a different point. Python filters raw rows and then
+  pairs set and clear rows. The browser tool pairs first and then filters. On a
+  log where a set falls outside the window and its clear falls inside, the two
+  would disagree. Nothing has hit this yet.
 
 ## Longer term
 
@@ -47,6 +68,4 @@ keep good ideas so they are not lost between sessions.
 ## Engineering hygiene
 
 - Add a code formatter and a linter check to CI once the team agrees on a style.
-- Add tests for the set/clear pairing path and the paired-interval path in the
-  Python suite, to match the coverage the browser tool already exercises.
 - Choose and add a license file. The project has none yet.
