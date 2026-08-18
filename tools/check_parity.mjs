@@ -17,68 +17,21 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./browser_core.mjs";
 import { summarize, builtInSample } from "./browser_summary.mjs";
+import { browserMapping } from "./vendor_mapping.mjs";
 
 const DATA = join(ROOT, "tests", "data");
 
 // Keys in a golden file that are notes for a human, not values to compare.
 const IGNORED_KEYS = new Set(["_note", "_by_hand", "_ranking_note"]);
 
-// The two logs we check, and how the browser tool should be told to read them.
-// The first is the duration case, where the log already says how long each
-// alarm lasted. The second is the set and clear case, where each alarm appears
-// as two rows that have to be paired.
+// The logs we check, and which vendor block in the shared config says how to
+// read each one. Naming the vendor rather than restating the columns means the
+// check reads the same configuration the Python tool reads. If that config is
+// wrong, the check notices instead of agreeing with itself.
 const SCENARIOS = [
-  {
-    name: "duration log",
-    csv: join(DATA, "sample_alarm_log.csv"),
-    golden: join(DATA, "expected_summary.json"),
-    mapping: {
-      ts_set: "EventTime",
-      fault_code: "AlarmID",
-      description: "AlarmText",
-      equipment: "ChamberID",
-      downMode: "duration",
-      durCol: "DownSeconds",
-      durScale: 1,
-      stateCol: "",
-      setVal: "SET",
-      clearVal: "CLEAR"
-    }
-  },
-  {
-    name: "set and clear log",
-    csv: join(DATA, "sample_setclear_log.csv"),
-    golden: join(DATA, "expected_setclear.json"),
-    mapping: {
-      ts_set: "EventTime",
-      fault_code: "AlarmID",
-      description: "AlarmText",
-      equipment: "ChamberID",
-      downMode: "events",
-      durCol: "",
-      durScale: 1,
-      stateCol: "EventState",
-      setVal: "SET",
-      clearVal: "CLEAR"
-    }
-  },
-  {
-    name: "daylight saving log",
-    csv: join(DATA, "sample_dst_log.csv"),
-    golden: join(DATA, "expected_dst.json"),
-    mapping: {
-      ts_set: "EventTime",
-      fault_code: "AlarmID",
-      description: "AlarmText",
-      equipment: "ChamberID",
-      downMode: "events",
-      durCol: "",
-      durScale: 1,
-      stateCol: "EventState",
-      setVal: "SET",
-      clearVal: "CLEAR"
-    }
-  }
+  { name: "duration log", csv: "sample_alarm_log.csv", golden: "expected_summary.json", vendor: "amat" },
+  { name: "set and clear log", csv: "sample_setclear_log.csv", golden: "expected_setclear.json", vendor: "amat_setclear_example" },
+  { name: "daylight saving log", csv: "sample_dst_log.csv", golden: "expected_dst.json", vendor: "amat_setclear_example" }
 ];
 
 const problems = [];
@@ -150,9 +103,10 @@ if (normalize(fileSample) !== normalize(builtInSample())) {
 // Check 2. Every scenario's numbers must match its golden file.
 // ---------------------------------------------------------------------------
 for (const scenario of SCENARIOS) {
-  const expected = JSON.parse(readFileSync(scenario.golden, "utf8"));
-  const text = readFileSync(scenario.csv, "utf8");
-  const actual = summarize(text, expected.window.window_days, scenario.mapping);
+  const expected = JSON.parse(readFileSync(join(DATA, scenario.golden), "utf8"));
+  const text = readFileSync(join(DATA, scenario.csv), "utf8");
+  const mapping = browserMapping(scenario.vendor);
+  const actual = summarize(text, expected.window.window_days, mapping);
   compare(actual, expected, scenario.name);
 }
 

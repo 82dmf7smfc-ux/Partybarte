@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Check the project's hard rules before a commit is made.
+#
+# This catches what an editor guard cannot see. A file written by a shell
+# redirect, a sed command, or by hand never passes through the editor, but it
+# does pass through here.
+#
+# Turn it on once, in your clone:
+#
+#     git config core.hooksPath .githooks
+#
+# To commit anyway in an emergency, use git commit --no-verify. Continuous
+# integration runs the same check on every push, so anything skipped here is
+# caught before it can be merged.
+
+set -u
+root="$(git rev-parse --show-toplevel)"
+cd "$root" || exit 0
+
+python=""
+for c in .venv/bin/python .venv/Scripts/python.exe python3 python; do
+  if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then python="$c"; break; fi
+done
+
+if [ -z "$python" ]; then
+  echo "pre-commit: no Python found, skipping the rules check."
+  echo "  Continuous integration will still run it."
+  exit 0
+fi
+
+"$python" tools/check_rules.py --staged || exit 1
+
+# If the analysis changed, the two tools must still agree. This needs Node,
+# which is not needed to use either tool, so it is skipped when absent.
+if git diff --cached --name-only | grep -qE '^(alarm_pareto/|alarm_pareto\.html|tests/data/)'; then
+  if command -v node >/dev/null 2>&1; then
+    node tools/check_parity.mjs || {
+      echo ""
+      echo "pre-commit: the browser tool and the golden numbers disagree."
+      echo "  Fix the cause. Do not edit a golden file to make this pass unless"
+      echo "  you have confirmed the new numbers by hand."
+      exit 1
+    }
+  else
+    echo "pre-commit: Node not found, skipping the parity check."
+  fi
+fi

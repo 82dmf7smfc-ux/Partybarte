@@ -33,6 +33,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Check the project's hard rules
+        # The real gate for the rules in CLAUDE.md. The editor guard and the
+        # git hook are both easy to bypass or skip. This is not.
+        run: python tools/check_rules.py
+
       - name: Set up Node for the browser parity check
         uses: actions/setup-node@v4
         with:

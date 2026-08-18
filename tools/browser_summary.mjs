@@ -4,29 +4,15 @@
 // browser tool and the Python tool can be checked against one golden file.
 //
 // Usage:
-//   node tools/browser_summary.mjs [path-to-csv] [window-days] [top-n]
+//   node tools/browser_summary.mjs [path-to-csv] [window-days] [vendor]
 //
-// With no arguments it uses the project's sample log and a 30 day window.
+// With no arguments it uses the project's sample log, a 30 day window, and the
+// "amat" vendor block from alarm_pareto/config/vendor_columns.json.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadBrowserCore, ROOT } from "./browser_core.mjs";
-
-// The column mapping for the sample log. These are the same names the "amat"
-// block in alarm_pareto/config/vendor_columns.json uses, so both tools read the
-// file the same way.
-const SAMPLE_MAPPING = {
-  ts_set: "EventTime",
-  fault_code: "AlarmID",
-  description: "AlarmText",
-  equipment: "ChamberID",
-  downMode: "duration",
-  durCol: "DownSeconds",
-  durScale: 1,
-  stateCol: "",
-  setVal: "SET",
-  clearVal: "CLEAR"
-};
+import { browserMapping } from "./vendor_mapping.mjs";
 
 const LEVELS = ["fault_code", "description", "equipment"];
 
@@ -40,7 +26,7 @@ const NO_COLLAPSE = 100000;
 // the uncollapsed totals would never touch it.
 const RANKING_TOP_N = 2;
 
-export function summarize(csvText, windowDays = 30, mapping = SAMPLE_MAPPING, method = "attributed") {
+export function summarize(csvText, windowDays = 30, mapping = browserMapping("amat"), method = "attributed") {
   const core = loadBrowserCore();
 
   const parsed = core.parseDelimited(csvText);
@@ -130,6 +116,8 @@ const isMain = process.argv[1] && process.argv[1].endsWith("browser_summary.mjs"
 if (isMain) {
   const csvPath = process.argv[2] || join(ROOT, "tests", "data", "sample_alarm_log.csv");
   const windowDays = Number(process.argv[3] || 30);
+  const vendor = process.argv[4] || "amat";
   const text = readFileSync(csvPath, "utf8");
-  process.stdout.write(JSON.stringify(summarize(text, windowDays), null, 2) + "\n");
+  const summary = summarize(text, windowDays, browserMapping(vendor));
+  process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
 }

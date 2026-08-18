@@ -3,7 +3,12 @@
 
 Claude Code runs this when Claude is about to stop. If the analysis code was
 touched and a check is failing, this sends Claude back to fix it instead of
-letting a broken change sit in the working tree.
+leaving a broken change behind.
+
+"Touched" means changed anywhere in this branch's work, not just sitting
+uncommitted. An earlier version of this hook only looked at the working tree,
+so it went quiet the moment anything was committed, which is exactly when a
+mistake becomes easy to miss.
 
 Only checks that can actually run here are run. On a machine with no packages
 installed the Python suite is skipped rather than reported as a failure.
@@ -38,7 +43,26 @@ def run(cmd, timeout=180):
         return None, str(exc)
 
 
-def changed_files():
+def find_trunk():
+    """Find a trunk to compare this branch against, or None.
+
+    Clones are not all alike. A full clone has origin/main. A clone made for one
+    branch may have no trunk at all. Returning None is a normal answer, not an
+    error, and the caller handles it by checking everything.
+    """
+    code, out = run(["git", "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"], timeout=30)
+    if code == 0 and out.strip():
+        return out.strip()
+
+    for ref in ("origin/main", "origin/master", "main", "master"):
+        code, _ = run(["git", "rev-parse", "--verify", "--quiet", ref], timeout=30)
+        if code == 0:
+            return ref
+    return None
+
+
+def uncommitted_files():
+    """Files changed in the working tree, staged or not."""
     code, out = run(["git", "status", "--porcelain"], timeout=30)
     if code != 0:
         return []
@@ -49,6 +73,37 @@ def changed_files():
             name = name.split("->")[-1].strip()
         names.append(name)
     return names
+
+
+def changed_files():
+    """Return (files, scope_is_known).
+
+    Committing is not the same as being finished, so this looks at everything
+    the branch has touched, not just what is still uncommitted. An earlier
+    version looked only at the working tree and went quiet the moment anything
+    was committed, which is when a mistake is easiest to miss.
+
+    When there is no trunk to compare against, scope_is_known is False. The
+    caller then runs the checks anyway. Running a fast check that was not needed
+    costs a second. Skipping one that was needed costs a wrong number on a
+    slide.
+    """
+    names = set(uncommitted_files())
+
+    trunk = find_trunk()
+    if trunk is None:
+        return sorted(names), False
+
+    code, base = run(["git", "merge-base", "HEAD", trunk], timeout=30)
+    if code != 0 or not base.strip():
+        return sorted(names), False
+
+    code, out = run(["git", "diff", "--name-only", base.strip(), "HEAD"], timeout=30)
+    if code != 0:
+        return sorted(names), False
+
+    names.update(line.strip() for line in out.splitlines() if line.strip())
+    return sorted(names), True
 
 
 def python_can_run():
@@ -66,9 +121,12 @@ def main():
     # Already sent Claude back once. Do not do it again.
     already_blocked = bool(event.get("stop_hook_active"))
 
-    changed = changed_files()
+    changed, scope_known = changed_files()
     touched = [f for f in changed if f.startswith(ANALYSIS_PATHS)]
-    if not touched:
+
+    # With no trunk to compare against we cannot tell what this branch changed,
+    # so we check anyway rather than assume there is nothing to check.
+    if scope_known and not touched:
         return 0
 
     failures = []

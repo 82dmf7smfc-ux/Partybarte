@@ -85,6 +85,18 @@ The release workflow runs the tests, builds the two zip packages, and attaches
 them to a new GitHub Release. It uses `tools/build_zips.py`, so the packages are
 the same every time.
 
+## Turn on the commit check
+
+Once, in your clone:
+
+    git config core.hooksPath .githooks
+
+That runs the project's hard rules before each commit, and the parity check when
+the analysis changed. It is the same check continuous integration runs, so
+turning it on saves a round trip. You can run it by hand any time:
+
+    python tools/check_rules.py
+
 ## Working with Claude Code
 
 This project carries its own rules for Claude Code in `CLAUDE.md`, with hooks in

@@ -16,6 +16,10 @@ rules that matter from prose into code.
     .claude/hooks/guard_edit.py     blocks edits that break a hard rule
     .claude/hooks/verify_stop.py    runs the checks before the session ends
     .claude/skills/                 step by step procedures for recurring jobs
+    .githooks/pre-commit            checks the rules before a commit is made
+    tools/project_rules.py          the rules themselves, in one place
+    tools/check_rules.py            applies the rules to files on disk
+    tools/vendor_mapping.mjs        reads the shared vendor config
     tools/browser_core.mjs          loads the browser code so it can be tested
     tools/browser_summary.mjs       runs the browser analysis, prints JSON
     tools/check_parity.mjs          compares the browser tool to the golden files
@@ -37,8 +41,23 @@ delivery network and breaks the one thing that makes the tool usable on a bench.
 Context can be forgotten in a long session. Hooks cannot. They run every time,
 outside the model's judgment.
 
-**`guard_edit.py`** runs before every file write. It blocks four things
-outright, because each one makes the tool unusable rather than merely untidy:
+The rules live in `tools/project_rules.py`, in one place, and are applied from
+three directions so they cannot be worked around by accident:
+
+1. `.claude/hooks/guard_edit.py` checks an edit before it is written. Fast
+   feedback, but it only sees edits made through the editor.
+2. `.githooks/pre-commit` checks the files on disk before a commit. This catches
+   what the editor never saw: a shell redirect, a sed command, a hand edit. Turn
+   it on once with `git config core.hooksPath .githooks`.
+3. Continuous integration runs `python tools/check_rules.py` on every push. This
+   is the real gate. A local hook can be skipped with `--no-verify` or never
+   installed at all. CI cannot.
+
+That layering matters. An earlier version of this setup had only the editor
+guard, and every file written by a shell command went straight past it.
+
+**The rules that block outright**, because each one makes the tool unusable
+rather than merely untidy:
 
 1. Anything that reaches the network in shipped code. No `requests`, no
    `urllib`, no `fetch`, no remote URL.
@@ -60,9 +79,15 @@ which one it was in by failing halfway through a task.
 
 **`verify_stop.py`** runs when Claude is about to finish. If any analysis file
 changed, it runs the parity check and the test suite. If something fails, Claude
-is sent back to fix it rather than leaving a broken change in the tree. It
-blocks at most once, so a check that cannot pass does not loop forever. It also
-notices when the analysis changed but the changelog did not.
+is sent back to fix it rather than leaving a broken change behind. It blocks at
+most once, so a check that cannot pass does not loop forever. It also notices
+when the analysis changed but the changelog did not.
+
+"Changed" means anywhere in this branch's work, not just still uncommitted. An
+earlier version looked only at the working tree, so it went quiet the moment
+anything was committed, which is when a mistake is easiest to miss. When there
+is no trunk to compare against, which happens in a clone made for a single
+branch, it runs the checks anyway rather than assume there is nothing to do.
 
 ### Layer 3. Procedures, in `.claude/skills/`
 
@@ -74,6 +99,13 @@ A skill is a set of steps that loads when the work matches its description.
 | `add-vendor` | a new log format, or a wrong column mapping |
 | `offline-setup` | packages are missing or pip cannot reach an index |
 | `cut-a-release` | tagging, shipping, or building the packages |
+
+`tests/test_project_setup.py` checks that each skill is well formed, that its
+name matches its folder, and that its description says when to use it rather
+than only what it is about. It does not prove a skill loads at the right moment.
+That depends on a model reading the description and choosing it, so it needs an
+eval that runs the model, not a unit test. The description checks are the part
+that can be tested offline.
 
 `change-the-analysis` is the important one. It carries the rule that both copies
 of the math change together, that expected numbers are worked out by hand first,
@@ -162,9 +194,11 @@ The parity harness is specific to this project. The other three layers transfer.
 2. In `CLAUDE.md`, write down what is true about the project that the code does
    not say. The test is whether a competent stranger would guess it. If they
    would not, it belongs in the file.
-3. In `guard_edit.py`, edit the constants at the top. `APPROVED_PACKAGES`,
-   `RUNTIME_PREFIXES`, and the checks themselves. Keep the split between
-   blocking and warning. Block only what makes the product wrong.
+3. In `tools/project_rules.py`, edit the constants at the top.
+   `APPROVED_PACKAGES`, `RUNTIME_PREFIXES`, and the checks themselves. Keep the
+   split between blocking and warning. Block only what makes the product wrong.
+   Wire `tools/check_rules.py` into CI, because that is the layer that actually
+   holds.
 4. Write a skill for anything explained more than twice.
 5. Before trusting any hook, do two things. Feed it a violation and confirm it
    blocks. Then replay every existing file in the repo through it and confirm it

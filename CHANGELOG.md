@@ -26,8 +26,23 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - **Faults with equal counts could rank in a different order in each tool.**
   Python ordered them by however pandas grouped them, the browser tool by the
   order they appeared in the file. Both tools now break ties by name.
+- The check that runs when a session ends went quiet as soon as anything was
+  committed, because it only looked at the working tree. It now looks at
+  everything the branch has touched, and checks anyway when it cannot tell.
+- The parity check kept its own copy of the vendor column mapping, so it could
+  have passed while `vendor_columns.json` said something different. It now reads
+  that config, which makes the config the only copy.
 
 ### Added
+- The project's hard rules now live in one place, `tools/project_rules.py`, and
+  are applied from three directions: before an edit, before a commit through
+  `.githooks/pre-commit`, and on every push in CI. Previously only edits made
+  through the editor were checked, so anything written by a shell command went
+  straight past. CI is the layer that actually holds, because a local hook can
+  be skipped or never installed.
+- `tests/test_project_setup.py`, which checks the hooks parse, the rules still
+  block what they must, the rules flag nothing already in the project, and each
+  skill is well formed with a description that says when to use it.
 - Parity check between the browser tool and the Python tool. `tools/check_parity.mjs`
   runs the real JavaScript out of `alarm_pareto.html` on plain Node and compares
   every number to the same golden files the Python tests use. Nothing is copied,
