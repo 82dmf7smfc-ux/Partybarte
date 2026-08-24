@@ -256,6 +256,15 @@ The same tests run automatically on GitHub for every push and pull request. See
 
 ## Downloads
 
-Packaged versions of both tools are published on the GitHub Releases page. Each
-release has two zip files. One holds the browser tool. One holds the Python
-tool. To build them yourself, run `python tools/build_zips.py`.
+Packaged versions are published on the GitHub Releases page. Each release has
+three zip files:
+
+| Zip | Holds |
+|---|---|
+| `alarm_pareto_browser.zip` | The single-file Pareto browser tool and a sample log. |
+| `alarm_pareto_python.zip` | The Python package and its tests. |
+| `pm_logger.zip` | The PM Round Logger, its read me, and the tablet capability test. |
+
+To build them yourself, run `python tools/build_zips.py`. Output lands in
+`dist/`, which is not tracked in git because the script rebuilds it identically
+from source every time.

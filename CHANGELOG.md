@@ -25,6 +25,11 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+- `tools/build_zips.py` now also builds `dist/pm_logger.zip`, holding the
+  logger, its read me, the tablet capability test and a screenshot. The release
+  workflow attaches it alongside the two existing packages.
+- `docs/pm_logger_screenshot.png`, so the package explains itself to someone
+  opening it cold.
 - `pm_logger_capability_test.html`, a standalone offline page that reports what
   a browser opened from a local file is allowed to do, and whether a chosen
   backup folder is remembered across a restart. Kept alongside the logger so

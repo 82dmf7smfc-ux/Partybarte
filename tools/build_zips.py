@@ -1,6 +1,6 @@
-"""Build the two distributable zip packages.
+"""Build the distributable zip packages.
 
-This script makes the same two zip files every time, from the current source. It
+This script makes the same zip files every time, from the current source. It
 uses only the Python standard library, so it runs anywhere with no extra
 packages. The GitHub release workflow calls this script, and you can run it by
 hand too.
@@ -8,10 +8,11 @@ hand too.
     python tools/build_zips.py
 
 Output goes to the dist folder:
-    dist/alarm_pareto_browser.zip   the single-file browser tool
+    dist/alarm_pareto_browser.zip   the single-file Pareto browser tool
     dist/alarm_pareto_python.zip    the Python package and tests
+    dist/pm_logger.zip              the PM round logger and its read me
 
-Both packages leave out caches, the virtual environment, and generated output.
+Every package leaves out caches, the virtual environment, and generated output.
 """
 
 import shutil
@@ -62,6 +63,28 @@ def build_browser_zip():
     return target
 
 
+def build_pm_logger_zip():
+    """Build the PM Round Logger package.
+
+    Everything someone needs to walk a round on a tablet, and nothing else. The
+    logger itself is self-contained, so this is really just the tool plus the
+    instructions plus the one-off capability test.
+    """
+    target = DIST / "pm_logger.zip"
+    top = "pm_logger"
+    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
+        _add_file(zf, ROOT / "pm_logger.html", f"{top}/pm_logger.html")
+        _add_file(zf, ROOT / "packaging" / "pm_logger_READ_ME_FIRST.txt", f"{top}/READ_ME_FIRST.txt")
+        # Run once per tablet to find out whether this browser can write into a
+        # folder you choose, and whether it remembers that folder afterwards.
+        _add_file(zf, ROOT / "pm_logger_capability_test.html", f"{top}/pm_logger_capability_test.html")
+        # The screenshot is a nice-to-have. Include it only if it exists.
+        shot = ROOT / "docs" / "pm_logger_screenshot.png"
+        if shot.exists():
+            _add_file(zf, shot, f"{top}/screenshot.png")
+    return target
+
+
 def build_python_zip():
     """Build the Python package. The code, the tests, and the setup files."""
     target = DIST / "alarm_pareto_python.zip"
@@ -82,9 +105,10 @@ def main():
 
     browser = build_browser_zip()
     python = build_python_zip()
+    pm_logger = build_pm_logger_zip()
 
     print("Built:")
-    for path in (browser, python):
+    for path in (browser, python, pm_logger):
         size_kb = path.stat().st_size / 1024
         print(f"  {path.relative_to(ROOT)}  ({size_kb:.0f} KB)")
     return 0

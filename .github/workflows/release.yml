@@ -1,6 +1,6 @@
 name: Release
 
-# Builds the two zip packages and publishes them as a GitHub Release.
+# Builds the zip packages and publishes them as a GitHub Release.
 #
 # Two ways to start it:
 #   1. Push a version tag like v1.0.0.
@@ -58,5 +58,6 @@ jobs:
             --target main \
             dist/alarm_pareto_browser.zip \
             dist/alarm_pareto_python.zip \
+            dist/pm_logger.zip \
             --title "${VERSION}" \
             --generate-notes
