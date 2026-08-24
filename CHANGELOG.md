@@ -25,6 +25,10 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+- `pm_logger_capability_test.html`, a standalone offline page that reports what
+  a browser opened from a local file is allowed to do, and whether a chosen
+  backup folder is remembered across a restart. Kept alongside the logger so
+  the question can be re-answered on a new tablet or after a browser change.
 - PM Round Logger: version numbers. `APP_VERSION` is shown in the Data tab
   footnote and leads every diagnostics report, and the data records which
   version created it and which last touched it. A `migrateData()` hook exists

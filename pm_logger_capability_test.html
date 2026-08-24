@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablet capability test</title>
+<!--
+  PM Round Logger - tablet capability test
+  ========================================
+  pm_logger_capability_test.html
+
+  A companion to pm_logger.html. Answers one question that can only be
+  answered on the real tablet:
+  can a page opened from a local file write straight into a folder you
+  choose, and does it REMEMBER that folder tomorrow?
+
+  Double-click this file on the tablet, in the same browser you use for
+  the PM logger. Run the tests top to bottom. Then tell me what the
+  Result boxes say.
+
+  This file stores nothing except a folder handle, and only if you pick
+  one. It does not touch anything belonging to pm_logger.html, and it
+  makes no network calls. Keep it for the next tablet.
+-->
+<style>
+  body { font-family: Segoe UI, Tahoma, Arial, sans-serif; font-size: 16px;
+         margin: 0; background: #f4f6f8; color: #1b1f24; line-height: 1.45; }
+  header { background: #305496; color: #fff; padding: 14px 18px; }
+  header h1 { margin: 0; font-size: 20px; }
+  main { padding: 16px; max-width: 800px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid #d7dce2; border-radius: 8px;
+          padding: 16px; margin-bottom: 14px; }
+  h2 { font-size: 17px; margin: 0 0 8px; }
+  p { margin: 6px 0; }
+  button { font: inherit; background: #305496; color: #fff; border: 0;
+           border-radius: 6px; padding: 12px 18px; min-height: 48px;
+           width: 100%; cursor: pointer; margin-top: 8px; }
+  .out { margin-top: 10px; padding: 10px; border-radius: 6px; font-size: 15px;
+         background: #eef1f5; border: 1px solid #d7dce2; word-break: break-word; }
+  .out.good { background: #e8f5e9; border-color: #b7dfb9; color: #2e7d32; font-weight: 600; }
+  .out.bad  { background: #fdecec; border-color: #f2c4c4; color: #c00000; font-weight: 600; }
+  .hint { color: #5b6570; font-size: 14px; }
+  b.q { color: #b26a00; }
+</style>
+</head>
+<body>
+<header><h1>Tablet capability test</h1></header>
+<main>
+
+<div class="card">
+  <h2>What this browser says about itself</h2>
+  <div class="out" id="basics">checking...</div>
+</div>
+
+<div class="card">
+  <h2>Test 1 &mdash; Save As dialog</h2>
+  <p class="hint">Should open a normal Windows "Save as" box. Save it anywhere.
+     If this works, the logger can let you steer each export to a folder
+     instead of always dropping it in Downloads.</p>
+  <button onclick="testSaveAs()">Run test 1</button>
+  <div class="out" id="out1">not run yet</div>
+</div>
+
+<div class="card">
+  <h2>Test 2 &mdash; Pick a backup folder</h2>
+  <p class="hint">Should open a "Select folder" box. Pick your OneDrive PM
+     folder. It writes a small test file there and remembers the folder.</p>
+  <button onclick="testPickFolder()">Run test 2</button>
+  <div class="out" id="out2">not run yet</div>
+</div>
+
+<div class="card">
+  <h2>Test 3 &mdash; <b class="q">the one that matters</b></h2>
+  <p class="hint">After test 2, <b>close this page completely, reopen it, and
+     press this button without running test 2 again.</b> This tells us whether
+     the tablet remembers your folder tomorrow, or asks again every day.</p>
+  <button onclick="testWriteAgain()">Run test 3</button>
+  <div class="out" id="out3">not run yet</div>
+</div>
+
+</main>
+
+<script>
+"use strict";
+
+function show(id, text, kind) {
+  var box = document.getElementById(id);
+  box.textContent = text;
+  box.className = "out" + (kind ? " " + kind : "");
+}
+
+// --- what the browser supports -------------------------------------------
+(function () {
+  var lines = [];
+  lines.push("Browser: " + navigator.userAgent.slice(0, 90));
+  lines.push("Address: " + location.protocol);
+  lines.push("Save As available: " + (typeof window.showSaveFilePicker === "function" ? "yes" : "NO"));
+  lines.push("Folder picker available: " + (typeof window.showDirectoryPicker === "function" ? "yes" : "NO"));
+  var ls = "no";
+  try { localStorage.setItem("t", "1"); localStorage.removeItem("t"); ls = "yes"; } catch (e) { ls = "NO - " + e.name; }
+  lines.push("Local storage works: " + ls);
+  show("basics", lines.join("\n"));
+  document.getElementById("basics").style.whiteSpace = "pre-wrap";
+
+  // If a folder was remembered from a previous visit, say so straight away.
+  getHandle().then(function (h) {
+    if (h) show("out3", "A folder was remembered from a previous visit: \"" + h.name
+      + "\". Now press the button to see if it can be written to WITHOUT asking again.");
+  });
+})();
+
+// --- test 1: save as ------------------------------------------------------
+async function testSaveAs() {
+  if (typeof window.showSaveFilePicker !== "function") {
+    show("out1", "FAILED. This browser has no Save As support for local pages.", "bad"); return;
+  }
+  try {
+    var handle = await window.showSaveFilePicker({
+      suggestedName: "pm_test.csv",
+      types: [{ description: "CSV", accept: { "text/csv": [".csv"] } }]
+    });
+    var w = await handle.createWritable();
+    await w.write("Date,Tool,Value\n2026-08-24,Test,1.23\n");
+    await w.close();
+    show("out1", "WORKS. Saved \"" + handle.name + "\" where you chose.", "good");
+  } catch (e) {
+    if (e.name === "AbortError") show("out1", "You cancelled the dialog. Run it again and actually save, so we know.");
+    else show("out1", "FAILED: " + e.name + " - " + e.message, "bad");
+  }
+}
+
+// --- test 2: pick a folder and remember it --------------------------------
+async function testPickFolder() {
+  if (typeof window.showDirectoryPicker !== "function") {
+    show("out2", "FAILED. This browser has no folder picker for local pages.", "bad"); return;
+  }
+  try {
+    var dir = await window.showDirectoryPicker({ mode: "readwrite" });
+    var fh = await dir.getFileHandle("pm_test.csv", { create: true });
+    var w = await fh.createWritable();
+    await w.write("Date,Tool,Value\n2026-08-24,Test,1.23\n");
+    await w.close();
+    await putHandle(dir);
+    show("out2", "WORKS. Wrote pm_test.csv into \"" + dir.name + "\" and remembered the folder.\n"
+      + "Now CLOSE this page, reopen it, and run test 3.", "good");
+    document.getElementById("out2").style.whiteSpace = "pre-wrap";
+  } catch (e) {
+    if (e.name === "AbortError") show("out2", "You cancelled the dialog. Run it again and pick a folder.");
+    else show("out2", "FAILED: " + e.name + " - " + e.message, "bad");
+  }
+}
+
+// --- test 3: does the permission survive a restart? -----------------------
+async function testWriteAgain() {
+  var dir = await getHandle();
+  if (!dir) { show("out3", "No folder remembered. Run test 2 first.", "bad"); return; }
+
+  try {
+    var before = await dir.queryPermission({ mode: "readwrite" });
+    if (before === "granted") {
+      var fh = await dir.getFileHandle("pm_test2.csv", { create: true });
+      var w = await fh.createWritable();
+      await w.write("written with no prompt\n");
+      await w.close();
+      show("out3", "BEST CASE. The folder \"" + dir.name + "\" was still granted with no prompt at all.\n"
+        + "The logger can write your daily file straight there, zero taps.", "good");
+    } else {
+      var after = await dir.requestPermission({ mode: "readwrite" });
+      if (after === "granted") {
+        show("out3", "PARTLY. The folder was remembered, but it asked permission again ("
+          + before + " -> granted).\nThat means one extra tap every day.", "bad");
+      } else {
+        show("out3", "FAILED. Permission was refused (" + before + " -> " + after + ").", "bad");
+      }
+    }
+    document.getElementById("out3").style.whiteSpace = "pre-wrap";
+  } catch (e) {
+    show("out3", "FAILED: " + e.name + " - " + e.message, "bad");
+  }
+}
+
+// --- storing the folder handle in IndexedDB -------------------------------
+function openDb() {
+  return new Promise(function (res, rej) {
+    var q = indexedDB.open("pm_capability_test", 1);
+    q.onupgradeneeded = function () { q.result.createObjectStore("handles"); };
+    q.onsuccess = function () { res(q.result); };
+    q.onerror = function () { rej(q.error); };
+  });
+}
+async function putHandle(h) {
+  var db = await openDb();
+  return new Promise(function (res, rej) {
+    var tx = db.transaction("handles", "readwrite");
+    tx.objectStore("handles").put(h, "backupDir");
+    tx.oncomplete = function () { db.close(); res(); };
+    tx.onerror = function () { rej(tx.error); };
+  });
+}
+async function getHandle() {
+  try {
+    var db = await openDb();
+    return await new Promise(function (res, rej) {
+      var tx = db.transaction("handles", "readonly");
+      var r = tx.objectStore("handles").get("backupDir");
+      r.onsuccess = function () { db.close(); res(r.result || null); };
+      r.onerror = function () { rej(r.error); };
+    });
+  } catch (e) { return null; }
+}
+</script>
+</body>
+</html>

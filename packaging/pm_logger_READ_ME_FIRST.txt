@@ -265,6 +265,30 @@ It is there so that when you do send a report, the tool can be improved in the
 places you actually use.
 
 
+The tablet capability test
+--------------------------
+There is a second page in the project, pm_logger_capability_test.html. You do
+not need it to log a round. It answers one question that can only be answered
+on the real tablet: can this browser write straight into a folder you choose,
+and does it REMEMBER that folder tomorrow?
+
+That matters because if the answer is yes, exports could go directly into your
+OneDrive folder with no taps at all. If it only remembers until you close the
+browser, it is not worth building, and the Edge download-folder setting above
+stays the better answer.
+
+Run it when you first set up a tablet, or if IT changes the browser:
+
+  1. Double-click pm_logger_capability_test.html.
+  2. Run test 1, then test 2.
+  3. CLOSE the page completely, reopen it, then run test 3. The restart is the
+     whole point of the test - do not skip it.
+  4. Send on what the Result boxes say.
+
+It stores nothing except the folder you pick, and it cannot touch your
+readings. Keep it for the next tablet.
+
+
 Files in this folder
 --------------------
 pm_logger.html    The tool. This is the only file you need.
