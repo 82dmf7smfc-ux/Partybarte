@@ -64,32 +64,58 @@ gets fed made-up numbers.
 Leave min and max blank for a reading you just want logged, not checked.
 
 
-Getting the data onto your PC
------------------------------
-On the Data tab there are two export buttons.
+SET THIS UP ONCE: where the files land
+--------------------------------------
+Do this before anything else. It takes a minute and saves you a step every
+single day.
 
-  Export for Excel (CSV)      pm_readings_2026-08-24.csv
-  Export full backup (JSON)   pm_backup_2026-08-24.json
+  1. Make a folder for this on the PC side. A OneDrive folder is ideal,
+     something like:  Documents\OneDrive\PM Rounds
+  2. On the tablet, open Edge and go to:
+       Settings > Downloads > Location > Change
+     Point it at that folder.
+  3. While you are there, make sure "Ask me what to do with each download"
+     is turned OFF.
 
-Both save to the tablet's Downloads folder. The page tells you the filename.
-From there, move the file however you normally do - OneDrive, Teams, email, or
-a USB stick.
+Now every export lands straight in OneDrive and syncs to your PC on its own.
+No copying, no USB stick, no emailing it to yourself.
 
-One thing worth knowing: the tool itself never touches the network, but
-OneDrive, Teams and email do. If this data is sensitive, check that sending it
-that way is allowed, or use a USB stick or a mapped drive instead.
+Worth doing too: keep pm_logger.html itself in that same folder. Then the tool
+and its data travel together, and there is only one place to look.
+
+A page opened from a file cannot choose where a download goes. That is a
+browser security rule, not something the tool can work around. The Edge
+setting above is the way to control it.
+
+One more thing: the tool itself never touches the network, but OneDrive, Teams
+and email do. If this data is sensitive, check that sending it that way is
+allowed, or point the download folder at a USB stick or a mapped drive
+instead.
 
 
-Which export do I use?
-----------------------
-Use the CSV for Excel. Use it weekly.
+The three export buttons
+------------------------
+On the Data tab:
 
-Use the JSON before anything risky - swapping tablets, or letting IT touch the
-machine. It is an exact copy, including tools you have set up but never
-logged yet. The CSV cannot carry those, because a tool with no readings has
-no rows in it.
+  Export this round (CSV)          pm_round_2026-08-24.csv
+  Export everything for Excel      pm_readings_through_2026-08-24.csv
+  Export full backup (JSON)        pm_backup_through_2026-08-24.json
 
-Both can be imported back.
+USE THE FIRST ONE EVERY DAY. It holds that one day's round, and it is named
+for the day the readings were TAKEN, not the day you pressed the button. So
+if you back-fill a missed Tuesday on Thursday, the file is still named for the
+Tuesday. It also appears as a button on the "Round complete" card, so
+finishing the round and filing it is one tap.
+
+Use the second one when you want to chart a trend. It holds everything, in one
+file, ready to pivot.
+
+Use the third before anything risky - swapping tablets, or letting IT touch
+the machine. It is an exact copy, including tools you have set up but never
+logged yet. A CSV cannot carry those, because a tool with no readings has no
+rows in it.
+
+All three import back.
 
 
 Trending it in Excel
@@ -116,6 +142,22 @@ To chart it:
 
 To look at one tool only, drag Tool into Filters as well.
 
+
+The better way, once you have a few weeks of daily files
+--------------------------------------------------------
+If your daily round files are all piling up in one OneDrive folder, Excel can
+read the whole folder as a single table and keep itself up to date. Set this
+up once and you never export the "everything" file again.
+
+  1. In a new workbook: Data > Get Data > From File > From Folder.
+  2. Pick your PM Rounds folder. Click Combine > Combine & Load.
+
+Excel stacks every daily file into one table. Build your PivotTable on that.
+From then on, when new daily files appear in the folder, just open the
+workbook and click Data > Refresh All. The chart updates itself.
+
+This is built into Excel. There is nothing to install.
+
 To find every bad reading fast: select the header row, Data > Filter, then
 filter the Status column to LOW and HIGH.
 
@@ -123,8 +165,17 @@ filter the Status column to LOW and HIGH.
 Restoring after a wipe
 ----------------------
 1. Open pm_logger.html.
-2. Data tab > Import > pick your most recent export.
-3. Choose "Replace" if the tablet is empty, which it will be after a wipe.
+2. Data tab > Import.
+3. Pick your files. You can select MANY AT ONCE - press Ctrl+A in the folder
+   picker to take every daily round file you have. CSV and JSON can be mixed
+   in the same go.
+4. Choose "Replace" if the tablet is empty, which it will be after a wipe.
+
+It tells you how many tools, readings and days it found before changing
+anything, so you can back out if the number looks wrong.
+
+If one file in the batch is damaged or is not a PM export, it is skipped by
+name and the rest still go in.
 
 "Merge" is for when the tablet already has readings you want to keep. It adds
 days that are missing and leaves everything already on the tablet alone. It
@@ -146,6 +197,19 @@ page tracks them by a hidden id rather than by name.
 The one place names do matter is importing, since a file has names in it, not
 ids. So do not give two tools the same name. The Tools tab warns you if you
 do.
+
+
+Running out of room
+-------------------
+The Data tab shows how full the browser's storage is. For scale: eight tools
+with ten readings each, logged every working day, is about 0.36 MB a year, and
+the allowance is about 5 MB. So you have years.
+
+Two things worth knowing anyway. That allowance is SHARED with any other tool
+you open from a file on the same tablet. And if it ever does fill up, the page
+says so in red at the top rather than letting a save fail quietly. If you see
+that: export everything, then Erase all data, then import back just the recent
+months you still want on the tablet.
 
 
 Files in this folder

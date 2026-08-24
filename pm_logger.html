@@ -259,6 +259,19 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // because in that case closing the page loses the day's work.
 var STORAGE_OK = true;
 
+// Why the last save failed, if it did: "full" or "blocked".
+var STORAGE_PROBLEM = "";
+
+// Roughly how much room the browser gives us. Measured on Chrome and Edge, a
+// page opened from a local file gets about 5 MB - and that 5 MB is SHARED with
+// every other local HTML file on the tablet, so another tool storing things
+// eats into the same allowance.
+//
+// For scale: eight tools with ten readings each, logged every working day,
+// comes to about 0.36 MB a year. So this is years away. But a save that fails
+// silently in the middle of a round is bad enough to be worth watching for.
+var STORAGE_BUDGET = 5 * 1024 * 1024;
+
 // The whole data set lives in this one variable while the page is open.
 var DATA = blankData();
 
@@ -300,10 +313,21 @@ function save() {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
     STORAGE_OK = true;
+    STORAGE_PROBLEM = "";
   } catch (e) {
     STORAGE_OK = false;
+    // A full storage slot and a browser that blocks storage outright are very
+    // different problems, so tell them apart and say the right thing.
+    STORAGE_PROBLEM = (e.name === "QuotaExceededError") ? "full" : "blocked";
   }
   renderBanner();
+}
+
+// How much of the allowance the data currently takes up, as a percentage.
+function storagePercent() {
+  var used;
+  try { used = JSON.stringify(DATA).length; } catch (e) { return 0; }
+  return Math.round((used / STORAGE_BUDGET) * 100);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,12 +558,26 @@ function renderBanner() {
   var banner = document.getElementById("banner");
   var readings = countAllReadings();
 
-  // If the browser will not store anything, that beats every other message.
+  // A failed save beats every other message: the round in front of you is at
+  // risk right now, not at some point in the future.
   if (!STORAGE_OK) {
     banner.className = "banner show bad";
-    banner.innerHTML = "<span>This browser is blocking local storage, so nothing will be "
-      + "remembered after you close this page. Export before you close it.</span>"
-      + "<button class=\"small\" onclick=\"exportCsv()\">Export now</button>";
+    banner.innerHTML = "<span>" + (STORAGE_PROBLEM === "full"
+        ? "This tablet's storage for local pages is FULL, so your last entry may not have saved. "
+          + "Export everything now, then use Erase all data to start a clean slate."
+        : "This browser is blocking local storage, so nothing will be remembered after you close "
+          + "this page. Export before you close it.")
+      + "</span><button class=\"small\" onclick=\"exportAllCsv()\">Export everything</button>";
+    return;
+  }
+
+  // Getting close to full. Years away at a normal round size, but say so early
+  // rather than letting a save fail mid-round.
+  if (storagePercent() >= 80) {
+    banner.className = "banner show warn";
+    banner.innerHTML = "<span>Storage for local pages is " + storagePercent() + "% full. "
+      + "Export everything, then erase and re-import just the recent months.</span>"
+      + "<button class=\"small\" onclick=\"exportAllCsv()\">Export everything</button>";
     return;
   }
 
@@ -560,7 +598,7 @@ function renderBanner() {
 
   banner.className = "banner show " + tone;
   banner.innerHTML = "<span>" + esc(text) + "</span>"
-    + "<button class=\"small\" onclick=\"exportCsv()\">Export now</button>";
+    + "<button class=\"small\" onclick=\"exportRoundCsv()\">Export now</button>";
 }
 
 // Total number of readings actually typed in, across every day.
@@ -636,7 +674,7 @@ function renderToday() {
       + '<h2>Round complete</h2>'
       + '<p class="hint">Every tool is logged for this date. Get the readings off the tablet now, '
       + 'while you are thinking about it.</p>'
-      + '<div class="big-actions"><button onclick="exportCsv()">Export for Excel</button></div>'
+      + '<div class="big-actions"><button onclick="exportRoundCsv()">Export this round</button></div>'
       + '</div>';
   }
 
@@ -1201,26 +1239,33 @@ function renderData() {
 
   var html = '<div class="card">'
     + '<h2>What is stored on this tablet</h2>'
-    + '<p class="hint">' + DATA.tools.length + ' tools &middot; ' + days + ' days logged &middot; '
-    + readings + ' readings &middot; last export: '
+    + '<p class="hint">' + DATA.tools.length + (DATA.tools.length === 1 ? ' tool' : ' tools')
+    + ' &middot; ' + days + (days === 1 ? ' day' : ' days') + ' logged &middot; '
+    + readings + (readings === 1 ? ' reading' : ' readings') + ' &middot; last export: '
     + (DATA.lastExport === "" ? "never" : esc(DATA.lastExport)) + '</p>'
+    + '<p class="hint">Storage used: ' + storagePercent() + '% of what this browser allows '
+    + 'local pages. Shared with any other tool you open from a file on this tablet.</p>'
     + '</div>';
 
   html += '<div class="card">'
     + '<h2>Export</h2>'
-    + '<p class="hint">The CSV is the one you open in Excel. The JSON is an exact backup, '
-    + 'including tools you have set up but not logged yet. Take a JSON before anything risky, '
-    + 'like swapping tablets.</p>'
+    + '<p class="hint"><strong>The round file is the daily habit.</strong> One file per day, named '
+    + 'for the day the readings were taken. The everything file is the one you trend in Excel. '
+    + 'The JSON is an exact backup, including tools you have set up but never logged - take one '
+    + 'before anything risky, like swapping tablets.</p>'
     + '<div class="big-actions">'
-    + '<button onclick="exportCsv()">Export for Excel (CSV)</button>'
+    + '<button onclick="exportRoundCsv()">Export this round &mdash; ' + esc(CURRENT_DATE) + ' (CSV)</button>'
+    + '<button class="secondary" onclick="exportAllCsv()">Export everything for Excel (CSV)</button>'
     + '<button class="secondary" onclick="exportJson()">Export full backup (JSON)</button>'
     + '</div><div class="msg" id="exportMsg"></div></div>';
 
   html += '<div class="card">'
     + '<h2>Import</h2>'
-    + '<p class="hint">Pick a CSV or JSON file this tool exported earlier. Use this after a '
-    + 'browser wipe, or to move your data onto a different tablet.</p>'
-    + '<input type="file" id="importFile" accept=".csv,.json,text/csv,application/json" onchange="fileChosen()">'
+    + '<p class="hint">Pick one file, or select a whole folder of daily round files at once. '
+    + 'Use this after a browser wipe, or to move your data onto a different tablet. '
+    + 'CSV and JSON both work, and you can mix them.</p>'
+    + '<input type="file" id="importFile" multiple '
+    + 'accept=".csv,.json,text/csv,application/json" onchange="fileChosen()">'
     + '<div id="importChoice"></div>'
     + '<div class="msg" id="importMsg"></div></div>';
 
@@ -1244,16 +1289,19 @@ function renderData() {
 // To change which columns come out, edit the header row and the row built
 // just below it. Keep the two in the same order.
 // ---------------------------------------------------------------------------
-function buildCsv() {
+// Pass a date to get just that day's round. Pass null to get everything.
+function buildCsv(onlyDate) {
   var rows = [["Date", "Tool", "Data point", "Unit", "Value", "Min", "Max", "Status", "Saved at"]];
 
-  var dates = Object.keys(DATA.entries).sort();
+  var dates = onlyDate ? [onlyDate] : Object.keys(DATA.entries).sort();
   for (var d = 0; d < dates.length; d++) {
     var date = dates[d];
+    var day = DATA.entries[date];
+    if (!day) continue;
     // Walk the tools in round order, so the file reads the way you walk.
     for (var t = 0; t < DATA.tools.length; t++) {
       var tool = DATA.tools[t];
-      var entry = DATA.entries[date][tool.id];
+      var entry = day[tool.id];
       if (!entry) continue;
 
       for (var p = 0; p < tool.points.length; p++) {
@@ -1290,20 +1338,58 @@ function csvLine(row) {
   }).join(",");
 }
 
-function exportCsv() {
+// The daily habit: one file per round, named for THE DAY THE READINGS WERE
+// TAKEN, not the day you pressed the button. Back-fill a missed Tuesday on
+// Thursday and the file is still named for the Tuesday.
+function exportRoundCsv() {
+  var date = CURRENT_DATE;
+  if (countReadingsOnDate(date) === 0) {
+    setMsg("exportMsg", "err", "Nothing is logged for " + date + " yet, so there is nothing to export.");
+    return;
+  }
+  var name = "pm_round_" + date + ".csv";
+  downloadFile(buildCsv(date), name, "text/csv");
+  markExported(name, "exportMsg");
+}
+
+// Everything in one file, for trending in Excel. Named for the last day it
+// contains, so the name says what is actually inside it.
+function exportAllCsv() {
   if (countAllReadings() === 0) {
     setMsg("exportMsg", "err", "There are no readings to export yet.");
     return;
   }
-  var name = "pm_readings_" + todayStr() + ".csv";
-  downloadFile(buildCsv(), name, "text/csv");
+  var name = "pm_readings_through_" + lastLoggedDate() + ".csv";
+  downloadFile(buildCsv(null), name, "text/csv");
   markExported(name, "exportMsg");
 }
 
 function exportJson() {
-  var name = "pm_backup_" + todayStr() + ".json";
+  var name = "pm_backup_through_" + lastLoggedDate() + ".json";
   downloadFile(JSON.stringify(DATA, null, 2), name, "application/json");
   markExported(name, "exportMsg");
+}
+
+// How many readings were typed in on one particular day.
+function countReadingsOnDate(date) {
+  var day = DATA.entries[date];
+  if (!day) return 0;
+  var total = 0;
+  var toolIds = Object.keys(day);
+  for (var t = 0; t < toolIds.length; t++) {
+    var values = day[toolIds[t]].values;
+    var keys = Object.keys(values);
+    for (var k = 0; k < keys.length; k++) {
+      if (String(values[keys[k]]).trim() !== "") total++;
+    }
+  }
+  return total;
+}
+
+// The most recent day that has anything logged against it.
+function lastLoggedDate() {
+  var dates = Object.keys(DATA.entries).sort();
+  return dates.length > 0 ? dates[dates.length - 1] : todayStr();
 }
 
 // Remember that we exported today, so the reminder banner goes quiet.
@@ -1341,42 +1427,100 @@ function downloadFile(text, filename, mimeType) {
 // ---------------------------------------------------------------------------
 var PENDING_IMPORT = null;   // the parsed file, waiting for merge or replace
 
+// Read every file the user picked. Because the daily habit makes one file per
+// round, restoring a wiped tablet means picking a whole year of them at once,
+// so this takes as many as you like and rolls them into one import.
+//
+// A file that cannot be read does not sink the rest. It is reported by name
+// and the others still go in.
 function fileChosen() {
   var input = document.getElementById("importFile");
   if (!input.files || input.files.length === 0) return;
-  var file = input.files[0];
 
-  var reader = new FileReader();
-  reader.onerror = function () {
-    setMsg("importMsg", "err", "Could not read that file.");
-  };
-  reader.onload = function () {
-    var text = String(reader.result);
-    var parsed;
-    try {
-      parsed = (file.name.toLowerCase().indexOf(".json") !== -1 || text.trim().charAt(0) === "{")
-        ? parseBackupJson(text)
-        : parseReadingsCsv(text);
-    } catch (e) {
-      setMsg("importMsg", "err", "That file is not one this tool exported. " + e.message);
+  // Sort by name so importing the same folder twice behaves the same way.
+  // Daily files are named by date, so this also puts them in date order.
+  var files = [];
+  for (var i = 0; i < input.files.length; i++) files.push(input.files[i]);
+  files.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
+
+  var combined = { tools: [], rows: [] };
+  var problems = [];
+  var waitingFor = files.length;
+
+  setMsg("importMsg", "info", "Reading " + files.length + (files.length === 1 ? " file..." : " files..."));
+
+  // Called as each file finishes, whether it worked or not. When the last one
+  // is done, we show the merge or replace choice.
+  function oneFileDone() {
+    waitingFor = waitingFor - 1;
+    if (waitingFor > 0) return;
+
+    if (combined.tools.length === 0 && combined.rows.length === 0) {
+      setMsg("importMsg", "err", "Nothing could be read. " + problems.join("  "));
       return;
     }
-    if (parsed.tools.length === 0 && parsed.rows.length === 0) {
-      setMsg("importMsg", "err", "That file has no tools or readings in it.");
-      return;
-    }
-    PENDING_IMPORT = parsed;
-    askMergeOrReplace(file.name, parsed);
-  };
-  reader.readAsText(file);
+    PENDING_IMPORT = combined;
+    askMergeOrReplace(files.length === 1 ? files[0].name : files.length + " files", combined, problems);
+  }
+
+  files.forEach(function (file) {
+    var reader = new FileReader();
+    reader.onerror = function () {
+      problems.push(file.name + ": could not be read.");
+      oneFileDone();
+    };
+    reader.onload = function () {
+      var text = String(reader.result);
+      try {
+        var parsed = (file.name.toLowerCase().indexOf(".json") !== -1 || text.trim().charAt(0) === "{")
+          ? parseBackupJson(text)
+          : parseReadingsCsv(text);
+        // Duplicate tools across files are harmless: ensureTool() matches on
+        // name, so the second and later copies simply find the first one.
+        combined.tools = combined.tools.concat(parsed.tools);
+        combined.rows = combined.rows.concat(parsed.rows);
+      } catch (e) {
+        problems.push(file.name + ": " + e.message);
+      }
+      oneFileDone();
+    };
+    reader.readAsText(file);
+  });
 }
 
-// Show the two big choices once a file has been read successfully.
-function askMergeOrReplace(filename, parsed) {
+// Count distinct names or dates, so a folder of daily files does not report
+// "250 tools" when it is really the same eight tools 250 times over.
+function countDistinct(list) {
+  var seen = {};
+  var n = 0;
+  for (var i = 0; i < list.length; i++) {
+    // The "n:" prefix stops a name like "constructor" colliding with a
+    // built-in property.
+    var key = "n:" + String(list[i]).trim().toLowerCase();
+    if (seen[key] !== true) { seen[key] = true; n++; }
+  }
+  return n;
+}
+
+// Show the two big choices once the files have been read.
+function askMergeOrReplace(label, parsed, problems) {
   var box = document.getElementById("importChoice");
-  box.innerHTML = '<p class="hint" style="margin-top:12px"><strong>' + esc(filename) + '</strong> holds '
-    + parsed.tools.length + ' tools and ' + parsed.rows.length + ' readings. What should happen to '
+
+  var toolNames = parsed.tools.map(function (t) { return t.name; });
+  var dates = parsed.rows.map(function (r) { return r.date; });
+
+  var trouble = "";
+  if (problems && problems.length > 0) {
+    trouble = '<p class="hint" style="color:var(--accent)"><strong>Skipped '
+      + problems.length + (problems.length === 1 ? ' file:</strong> ' : ' files:</strong> ')
+      + esc(problems.join("  ")) + '</p>';
+  }
+
+  box.innerHTML = '<p class="hint" style="margin-top:12px"><strong>' + esc(label) + '</strong> holds '
+    + countDistinct(toolNames) + ' tools and ' + parsed.rows.length + ' readings across '
+    + countDistinct(dates) + ' days. What should happen to '
     + 'what is already on this tablet?</p>'
+    + trouble
     + '<div class="big-actions">'
     + '<button onclick="runImport(\'merge\')">Merge &ndash; keep what is here, add what is missing</button>'
     + '<button class="secondary" onclick="runImport(\'replace\')">Replace &ndash; erase this tablet, use the file</button>'

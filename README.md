@@ -24,15 +24,25 @@ not done yet today.
    you would rather see it working first.
 2. Each day, on the Today tab: tap a tool, type its readings, tap "Save and
    next tool". Tools you have not logged sort to the top.
-3. On the Data tab: export a CSV for Excel, or a JSON backup. Import either
-   one back after a browser wipe or on a new tablet.
+3. On the Data tab: export the day's round, everything at once for trending,
+   or an exact JSON backup. Import any of them back after a browser wipe or on
+   a new tablet, several files at a time.
+
+**Point Edge's download folder at OneDrive** (Settings > Downloads > Location).
+Then every export lands there and syncs to your PC with no copying. A page
+opened from a file cannot choose where a download goes, so that setting is the
+way to control it.
 
 A reading outside its limits turns red and says why, but **always saves**. On a
 round you record what the screen says, good or bad. A tool that refuses a bad
 number is a tool that gets fed made-up ones.
 
-The exported CSV has one row per reading, which is the shape an Excel
-PivotTable wants:
+The daily file, `pm_round_2026-08-24.csv`, is named for the day the readings
+were **taken**, not the day you pressed the button, so back-filling a missed
+day still files it under the right date.
+
+Every export has one row per reading, which is the shape an Excel PivotTable
+wants:
 
 ```
 Date,Tool,Data point,Unit,Value,Min,Max,Status,Saved at
@@ -44,6 +54,10 @@ Date,Tool,Data point,Unit,Value,Min,Max,Status,Saved at
 tablet. That storage is wiped with no warning by "Clear browsing data" or by a
 tablet re-image. The page nags you about this after a day and gets insistent
 after three. The exported file is the record; the tablet is a clipboard.
+
+Once daily files are piling up in one folder, Excel's
+Data > Get Data > From Folder reads the whole folder as one table and
+refreshes as new days appear.
 
 Full instructions, including how to build the pivot chart, are in
 `packaging/pm_logger_READ_ME_FIRST.txt`.
