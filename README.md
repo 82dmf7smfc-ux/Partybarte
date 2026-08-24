@@ -33,6 +33,13 @@ Then every export lands there and syncs to your PC with no copying. A page
 opened from a file cannot choose where a download goes, so that setting is the
 way to control it.
 
+**Chambers.** A tool can have chambers, and a chamber has a *type* carrying its
+reading list, so "Etch" is defined once and every etch chamber on every tool
+uses it. Tool-level readings cover whatever belongs to the whole machine.
+Tapping a chambered tool lists its chambers with their own done marks; a tool
+with no chambers goes straight to its readings as before. The export gains
+`Chamber` and `Chamber type` columns, empty for tool-level rows.
+
 A reading outside its limits turns red and says why, but **always saves**. On a
 round you record what the screen says, good or bad. A tool that refuses a bad
 number is a tool that gets fed made-up ones.
@@ -45,9 +52,10 @@ Every export has one row per reading, which is the shape an Excel PivotTable
 wants:
 
 ```
-Date,Tool,Data point,Unit,Value,Min,Max,Status,Saved at
-2026-08-24,Etcher 3,Chamber pressure,mTorr,9.4,8,12,OK,2026-08-24 09:12
-2026-08-24,Etcher 3,He leak rate,sccm,2.9,,2.5,HIGH,2026-08-24 09:12
+Date,Tool,Chamber,Chamber type,Data point,Unit,Value,Min,Max,Status,Saved at
+2026-08-24,Etcher 3,,,Chiller temperature,C,20.4,18,22,OK,2026-08-24 09:12
+2026-08-24,Etcher 3,PM1,Etch,Kit life used,%,44,,80,OK,2026-08-24 09:12
+2026-08-24,Etcher 3,PM2,Etch,Kit life used,%,95,,80,HIGH,2026-08-24 09:12
 ```
 
 **Export regularly.** Readings live in the browser's own storage on one

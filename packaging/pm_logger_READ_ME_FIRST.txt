@@ -34,6 +34,8 @@ How to use it
    each one, add the readings you take at it. Give each reading a unit, and a
    min and max if you want it checked.
 
+   If a tool has CHAMBERS, see "Tools with chambers" below before you start.
+
    In a hurry? Tap "Load an example setup to try it" to see how it works with
    two made-up tools, then delete them.
 
@@ -50,6 +52,50 @@ How to use it
 
 5. Missed a day? Use the arrows either side of the date to go back and fill
    it in.
+
+
+Tools with chambers
+-------------------
+A cluster tool's chambers wear differently. PM1 and PM3 do not share a process
+kit and do not share RF hours, so they are logged separately.
+
+Three ideas, and only the first is new:
+
+  A CHAMBER TYPE is a name plus a list of readings, like "Etch" or "Strip".
+  A CHAMBER is a name and a type, like "PM1 is an Etch chamber".
+  TOOL READINGS belong to the whole machine, like facility nitrogen.
+
+Chambers of the same type log the same things. So you write the Etch reading
+list ONCE, and every etch chamber on every tool uses it. Two identical etchers
+share one definition rather than two copies that slowly drift apart.
+
+Setting it up:
+
+  1. Tools tab, "Chamber types" at the top. Add a type, for example Etch.
+     Add the readings taken at any etch chamber, with their limits.
+  2. Add a second type if your tool has different chambers, for example Strip.
+  3. Further down, on the tool itself, add each chamber by name (PM1, PM2)
+     and pick its type from the drop-down.
+  4. Put anything that belongs to the whole machine under "Readings logged at
+     the tool itself". Leave it empty if everything you log is per chamber.
+
+Walking a tool with chambers:
+
+  Tap the tool and you get a list: its tool readings, then each chamber, each
+  with its own done or not-done mark. Tap one, type its readings, then
+  "Save and next" walks you through the rest. The tool is only counted as
+  logged once every chamber is in.
+
+A tool with no chambers is unchanged. Tap it and you are straight into its
+readings, exactly as before. A wet bench needs no chambers at all.
+
+If a chamber was not run today, leave it blank. Blank readings never appear in
+the export.
+
+Changing a reading on a TYPE changes it for every chamber of that type, on
+every tool. That is the point of types, and it is also the thing to be careful
+about. A type that is still in use cannot be deleted; the page says which tool
+is in the way.
 
 
 About the limits
@@ -150,9 +196,14 @@ Double-click the CSV. It opens straight into Excel.
 
 The file has one row per reading, like this:
 
-  Date        Tool       Data point         Unit    Value   Min  Max  Status
-  2026-08-24  Etcher 3   Chamber pressure   mTorr   9.4     8    12   OK
-  2026-08-24  Etcher 3   He leak rate       sccm    2.9          2.5  HIGH
+  Date        Tool      Chamber  Chamber type  Data point       Value  Status
+  2026-08-24  Etcher 3                        Chiller temp     20.4   OK
+  2026-08-24  Etcher 3  PM1      Etch          Kit life used    44     OK
+  2026-08-24  Etcher 3  PM2      Etch          Kit life used    95     HIGH
+
+Tool readings leave the Chamber columns empty, so filtering on Chamber cleanly
+separates the two. To trend one chamber, drag Chamber into Filters. To compare
+every chamber of one kind, filter on Chamber type instead.
 
 That is one row per reading rather than a wide grid, on purpose: your tools
 each log different things, so a grid would be mostly empty boxes.
@@ -162,7 +213,8 @@ To chart it:
   1. Click any cell in the data.
   2. Insert > PivotTable > OK.
   3. Drag Date into Rows.
-  4. Drag Data point into Columns.
+  4. Drag Data point into Columns. For a chambered tool, drag Chamber in
+     above it so each chamber gets its own line.
   5. Drag Value into Values, then set it to Average or Max rather than Count.
   6. With the pivot selected: Insert > Line Chart.
 

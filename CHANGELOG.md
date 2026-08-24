@@ -25,6 +25,22 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+- PM Round Logger 1.4.0: chambers. A tool may have chambers, and each chamber
+  has a TYPE that carries its reading list, so chambers of the same kind log
+  the same things and a type written once is shared by every chamber using it,
+  across tools. Tools keep readings of their own for whatever belongs to the
+  whole machine. Tapping a chambered tool lists its units, each with its own
+  done mark and its own limit checking, so one chamber can flag while its twin
+  passes; a tool with no chambers is unchanged and still opens straight into
+  its readings. A tool counts as logged only once every chamber is in.
+- PM Round Logger 1.4.0: the export gains `Chamber` and `Chamber type`
+  columns, left empty on tool-level rows so an Excel filter separates the two.
+  Import reads files with or without those columns, so exports taken before
+  chambers existed still restore correctly.
+- PM Round Logger 1.4.0: stored data layout moves to version 2. The migration
+  hook added in 1.2.0 does the work: existing tools gain an empty chamber list
+  and existing entries an empty chamber record, with every logged reading left
+  exactly where it was. This is the first real use of that hook.
 - PM Round Logger 1.3.0: an "Export this round to a folder you pick" button,
   opening a real Save As dialog, shown only where the browser supports it. A
   failure falls back to an ordinary download rather than losing the export, and

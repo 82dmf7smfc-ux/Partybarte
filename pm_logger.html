@@ -276,6 +276,7 @@
 <main>
   <!-- Each of these is filled in by JavaScript. Only one shows at a time. -->
   <section id="viewToday" class="view"></section>
+  <section id="viewTool"  class="view"></section>
   <section id="viewEntry" class="view"></section>
   <section id="viewTools" class="view"></section>
   <section id="viewData"  class="view"></section>
@@ -308,9 +309,9 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // of the stored data, and only goes up if that layout changes in a way that
 // old data needs converting for. See migrateData().
 // ---------------------------------------------------------------------------
-var APP_VERSION = "1.3.0";
+var APP_VERSION = "1.4.0";
 var BUILD_DATE = "2026-08-24";
-var DATA_SHAPE = 1;
+var DATA_SHAPE = 2;
 
 // A second, separate storage slot for diagnostics: the error log, the usage
 // counters and the upgrade history.
@@ -348,8 +349,18 @@ function blankData() {
     lastOpenedWith: APP_VERSION,// app version that last touched it
     nextId: 0,       // counter used to hand out ids, see newId()
     lastExport: "",  // date of the last export, as YYYY-MM-DD
+
+    // Chamber types. A type is a NAME plus a list of readings, for example
+    // "Etch" or "Strip". Chambers of the same type log the same things, so the
+    // list is written once here and every chamber of that type uses it. Change
+    // a reading on the type and every chamber using it changes with it.
+    //
+    // Types live here rather than inside a tool on purpose: two identical
+    // etchers should share one definition, not keep two copies that drift.
+    chamberTypes: [],  // [{ id, name, points: [...] }]
+
     tools: [],       // see addTool() for the shape of a tool
-    entries: {}      // entries[date][toolId] = { savedAt: "...", values: {} }
+    entries: {}      // see unitEntry() for the shape of an entry
   };
 }
 
@@ -399,8 +410,28 @@ function migrateData() {
     return false;
   }
 
-  // Convert older layouts, oldest first. Nothing to do yet.
-  // if (storedShape < 2) { ...change DATA in place...; DATA.version = 2; }
+  // Convert older layouts, oldest first.
+  //
+  // Layout 1 -> 2 added chambers. Every change here is additive: existing
+  // tools gain an empty chamber list, existing entries gain an empty chamber
+  // record, and the readings already logged are left exactly where they were.
+  // Nothing is moved and nothing is dropped, which is why data written before
+  // chambers existed still opens correctly.
+  if (storedShape < 2) {
+    if (!DATA.chamberTypes) DATA.chamberTypes = [];
+    for (var t = 0; t < DATA.tools.length; t++) {
+      if (!DATA.tools[t].chambers) DATA.tools[t].chambers = [];
+    }
+    var dates = Object.keys(DATA.entries);
+    for (var d = 0; d < dates.length; d++) {
+      var day = DATA.entries[dates[d]];
+      var toolIds = Object.keys(day);
+      for (var k = 0; k < toolIds.length; k++) {
+        if (!day[toolIds[k]].chambers) day[toolIds[k]].chambers = {};
+      }
+    }
+    MIGRATION_CHANGED = true;
+  }
 
   if (DATA.version !== DATA_SHAPE) { DATA.version = DATA_SHAPE; MIGRATION_CHANGED = true; }
 
@@ -602,6 +633,126 @@ function findTool(toolId) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// CHAMBERS
+//
+// A tool may have chambers. Each chamber has a TYPE, and the type carries the
+// list of readings. So "PM1 is an Etch chamber" is all a chamber stores; what
+// gets logged at PM1 comes from the Etch type.
+//
+// A tool can also have readings of its own, for things that belong to the
+// whole machine rather than one chamber - facility nitrogen, chiller
+// temperature, and so on.
+// ---------------------------------------------------------------------------
+function findChamberType(typeId) {
+  for (var i = 0; i < DATA.chamberTypes.length; i++) {
+    if (DATA.chamberTypes[i].id === typeId) return DATA.chamberTypes[i];
+  }
+  return null;
+}
+
+function findChamberTypeByName(name) {
+  var want = String(name).trim().toLowerCase();
+  for (var i = 0; i < DATA.chamberTypes.length; i++) {
+    if (DATA.chamberTypes[i].name.trim().toLowerCase() === want) return DATA.chamberTypes[i];
+  }
+  return null;
+}
+
+function findChamber(tool, chamberId) {
+  var chambers = tool.chambers || [];
+  for (var i = 0; i < chambers.length; i++) {
+    if (chambers[i].id === chamberId) return chambers[i];
+  }
+  return null;
+}
+
+function findChamberByName(tool, name) {
+  var want = String(name).trim().toLowerCase();
+  var chambers = tool.chambers || [];
+  for (var i = 0; i < chambers.length; i++) {
+    if (chambers[i].name.trim().toLowerCase() === want) return chambers[i];
+  }
+  return null;
+}
+
+// What a chamber logs: its type's readings. A chamber whose type has been
+// deleted logs nothing rather than crashing.
+function chamberPoints(chamber) {
+  var type = findChamberType(chamber.typeId);
+  return type ? type.points : [];
+}
+
+function chamberTypeName(chamber) {
+  var type = findChamberType(chamber.typeId);
+  return type ? type.name : "no type set";
+}
+
+// ---------------------------------------------------------------------------
+// A "unit" is one thing you fill in and save in one go: either the tool's own
+// readings, or one chamber. Everything that walks a round - the status chips,
+// the progress counts, the entry form, the export - works from this list, so
+// there is exactly one place that decides what still has to be logged.
+//
+// A tool with no readings of its own contributes no tool unit, so a pure
+// multi-chamber tool shows only its chambers and no empty extra row.
+// ---------------------------------------------------------------------------
+function toolUnits(tool) {
+  var units = [];
+  if (tool.points.length > 0) {
+    units.push({ kind: "tool", id: "tool", name: "Tool readings",
+                 typeName: "", points: tool.points });
+  }
+  var chambers = tool.chambers || [];
+  for (var i = 0; i < chambers.length; i++) {
+    units.push({ kind: "chamber", id: chambers[i].id, name: chambers[i].name,
+                 typeName: chamberTypeName(chambers[i]),
+                 points: chamberPoints(chambers[i]) });
+  }
+  return units;
+}
+
+// The saved readings for one unit on one date, or null if it has not been
+// saved yet. Tool readings live directly on the entry, which is how they were
+// stored before chambers existed - that is why old data still reads correctly.
+function unitEntry(toolId, unitId, date) {
+  var day = DATA.entries[date];
+  var entry = day ? day[toolId] : null;
+  if (!entry) return null;
+
+  if (unitId === "tool") {
+    // An entry that only holds chamber readings has no tool-level save time,
+    // so an empty savedAt means the tool readings were never entered.
+    if (!entry.savedAt) return null;
+    return { savedAt: entry.savedAt, values: entry.values || {} };
+  }
+  var chambers = entry.chambers || {};
+  return chambers[unitId] || null;
+}
+
+// Make sure the entry object for one tool on one date exists, and hand it back.
+function ensureEntry(toolId, date) {
+  if (!DATA.entries[date]) DATA.entries[date] = {};
+  if (!DATA.entries[date][toolId]) {
+    DATA.entries[date][toolId] = { savedAt: "", values: {}, chambers: {} };
+  }
+  var entry = DATA.entries[date][toolId];
+  if (!entry.chambers) entry.chambers = {};
+  if (!entry.values) entry.values = {};
+  return entry;
+}
+
+// Store one unit's readings.
+function saveUnitValues(toolId, unitId, date, values) {
+  var entry = ensureEntry(toolId, date);
+  if (unitId === "tool") {
+    entry.savedAt = nowStamp();
+    entry.values = values;
+  } else {
+    entry.chambers[unitId] = { savedAt: nowStamp(), values: values };
+  }
+}
+
 // Find a data point inside one tool, by its id.
 function findPoint(tool, pointId) {
   for (var i = 0; i < tool.points.length; i++) {
@@ -712,30 +863,84 @@ function limitHint(point) {
 // Works out, for one tool on one date, whether it has been logged and how
 // many of its readings fell outside their limits.
 // ---------------------------------------------------------------------------
-function toolStatus(tool, date) {
-  var day = DATA.entries[date];
-  var entry = day ? day[tool.id] : null;
-  if (!entry) return { logged: false, outOfRange: 0, savedAt: "", filled: 0 };
+// One unit's status: has it been saved, and how many readings were outside
+// their limits.
+function unitStatus(tool, unit, date) {
+  var entry = unitEntry(tool.id, unit.id, date);
+  if (!entry) return { logged: false, outOfRange: 0, savedAt: "" };
 
   var outOfRange = 0;
-  var filled = 0;
-  for (var i = 0; i < tool.points.length; i++) {
-    var point = tool.points[i];
-    var value = entry.values[point.id];
-    if (value !== undefined && String(value).trim() !== "") filled++;
-    var status = rangeStatus(value, point);
+  for (var i = 0; i < unit.points.length; i++) {
+    var status = rangeStatus(entry.values[unit.points[i].id], unit.points[i]);
     if (status === "LOW" || status === "HIGH") outOfRange++;
   }
-  return { logged: true, outOfRange: outOfRange, savedAt: entry.savedAt || "", filled: filled };
+  return { logged: true, outOfRange: outOfRange, savedAt: entry.savedAt || "" };
 }
 
-// How many tools still need doing on a given date.
+// A whole tool's status, adding up its units. A tool counts as logged only
+// once every one of its units is in, so a four-chamber etcher with three
+// chambers done still shows as outstanding on the round.
+function toolStatus(tool, date) {
+  var units = toolUnits(tool);
+  var done = 0;
+  var outOfRange = 0;
+  var savedAt = "";
+
+  for (var i = 0; i < units.length; i++) {
+    var st = unitStatus(tool, units[i], date);
+    if (!st.logged) continue;
+    done++;
+    outOfRange += st.outOfRange;
+    if (st.savedAt > savedAt) savedAt = st.savedAt;   // dates sort as text
+  }
+
+  return {
+    // A tool with nothing set up yet is not "logged", but it is not part of
+    // the round either. See countTotal().
+    logged: units.length > 0 && done === units.length,
+    ready: units.length > 0,
+    done: done,
+    total: units.length,
+    outOfRange: outOfRange,
+    savedAt: savedAt
+  };
+}
+
+// How many tools are fully logged on a given date.
 function countLogged(date) {
   var n = 0;
   for (var i = 0; i < DATA.tools.length; i++) {
     if (toolStatus(DATA.tools[i], date).logged) n++;
   }
   return n;
+}
+
+// How many tools are actually part of the round. A tool with no readings and
+// no chambers is left out of the count rather than making the round
+// permanently impossible to finish.
+function countTotal(date) {
+  var n = 0;
+  for (var i = 0; i < DATA.tools.length; i++) {
+    if (toolStatus(DATA.tools[i], date).ready) n++;
+  }
+  return n;
+}
+
+// The next unit within one tool that still needs doing.
+function nextUnitInTool(tool, date, afterUnitId) {
+  var units = toolUnits(tool);
+  var seen = false;
+  var i;
+  for (i = 0; i < units.length; i++) {
+    if (units[i].id === afterUnitId) { seen = true; continue; }
+    if (!seen) continue;
+    if (!unitStatus(tool, units[i], date).logged) return units[i];
+  }
+  for (i = 0; i < units.length; i++) {
+    if (units[i].id === afterUnitId) continue;
+    if (!unitStatus(tool, units[i], date).logged) return units[i];
+  }
+  return null;
 }
 
 // The next tool on the round that has not been logged yet. Used by the
@@ -748,13 +953,13 @@ function nextUnlogged(date, afterToolId) {
     tool = DATA.tools[i];
     if (tool.id === afterToolId) { seenCurrent = true; continue; }
     if (!seenCurrent) continue;
-    if (!toolStatus(tool, date).logged) return tool;
+    if (toolStatus(tool, date).ready && !toolStatus(tool, date).logged) return tool;
   }
   // Then wrap round to the start and pick up anything skipped.
   for (i = 0; i < DATA.tools.length; i++) {
     tool = DATA.tools[i];
     if (tool.id === afterToolId) continue;
-    if (!toolStatus(tool, date).logged) return tool;
+    if (toolStatus(tool, date).ready && !toolStatus(tool, date).logged) return tool;
   }
   return null;
 }
@@ -767,28 +972,33 @@ function nextUnlogged(date, afterToolId) {
 // ---------------------------------------------------------------------------
 var VIEW = "today";          // "today", "entry", "tools" or "data"
 var CURRENT_DATE = todayStr();  // the date the Today tab is showing
-var CURRENT_TOOL = null;     // id of the tool being entered, while on "entry"
+var CURRENT_TOOL = null;     // id of the tool being worked on
+var CURRENT_UNIT = null;     // id of the unit being entered: "tool" or a chamber id
 
 function showTab(name) {
   VIEW = name;
   CURRENT_TOOL = null;
+  CURRENT_UNIT = null;
   render();
 }
 
 // Draw whichever screen is current, plus the banner and the tab highlights.
 function render() {
   document.getElementById("viewToday").className = "view" + (VIEW === "today" ? " active" : "");
+  document.getElementById("viewTool").className  = "view" + (VIEW === "tool"  ? " active" : "");
   document.getElementById("viewEntry").className = "view" + (VIEW === "entry" ? " active" : "");
   document.getElementById("viewTools").className = "view" + (VIEW === "tools" ? " active" : "");
   document.getElementById("viewData").className  = "view" + (VIEW === "data"  ? " active" : "");
 
   // The Today tab stays highlighted while the entry form is open, because the
   // entry form is part of doing the round.
-  document.getElementById("tabToday").className = (VIEW === "today" || VIEW === "entry") ? "active" : "";
+  document.getElementById("tabToday").className =
+    (VIEW === "today" || VIEW === "tool" || VIEW === "entry") ? "active" : "";
   document.getElementById("tabTools").className = (VIEW === "tools") ? "active" : "";
   document.getElementById("tabData").className  = (VIEW === "data")  ? "active" : "";
 
   if (VIEW === "today") renderToday();
+  if (VIEW === "tool")  renderToolScreen();
   if (VIEW === "entry") renderEntry();
   if (VIEW === "tools") renderTools();
   if (VIEW === "data")  renderData();
@@ -879,10 +1089,11 @@ function countAllReadings() {
     var day = DATA.entries[dates[d]];
     var toolIds = Object.keys(day);
     for (var t = 0; t < toolIds.length; t++) {
-      var values = day[toolIds[t]].values;
-      var keys = Object.keys(values);
-      for (var k = 0; k < keys.length; k++) {
-        if (String(values[keys[k]]).trim() !== "") total++;
+      var entry = day[toolIds[t]];
+      total += countFilled(entry.values || {});
+      var chamberIds = Object.keys(entry.chambers || {});
+      for (var c = 0; c < chamberIds.length; c++) {
+        total += countFilled(entry.chambers[chamberIds[c]].values);
       }
     }
   }
@@ -915,7 +1126,7 @@ function renderToday() {
   }
 
   var done = countLogged(CURRENT_DATE);
-  var total = DATA.tools.length;
+  var total = countTotal(CURRENT_DATE);
   var isToday = (CURRENT_DATE === todayStr());
 
   var html = '<div class="card">';
@@ -939,7 +1150,7 @@ function renderToday() {
 
   // When the round is finished, offer the export right here rather than
   // making the user go and find the Data tab.
-  if (done === total) {
+  if (total > 0 && done === total) {
     html += '<div class="card" style="background:var(--ok-bg);border-color:#b7dfb9">'
       + '<h2>Round complete</h2>'
       + '<p class="hint">Every tool is logged for this date. Get the readings off the tablet now, '
@@ -965,23 +1176,41 @@ function renderToday() {
   host.innerHTML = html;
 }
 
-// One row in the tool list.
+// One row in the tool list on the Today tab.
 function toolRowHtml(tool) {
   var st = toolStatus(tool, CURRENT_DATE);
+  var chambers = (tool.chambers || []).length;
   var rowClass = "toolrow";
   var chip;
-  var sub = tool.points.length + (tool.points.length === 1 ? " reading" : " readings");
+  var sub;
+
+  if (!st.ready) {
+    // Nothing set up on this tool yet, so it is not part of the round.
+    return '<button class="toolrow" onclick="showTab(\'tools\')">'
+      + '<span><span class="name">' + esc(tool.name) + '</span>'
+      + '<span class="sub">No readings or chambers set up yet</span></span>'
+      + '<span class="chip todo">Not set up</span></button>';
+  }
+
+  // What the tool is made of, so a four-chamber etcher says so on the round.
+  var parts = [];
+  if (chambers > 0) parts.push(chambers + (chambers === 1 ? " chamber" : " chambers"));
+  if (tool.points.length > 0) parts.push(tool.points.length
+    + (tool.points.length === 1 ? " tool reading" : " tool readings"));
+  sub = parts.join(" \u00b7 ");
 
   if (!st.logged) {
-    chip = '<span class="chip todo">Not logged</span>';
+    chip = '<span class="chip todo">' + st.done + ' of ' + st.total + ' done</span>';
+    // Part way through is worth showing differently from not started at all.
+    if (st.done > 0) sub = sub + " \u00b7 part done";
   } else if (st.outOfRange > 0) {
     rowClass += " attention";
     chip = '<span class="chip bad">' + st.outOfRange + ' out of range</span>';
-    sub = "Logged " + esc(shortTime(st.savedAt));
+    sub = "Logged " + esc(shortTime(st.savedAt)) + " \u00b7 " + sub;
   } else {
     rowClass += " done";
     chip = '<span class="chip ok">Logged</span>';
-    sub = "Logged " + esc(shortTime(st.savedAt));
+    sub = "Logged " + esc(shortTime(st.savedAt)) + " \u00b7 " + sub;
   }
 
   return '<button class="' + rowClass + '" onclick="openTool(\'' + tool.id + '\')">'
@@ -1011,47 +1240,162 @@ function pickDate(dateStr) {
 // One big numeric box per reading. Values colour themselves as you type, but
 // nothing is ever refused. If a tool reads badly, you record the bad number.
 // ---------------------------------------------------------------------------
+// Tapping a tool on the round. A tool with chambers shows its list of
+// chambers first. A tool without chambers goes straight into its readings, so
+// nothing changes for the simple case: one tap, start typing.
 function openTool(toolId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
   CURRENT_TOOL = toolId;
+
+  var units = toolUnits(tool);
+  if (units.length === 1) { openUnit(toolId, units[0].id); return; }
+
+  VIEW = "tool";
+  CURRENT_UNIT = null;
+  render();
+}
+
+function openUnit(toolId, unitId) {
+  CURRENT_TOOL = toolId;
+  CURRENT_UNIT = unitId;
   VIEW = "entry";
   bump("entryScreensOpened");
   render();
+}
+
+// Find one unit on the current tool by its id.
+function findUnit(tool, unitId) {
+  var units = toolUnits(tool);
+  for (var i = 0; i < units.length; i++) {
+    if (units[i].id === unitId) return units[i];
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// THE TOOL SCREEN
+//
+// Only shown for a tool that has more than one thing to log. Lists the tool's
+// own readings and each chamber as its own row, with the same done / not done
+// chips used on the round itself.
+// ---------------------------------------------------------------------------
+function renderToolScreen() {
+  var host = document.getElementById("viewTool");
+  var tool = findTool(CURRENT_TOOL);
+  if (!tool) { showTab("today"); return; }
+
+  var st = toolStatus(tool, CURRENT_DATE);
+  var units = toolUnits(tool);
+
+  var html = '<div class="card">'
+    + '<div class="spread"><h2 style="margin:0">' + esc(tool.name) + '</h2>'
+    + '<span class="count">' + esc(CURRENT_DATE) + '</span></div>'
+    + '<p class="hint" style="margin-top:8px">' + st.done + ' of ' + st.total + ' done. '
+    + 'Tap one to enter its readings.</p></div>';
+
+  html += '<div class="card">';
+  for (var i = 0; i < units.length; i++) {
+    html += unitRowHtml(tool, units[i]);
+  }
+  html += '</div>';
+
+  html += '<div class="card"><div class="big-actions">';
+  if (st.logged) {
+    var next = nextUnlogged(CURRENT_DATE, tool.id);
+    if (next) {
+      html += '<button onclick="openTool(\'' + next.id + '\')">Next tool ('
+        + esc(next.name) + ')</button>';
+    }
+  }
+  html += '<button class="secondary" onclick="showTab(\'today\')">Back to the round</button>'
+    + '</div></div>';
+
+  host.innerHTML = html;
+}
+
+// One row on the tool screen: the tool's own readings, or one chamber.
+function unitRowHtml(tool, unit) {
+  var st = unitStatus(tool, unit, CURRENT_DATE);
+  var rowClass = "toolrow";
+  var chip;
+  var sub;
+
+  if (unit.points.length === 0) {
+    return '<button class="toolrow" onclick="showTab(\'tools\')">'
+      + '<span><span class="name">' + esc(unit.name) + '</span>'
+      + '<span class="sub">' + (unit.kind === "chamber"
+          ? 'Its type "' + esc(unit.typeName) + '" has no readings yet'
+          : 'No readings set up') + '</span></span>'
+      + '<span class="chip todo">Not set up</span></button>';
+  }
+
+  sub = (unit.kind === "chamber" ? esc(unit.typeName) + " \u00b7 " : "")
+    + unit.points.length + (unit.points.length === 1 ? " reading" : " readings");
+
+  if (!st.logged) {
+    chip = '<span class="chip todo">Not logged</span>';
+  } else if (st.outOfRange > 0) {
+    rowClass += " attention";
+    chip = '<span class="chip bad">' + st.outOfRange + ' out of range</span>';
+    sub = "Logged " + esc(shortTime(st.savedAt)) + " \u00b7 " + sub;
+  } else {
+    rowClass += " done";
+    chip = '<span class="chip ok">Logged</span>';
+    sub = "Logged " + esc(shortTime(st.savedAt)) + " \u00b7 " + sub;
+  }
+
+  return '<button class="' + rowClass + '" onclick="openUnit(\'' + tool.id + '\',\''
+    + unit.id + '\')">'
+    + '<span><span class="name">' + esc(unit.name) + '</span>'
+    + '<span class="sub">' + sub + '</span></span>'
+    + chip + '</button>';
 }
 
 function renderEntry() {
   var host = document.getElementById("viewEntry");
   var tool = findTool(CURRENT_TOOL);
   if (!tool) { showTab("today"); return; }
+  var unit = findUnit(tool, CURRENT_UNIT);
+  if (!unit) { showTab("today"); return; }
 
-  // If this tool was already logged on this date, put those values back in
-  // the boxes so correcting a typo is easy.
-  var day = DATA.entries[CURRENT_DATE];
-  var entry = day ? day[tool.id] : null;
-  var saved = entry ? entry.values : {};
+  // If this unit was already logged on this date, put those values back in the
+  // boxes so correcting a typo is easy.
+  var saved = {};
+  var existing = unitEntry(tool.id, unit.id, CURRENT_DATE);
+  if (existing) saved = existing.values;
 
+  var manyUnits = toolUnits(tool).length > 1;
+
+  var heading = manyUnits ? esc(tool.name) + " \u2013 " + esc(unit.name) : esc(tool.name);
   var html = '<div class="card">'
-    + '<div class="spread"><h2 style="margin:0">' + esc(tool.name) + '</h2>'
+    + '<div class="spread"><h2 style="margin:0">' + heading + '</h2>'
     + '<span class="count">' + esc(CURRENT_DATE) + '</span></div>';
 
-  if (entry) {
-    html += '<p class="hint" style="margin-top:8px">Already logged at ' + esc(shortTime(entry.savedAt))
+  if (unit.kind === "chamber") {
+    html += '<p class="hint" style="margin-top:6px">Chamber type: ' + esc(unit.typeName) + '</p>';
+  }
+  if (existing) {
+    html += '<p class="hint" style="margin-top:6px">Already logged at ' + esc(shortTime(existing.savedAt))
       + '. Saving again replaces what is there.</p>';
   }
   html += '</div>';
 
-  if (tool.points.length === 0) {
-    html += '<div class="card"><p class="hint">This tool has no readings set up yet. '
-      + 'Add some on the Tools tab.</p>'
+  if (unit.points.length === 0) {
+    html += '<div class="card"><p class="hint">Nothing is set up to log here yet. '
+      + (unit.kind === "chamber"
+          ? 'Add readings to the "' + esc(unit.typeName) + '" chamber type on the Tools tab.'
+          : 'Add some readings on the Tools tab.') + '</p>'
       + '<div class="big-actions"><button onclick="showTab(\'tools\')">Go to Tools</button>'
-      + '<button class="secondary" onclick="showTab(\'today\')">Back</button></div></div>';
+      + '<button class="secondary" onclick="backFromEntry()">Back</button></div></div>';
     host.innerHTML = html;
     return;
   }
 
-  // One block per data point.
+  // One block per reading.
   html += '<div class="card">';
-  for (var i = 0; i < tool.points.length; i++) {
-    var point = tool.points[i];
+  for (var i = 0; i < unit.points.length; i++) {
+    var point = unit.points[i];
     var value = saved[point.id] !== undefined ? saved[point.id] : "";
     var status = rangeStatus(value, point);
     var unitLabel = point.unit ? " (" + esc(point.unit) + ")" : "";
@@ -1070,23 +1414,58 @@ function renderEntry() {
   html += '</div>';
 
   // The buttons. Full width and extra tall, because these get tapped most.
-  var next = nextUnlogged(CURRENT_DATE, tool.id);
+  // On a multi-chamber tool the next step is the next chamber; on a plain tool
+  // it is the next tool, exactly as before.
   html += '<div class="card"><div class="big-actions">';
-  if (next) {
-    html += '<button onclick="saveEntry(\'next\')">Save and next tool (' + esc(next.name) + ')</button>';
+  if (manyUnits) {
+    var nextUnit = nextUnitInTool(tool, CURRENT_DATE, unit.id);
+    if (nextUnit) {
+      html += '<button onclick="saveEntry(\'next\')">Save and next ('
+        + esc(nextUnit.name) + ')</button>';
+    }
+    html += '<button' + (nextUnit ? ' class="secondary"' : '') + ' onclick="saveEntry(\'close\')">'
+      + 'Save and back to ' + esc(tool.name) + '</button>';
+  } else {
+    var nextTool = nextUnlogged(CURRENT_DATE, tool.id);
+    if (nextTool) {
+      html += '<button onclick="saveEntry(\'next\')">Save and next tool ('
+        + esc(nextTool.name) + ')</button>';
+    }
+    html += '<button' + (nextTool ? ' class="secondary"' : '') + ' onclick="saveEntry(\'close\')">'
+      + 'Save and close</button>';
   }
-  html += '<button' + (next ? ' class="secondary"' : '') + ' onclick="saveEntry(\'close\')">Save and close</button>'
-    + '<button class="secondary" onclick="showTab(\'today\')">Cancel, do not save</button>'
+  html += '<button class="secondary" onclick="backFromEntry()">Cancel, do not save</button>'
     + '</div><div class="msg" id="entryMsg"></div></div>';
 
   host.innerHTML = html;
+}
+
+// Leaving the entry form without saving. Goes back to wherever you came from:
+// the tool screen for a multi-chamber tool, the round itself otherwise.
+function backFromEntry() {
+  var tool = findTool(CURRENT_TOOL);
+  if (tool && toolUnits(tool).length > 1) {
+    VIEW = "tool";
+    CURRENT_UNIT = null;
+    render();
+    return;
+  }
+  showTab("today");
 }
 
 // Recolour one box while the user types. Purely cosmetic, changes no data.
 function colorField(pointId) {
   var tool = findTool(CURRENT_TOOL);
   if (!tool) return;
-  var point = findPoint(tool, pointId);
+  var unit = findUnit(tool, CURRENT_UNIT);
+  if (!unit) return;
+
+  var point = null;
+  for (var i = 0; i < unit.points.length; i++) {
+    if (unit.points[i].id === pointId) point = unit.points[i];
+  }
+  if (!point) return;
+
   var input = document.getElementById("val_" + pointId);
   var pill = document.getElementById("st_" + pointId);
   var status = rangeStatus(input.value, point);
@@ -1095,40 +1474,52 @@ function colorField(pointId) {
   pill.textContent = statusText(status, point);
 }
 
-// Save what is in the boxes, then either move to the next tool or go back to
-// the round list. Blank boxes are saved as blank, which is fine: a blank
-// reading simply does not appear in the export.
+// Save what is in the boxes, then move on. Blank boxes are saved as blank,
+// which is fine: a blank reading simply does not appear in the export. That is
+// also how a chamber that was not run today is recorded - leave it empty.
 function saveEntry(mode) {
   var tool = findTool(CURRENT_TOOL);
   if (!tool) return;
+  var unit = findUnit(tool, CURRENT_UNIT);
+  if (!unit) return;
 
   var values = {};
-  for (var i = 0; i < tool.points.length; i++) {
-    var point = tool.points[i];
+  for (var i = 0; i < unit.points.length; i++) {
+    var point = unit.points[i];
     values[point.id] = document.getElementById("val_" + point.id).value.trim();
   }
 
   // Counters, for working out which parts of the tool actually get used.
   // Taken before the save, so we can tell a first entry from a correction.
-  var wasComplete = (DATA.tools.length > 0 && countLogged(CURRENT_DATE) === DATA.tools.length);
-  var hadEntry = !!(DATA.entries[CURRENT_DATE] && DATA.entries[CURRENT_DATE][tool.id]);
+  var wasComplete = (countTotal(CURRENT_DATE) > 0
+    && countLogged(CURRENT_DATE) === countTotal(CURRENT_DATE));
+  var hadEntry = !!unitEntry(tool.id, unit.id, CURRENT_DATE);
 
-  if (!DATA.entries[CURRENT_DATE]) DATA.entries[CURRENT_DATE] = {};
-  DATA.entries[CURRENT_DATE][tool.id] = { savedAt: nowStamp(), values: values };
+  saveUnitValues(tool.id, unit.id, CURRENT_DATE, values);
   save();
 
   if (hadEntry) bump("reEditsOfASavedTool");
   if (CURRENT_DATE !== todayStr()) bump("backFilledSaves");
+  if (unit.kind === "chamber") bump("chamberSaves");
   // Only count the moment a round TIPS into complete, not every later re-save.
-  if (!wasComplete && DATA.tools.length > 0 && countLogged(CURRENT_DATE) === DATA.tools.length) {
+  if (!wasComplete && countTotal(CURRENT_DATE) > 0
+      && countLogged(CURRENT_DATE) === countTotal(CURRENT_DATE)) {
     bump("roundsCompleted");
   }
 
+  var manyUnits = toolUnits(tool).length > 1;
+
   if (mode === "next") {
-    var next = nextUnlogged(CURRENT_DATE, tool.id);
-    if (next) { openTool(next.id); return; }
+    if (manyUnits) {
+      var nextUnit = nextUnitInTool(tool, CURRENT_DATE, unit.id);
+      if (nextUnit) { openUnit(tool.id, nextUnit.id); return; }
+    } else {
+      var nextTool = nextUnlogged(CURRENT_DATE, tool.id);
+      if (nextTool) { openTool(nextTool.id); return; }
+    }
   }
-  showTab("today");
+
+  backFromEntry();
 }
 
 // ---------------------------------------------------------------------------
@@ -1158,6 +1549,8 @@ function renderTools() {
       + '</div>';
   }
   html += '</div>';
+
+  html += chamberTypesHtml();
 
   // One card per tool, holding that tool's data points.
   for (var i = 0; i < DATA.tools.length; i++) {
@@ -1200,6 +1593,25 @@ function warnAboutDuplicateNames() {
       }
       pointSeen[pkey] = true;
     }
+
+    var chamberSeen = {};
+    var chambers = tool.chambers || [];
+    for (var c = 0; c < chambers.length; c++) {
+      var ckey = "n:" + chambers[c].name.trim().toLowerCase();
+      if (chamberSeen[ckey] === true) {
+        problems.push('"' + tool.name + '" has two chambers called "' + chambers[c].name + '".');
+      }
+      chamberSeen[ckey] = true;
+    }
+  }
+
+  var typeSeen = {};
+  for (var y = 0; y < DATA.chamberTypes.length; y++) {
+    var tkey = "n:" + DATA.chamberTypes[y].name.trim().toLowerCase();
+    if (typeSeen[tkey] === true) {
+      problems.push('Two chamber types are both called "' + DATA.chamberTypes[y].name + '".');
+    }
+    typeSeen[tkey] = true;
   }
 
   if (problems.length === 0) { box.innerHTML = ""; return; }
@@ -1213,6 +1625,252 @@ function warnAboutDuplicateNames() {
 }
 
 // The editor card for one tool.
+// ---------------------------------------------------------------------------
+// CHAMBER TYPES
+//
+// A type is a name plus a list of readings. Chambers of the same type log the
+// same things, so an etcher with four etch chambers needs the list typed once,
+// and two identical etchers share one definition rather than keeping two
+// copies that drift apart.
+//
+// Change a reading here and every chamber of that type changes with it, on
+// every tool. That is the point of types, and it is also the thing to be
+// careful about.
+// ---------------------------------------------------------------------------
+function chamberTypesHtml() {
+  var html = '<div class="card">'
+    + '<h2>Chamber types</h2>'
+    + '<p class="hint">Only needed if your tools have chambers. A type is a name plus the '
+    + 'readings taken at any chamber of that kind, for example "Etch" or "Strip". '
+    + 'Set it up once here, then give each chamber its type on the tool below.</p>'
+    + '<div class="row">'
+    + '<div class="grow"><input type="text" id="newTypeName" placeholder="For example: Etch"></div>'
+    + '<button onclick="addChamberType()">Add type</button>'
+    + '</div><div class="msg" id="typesMsg"></div>';
+
+  for (var i = 0; i < DATA.chamberTypes.length; i++) {
+    var type = DATA.chamberTypes[i];
+    html += '<div class="pointedit" style="margin-top:10px">'
+      + '<div class="row">'
+      + '<div class="grow"><label>Type name</label>'
+      + '<input type="text" value="' + esc(type.name) + '" '
+      + 'oninput="renameChamberType(\'' + type.id + '\', this.value)"></div>'
+      + '<button class="danger small" onclick="deleteChamberType(\'' + type.id + '\')">Delete</button>'
+      + '</div>'
+      + '<p class="hint" style="margin:8px 0 4px">Used by ' + countChambersOfType(type.id)
+      + ' chamber(s). Readings taken at every chamber of this type:</p>';
+
+    for (var q = 0; q < type.points.length; q++) {
+      html += pointEditorHtml(type.points[q], q, type.points.length,
+        "updateTypePoint('" + type.id + "','" + type.points[q].id + "'",
+        "moveTypePoint('" + type.id + "','" + type.points[q].id + "'",
+        "deleteTypePoint('" + type.id + "','" + type.points[q].id + "')");
+    }
+    if (type.points.length === 0) {
+      html += '<p class="hint">No readings yet. Add the first one below.</p>';
+    }
+
+    html += '<div class="row" style="margin-top:10px">'
+      + '<div class="grow"><input type="text" id="newTypePoint_' + type.id + '" '
+      + 'placeholder="For example: RF hours"></div>'
+      + '<button onclick="addTypePoint(\'' + type.id + '\')">Add reading</button>'
+      + '</div></div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// The editor block for one reading. Shared by chamber types and by a tool's
+// own readings, so both look and behave the same. The three handler strings
+// are the calls to make when this particular reading is edited, moved or
+// deleted - they differ only in which list the reading lives in.
+function pointEditorHtml(point, index, total, updateCall, moveCall, deleteCall) {
+  return '<div class="pointedit">'
+    + '<div class="row">'
+    + '<div class="grow"><label>Reading name</label>'
+    + '<input type="text" value="' + esc(point.name) + '" '
+    + 'oninput="' + updateCall + ',\'name\',this.value)"></div>'
+    + '</div>'
+    + '<div class="grid" style="margin-top:8px">'
+    + '<div><label>Unit</label><input type="text" value="' + esc(point.unit) + '" '
+    + 'placeholder="mTorr" oninput="' + updateCall + ',\'unit\',this.value)"></div>'
+    + '<div><label>&nbsp;</label><div class="row">'
+    + '<button class="secondary small" onclick="' + moveCall + ',-1)"'
+    + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
+    + '<button class="secondary small" onclick="' + moveCall + ',1)"'
+    + (index === total - 1 ? ' disabled' : '') + '>&#9660;</button>'
+    + '<button class="danger small" onclick="' + deleteCall + '">Delete</button>'
+    + '</div></div></div>'
+    + '<div class="grid" style="margin-top:8px">'
+    + '<div><label>Min (optional)</label><input type="number" step="any" value="'
+    + (point.min === null ? "" : esc(point.min)) + '" placeholder="no min" '
+    + 'oninput="' + updateCall + ',\'min\',this.value)"></div>'
+    + '<div><label>Max (optional)</label><input type="number" step="any" value="'
+    + (point.max === null ? "" : esc(point.max)) + '" placeholder="no max" '
+    + 'oninput="' + updateCall + ',\'max\',this.value)"></div>'
+    + '</div></div>';
+}
+
+function countChambersOfType(typeId) {
+  var n = 0;
+  for (var t = 0; t < DATA.tools.length; t++) {
+    var chambers = DATA.tools[t].chambers || [];
+    for (var c = 0; c < chambers.length; c++) if (chambers[c].typeId === typeId) n++;
+  }
+  return n;
+}
+
+function addChamberType() {
+  var box = document.getElementById("newTypeName");
+  var name = box.value.trim();
+  if (name === "") { setMsg("typesMsg", "err", "Type a name for the chamber type first."); return; }
+  if (findChamberTypeByName(name)) { setMsg("typesMsg", "err", "There is already a type called that."); return; }
+
+  DATA.chamberTypes.push({ id: newId(), name: name, points: [] });
+  save();
+  box.value = "";
+  render();
+  setMsg("typesMsg", "ok", "Added the " + name + " type. Now add the readings taken at it.");
+}
+
+function renameChamberType(typeId, name) {
+  var type = findChamberType(typeId);
+  if (!type) return;
+  name = name.trim();
+  if (name === "") return;
+  type.name = name;
+  save();
+}
+
+// A type in use cannot be deleted: the chambers using it would be left logging
+// nothing, silently. Say which tools are in the way instead.
+function deleteChamberType(typeId) {
+  var type = findChamberType(typeId);
+  if (!type) return;
+
+  var users = [];
+  for (var t = 0; t < DATA.tools.length; t++) {
+    var chambers = DATA.tools[t].chambers || [];
+    for (var c = 0; c < chambers.length; c++) {
+      if (chambers[c].typeId === typeId && users.indexOf(DATA.tools[t].name) === -1) {
+        users.push(DATA.tools[t].name);
+      }
+    }
+  }
+  if (users.length > 0) {
+    setMsg("typesMsg", "err", 'Cannot delete "' + type.name + '": still used by '
+      + users.join(", ") + '. Change or remove those chambers first.');
+    return;
+  }
+  if (!window.confirm('Delete the chamber type "' + type.name + '"?')) return;
+
+  var kept = [];
+  for (var i = 0; i < DATA.chamberTypes.length; i++) {
+    if (DATA.chamberTypes[i].id !== typeId) kept.push(DATA.chamberTypes[i]);
+  }
+  DATA.chamberTypes = kept;
+  save();
+  render();
+  setMsg("typesMsg", "ok", "Deleted " + type.name + ".");
+}
+
+function addTypePoint(typeId) {
+  var type = findChamberType(typeId);
+  if (!type) return;
+  var box = document.getElementById("newTypePoint_" + typeId);
+  var name = box.value.trim();
+  if (name === "") { setMsg("typesMsg", "err", "Type a name for the reading first."); return; }
+  for (var i = 0; i < type.points.length; i++) {
+    if (type.points[i].name.trim().toLowerCase() === name.toLowerCase()) {
+      setMsg("typesMsg", "err", type.name + " already has a reading called that.");
+      return;
+    }
+  }
+  type.points.push({ id: newId(), name: name, unit: "", min: null, max: null });
+  save();
+  render();
+  setMsg("typesMsg", "ok", "Added " + name + " to every " + type.name + " chamber.");
+}
+
+function updateTypePoint(typeId, pointId, field, value) {
+  var type = findChamberType(typeId);
+  if (!type) return;
+  for (var i = 0; i < type.points.length; i++) {
+    if (type.points[i].id === pointId) { applyPointField(type.points[i], field, value); break; }
+  }
+  save();
+}
+
+function deleteTypePoint(typeId, pointId) {
+  var type = findChamberType(typeId);
+  if (!type) return;
+  var point = null;
+  for (var i = 0; i < type.points.length; i++) if (type.points[i].id === pointId) point = type.points[i];
+  if (!point) return;
+  if (!window.confirm('Delete "' + point.name + '" from every ' + type.name
+      + ' chamber?\n\nAny values already logged for it are deleted too.')) return;
+
+  var kept = [];
+  for (var k = 0; k < type.points.length; k++) {
+    if (type.points[k].id !== pointId) kept.push(type.points[k]);
+  }
+  type.points = kept;
+  forgetPointEverywhere(pointId);
+  save();
+  render();
+}
+
+function moveTypePoint(typeId, pointId, step) {
+  var type = findChamberType(typeId);
+  if (!type) return;
+  movePointInList(type.points, pointId, step);
+  save();
+  render();
+}
+
+// Shared by the tool and chamber-type editors so both behave identically.
+function applyPointField(point, field, value) {
+  if (field === "name") {
+    var name = String(value).trim();
+    if (name !== "") point.name = name;
+  } else if (field === "unit") {
+    point.unit = String(value).trim();
+  } else if (field === "min" || field === "max") {
+    var text = String(value).trim();
+    point[field] = (text === "" || isNaN(Number(text))) ? null : Number(text);
+  }
+}
+
+function movePointInList(list, pointId, step) {
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id !== pointId) continue;
+    var to = i + step;
+    if (to < 0 || to >= list.length) return;
+    var moved = list[i];
+    list[i] = list[to];
+    list[to] = moved;
+    return;
+  }
+}
+
+// Drop every logged value for one reading, wherever it was stored.
+function forgetPointEverywhere(pointId) {
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var day = DATA.entries[dates[d]];
+    var toolIds = Object.keys(day);
+    for (var t = 0; t < toolIds.length; t++) {
+      var entry = day[toolIds[t]];
+      if (entry.values) delete entry.values[pointId];
+      var chamberIds = Object.keys(entry.chambers || {});
+      for (var c = 0; c < chamberIds.length; c++) {
+        delete entry.chambers[chamberIds[c]].values[pointId];
+      }
+    }
+  }
+}
+
 function toolEditorHtml(tool, index) {
   var html = '<div class="card">';
 
@@ -1228,55 +1886,32 @@ function toolEditorHtml(tool, index) {
     + '<button class="danger small" onclick="deleteTool(\'' + tool.id + '\')">Delete</button>'
     + '</div>';
 
-  html += '<h2 style="margin-top:16px">Readings logged at this tool</h2>';
+  html += '<h2 style="margin-top:16px">Chambers</h2>';
+  html += chamberEditorHtml(tool);
+
+  html += '<h2 style="margin-top:16px">Readings logged at the tool itself</h2>';
+  html += '<p class="hint">For things that belong to the whole machine rather than one '
+    + 'chamber - facility nitrogen, chiller temperature. Leave empty if everything you log '
+    + 'is per chamber.</p>';
 
   if (tool.points.length === 0) {
-    html += '<p class="hint">No readings yet. Add the first one below.</p>';
+    html += '<p class="hint">None yet.</p>';
   }
-
-  // One editable block per data point.
   for (var i = 0; i < tool.points.length; i++) {
-    var point = tool.points[i];
-    html += '<div class="pointedit">'
-      + '<div class="row">'
-      + '<div class="grow"><label>Reading name</label>'
-      + '<input type="text" value="' + esc(point.name) + '" '
-      + 'oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'name\',this.value)"></div>'
-      + '</div>'
-      + '<div class="grid" style="margin-top:8px">'
-      + '<div><label>Unit</label><input type="text" value="' + esc(point.unit) + '" '
-      + 'placeholder="mTorr" oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'unit\',this.value)"></div>'
-      + '<div><label>&nbsp;</label>'
-      + '<div class="row">'
-      + '<button class="secondary small" onclick="movePoint(\'' + tool.id + '\',\'' + point.id + '\',-1)"'
-      + (i === 0 ? ' disabled' : '') + '>&#9650;</button>'
-      + '<button class="secondary small" onclick="movePoint(\'' + tool.id + '\',\'' + point.id + '\',1)"'
-      + (i === tool.points.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
-      + '<button class="danger small" onclick="deletePoint(\'' + tool.id + '\',\'' + point.id + '\')">Delete</button>'
-      + '</div></div>'
-      + '</div>'
-      + '<div class="grid" style="margin-top:8px">'
-      + '<div><label>Min (optional)</label><input type="number" step="any" value="'
-      + (point.min === null ? "" : esc(point.min)) + '" placeholder="no min" '
-      + 'oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'min\',this.value)"></div>'
-      + '<div><label>Max (optional)</label><input type="number" step="any" value="'
-      + (point.max === null ? "" : esc(point.max)) + '" placeholder="no max" '
-      + 'oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'max\',this.value)"></div>'
-      + '</div>'
-      + '<p class="hint" style="margin:8px 0 0">Leave min and max blank to log the number '
-      + 'without checking it. A reading outside its limits is coloured, never refused.</p>'
-      + '</div>';
+    html += pointEditorHtml(tool.points[i], i, tool.points.length,
+      "updatePoint('" + tool.id + "','" + tool.points[i].id + "'",
+      "movePoint('" + tool.id + "','" + tool.points[i].id + "'",
+      "deletePoint('" + tool.id + "','" + tool.points[i].id + "')");
   }
 
-  // Add a new data point to this tool.
+  // Add a new tool-level reading.
   html += '<div class="row" style="margin-top:10px">'
     + '<div class="grow"><input type="text" id="newPoint_' + tool.id + '" '
-    + 'placeholder="For example: Chamber pressure"></div>'
-    + '<button onclick="addPoint(\'' + tool.id + '\')">Add reading</button>'
+    + 'placeholder="For example: N2 pressure"></div>'
+    + '<button onclick="addPoint(\'' + tool.id + '\')">Add tool reading</button>'
     + '</div>';
 
-  // Copy the whole reading list from another tool, so setting up a second
-  // machine of the same type is one tap instead of ten.
+  // Copy the tool-level reading list from another tool.
   var others = [];
   for (var k = 0; k < DATA.tools.length; k++) {
     if (DATA.tools[k].id !== tool.id && DATA.tools[k].points.length > 0) others.push(DATA.tools[k]);
@@ -1288,12 +1923,164 @@ function toolEditorHtml(tool, index) {
       html += '<option value="' + others[m].id + '">' + esc(others[m].name) + '</option>';
     }
     html += '</select></div>'
-      + '<button class="secondary" onclick="copyPoints(\'' + tool.id + '\')">Copy its readings here</button>'
+      + '<button class="secondary" onclick="copyPoints(\'' + tool.id + '\')">'
+      + 'Copy its tool readings here</button>'
       + '</div>';
   }
 
   html += '</div>';
   return html;
+}
+
+// ---------------------------------------------------------------------------
+// The chambers on one tool. A chamber is just a name and a type; what it logs
+// comes from the type, which is defined once at the top of this tab.
+// ---------------------------------------------------------------------------
+function chamberEditorHtml(tool) {
+  var chambers = tool.chambers || [];
+  var html = '';
+
+  if (DATA.chamberTypes.length === 0) {
+    return '<p class="hint">This tool has no chambers. If it should, first add a chamber '
+      + 'type at the top of this tab, then come back and add chambers here.</p>';
+  }
+
+  if (chambers.length === 0) {
+    html += '<p class="hint">None. Leave it that way for a single-chamber tool like a wet bench.</p>';
+  }
+
+  for (var i = 0; i < chambers.length; i++) {
+    var chamber = chambers[i];
+    html += '<div class="pointedit">'
+      + '<div class="grid">'
+      + '<div><label>Chamber name</label>'
+      + '<input type="text" value="' + esc(chamber.name) + '" '
+      + 'oninput="renameChamber(\'' + tool.id + '\',\'' + chamber.id + '\', this.value)"></div>'
+      + '<div><label>Type</label><select '
+      + 'onchange="setChamberType(\'' + tool.id + '\',\'' + chamber.id + '\', this.value)">';
+    for (var q = 0; q < DATA.chamberTypes.length; q++) {
+      var type = DATA.chamberTypes[q];
+      html += '<option value="' + type.id + '"'
+        + (type.id === chamber.typeId ? ' selected' : '') + '>' + esc(type.name)
+        + ' (' + type.points.length + ')</option>';
+    }
+    html += '</select></div></div>'
+      + '<div class="row" style="margin-top:8px">'
+      + '<button class="secondary small" onclick="moveChamber(\'' + tool.id + '\',\''
+      + chamber.id + '\',-1)"' + (i === 0 ? ' disabled' : '') + '>&#9650;</button>'
+      + '<button class="secondary small" onclick="moveChamber(\'' + tool.id + '\',\''
+      + chamber.id + '\',1)"' + (i === chambers.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
+      + '<button class="danger small" onclick="deleteChamber(\'' + tool.id + '\',\''
+      + chamber.id + '\')">Delete chamber</button>'
+      + '</div></div>';
+  }
+
+  html += '<div class="row" style="margin-top:10px">'
+    + '<div class="grow"><input type="text" id="newChamber_' + tool.id + '" '
+    + 'placeholder="For example: PM1"></div>'
+    + '<button onclick="addChamber(\'' + tool.id + '\')">Add chamber</button>'
+    + '</div>';
+
+  return html;
+}
+
+function addChamber(toolId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  if (DATA.chamberTypes.length === 0) {
+    setMsg("toolsMsg", "err", "Add a chamber type at the top of this tab first.");
+    return;
+  }
+  var box = document.getElementById("newChamber_" + toolId);
+  var name = box.value.trim();
+  if (name === "") { setMsg("toolsMsg", "err", "Type a name for the chamber first."); return; }
+  if (findChamberByName(tool, name)) {
+    setMsg("toolsMsg", "err", tool.name + " already has a chamber called that.");
+    return;
+  }
+
+  if (!tool.chambers) tool.chambers = [];
+  // Default to the first type. Almost always right for a tool whose chambers
+  // are all the same, and one tap to change when they are not.
+  tool.chambers.push({ id: newId(), name: name, typeId: DATA.chamberTypes[0].id });
+  save();
+  render();
+  setMsg("toolsMsg", "ok", "Added " + name + " to " + tool.name
+    + ". Check its type is right.");
+}
+
+function renameChamber(toolId, chamberId, name) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var chamber = findChamber(tool, chamberId);
+  if (!chamber) return;
+  name = String(name).trim();
+  if (name === "") return;
+  chamber.name = name;
+  save();
+}
+
+function setChamberType(toolId, chamberId, typeId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var chamber = findChamber(tool, chamberId);
+  if (!chamber) return;
+  chamber.typeId = typeId;
+  save();
+  render();
+}
+
+function moveChamber(toolId, chamberId, step) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  movePointInList(tool.chambers, chamberId, step);
+  save();
+  render();
+}
+
+function deleteChamber(toolId, chamberId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var chamber = findChamber(tool, chamberId);
+  if (!chamber) return;
+
+  var logged = countReadingsForChamber(toolId, chamberId);
+  var question = 'Delete the chamber "' + chamber.name + '" from ' + tool.name + '?';
+  if (logged > 0) question += "\n\nThis also deletes " + logged
+    + " readings logged against it. This cannot be undone.";
+  if (!window.confirm(question)) return;
+  if (logged > 0 && !window.confirm("Really delete " + logged
+      + " readings? Export first if you are not sure.")) return;
+
+  var kept = [];
+  for (var i = 0; i < tool.chambers.length; i++) {
+    if (tool.chambers[i].id !== chamberId) kept.push(tool.chambers[i]);
+  }
+  tool.chambers = kept;
+
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var entry = DATA.entries[dates[d]][toolId];
+    if (entry && entry.chambers) delete entry.chambers[chamberId];
+  }
+  save();
+  render();
+  setMsg("toolsMsg", "ok", "Deleted " + chamber.name + ".");
+}
+
+function countReadingsForChamber(toolId, chamberId) {
+  var total = 0;
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var entry = DATA.entries[dates[d]][toolId];
+    if (!entry || !entry.chambers || !entry.chambers[chamberId]) continue;
+    var values = entry.chambers[chamberId].values;
+    var keys = Object.keys(values);
+    for (var k = 0; k < keys.length; k++) {
+      if (String(values[keys[k]]).trim() !== "") total++;
+    }
+  }
+  return total;
 }
 
 function addTool() {
@@ -1302,7 +2089,7 @@ function addTool() {
   if (name === "") { setMsg("toolsMsg", "err", "Type a name for the tool first."); return; }
   if (findToolByName(name)) { setMsg("toolsMsg", "err", "There is already a tool called that."); return; }
 
-  DATA.tools.push({ id: newId(), name: name, points: [] });
+  DATA.tools.push({ id: newId(), name: name, points: [], chambers: [] });
   save();
   box.value = "";
   render();
@@ -1353,18 +2140,30 @@ function deleteTool(toolId) {
   setMsg("toolsMsg", "ok", "Deleted " + tool.name + ".");
 }
 
+// Every reading logged against a tool, including all of its chambers.
 function countReadingsForTool(toolId) {
   var total = 0;
   var dates = Object.keys(DATA.entries);
   for (var d = 0; d < dates.length; d++) {
     var entry = DATA.entries[dates[d]][toolId];
     if (!entry) continue;
-    var keys = Object.keys(entry.values);
-    for (var k = 0; k < keys.length; k++) {
-      if (String(entry.values[keys[k]]).trim() !== "") total++;
+    total += countFilled(entry.values || {});
+    var chamberIds = Object.keys(entry.chambers || {});
+    for (var c = 0; c < chamberIds.length; c++) {
+      total += countFilled(entry.chambers[chamberIds[c]].values);
     }
   }
   return total;
+}
+
+// How many of a set of values were actually filled in.
+function countFilled(values) {
+  var n = 0;
+  var keys = Object.keys(values);
+  for (var k = 0; k < keys.length; k++) {
+    if (String(values[keys[k]]).trim() !== "") n++;
+  }
+  return n;
 }
 
 // Move a tool up or down the round order.
@@ -1412,15 +2211,7 @@ function updatePoint(toolId, pointId, field, value) {
   var point = findPoint(tool, pointId);
   if (!point) return;
 
-  if (field === "name") {
-    var name = value.trim();
-    if (name !== "") point.name = name;
-  } else if (field === "unit") {
-    point.unit = value.trim();
-  } else if (field === "min" || field === "max") {
-    var text = String(value).trim();
-    point[field] = (text === "" || isNaN(Number(text))) ? null : Number(text);
-  }
+  applyPointField(point, field, value);
   save();
   warnAboutDuplicateNames();
 }
@@ -1438,14 +2229,7 @@ function deletePoint(toolId, pointId) {
     if (tool.points[i].id !== pointId) kept.push(tool.points[i]);
   }
   tool.points = kept;
-
-  // Drop the values for that point on every date.
-  var dates = Object.keys(DATA.entries);
-  for (var d = 0; d < dates.length; d++) {
-    var entry = DATA.entries[dates[d]][toolId];
-    if (entry) delete entry.values[pointId];
-  }
-
+  forgetPointEverywhere(pointId);
   save();
   render();
 }
@@ -1453,17 +2237,9 @@ function deletePoint(toolId, pointId) {
 function movePoint(toolId, pointId, step) {
   var tool = findTool(toolId);
   if (!tool) return;
-  for (var i = 0; i < tool.points.length; i++) {
-    if (tool.points[i].id !== pointId) continue;
-    var to = i + step;
-    if (to < 0 || to >= tool.points.length) return;
-    var moved = tool.points[i];
-    tool.points[i] = tool.points[to];
-    tool.points[to] = moved;
-    save();
-    render();
-    return;
-  }
+  movePointInList(tool.points, pointId, step);
+  save();
+  render();
 }
 
 // Copy every reading from another tool into this one. Readings this tool
@@ -1490,26 +2266,49 @@ function copyPoints(toolId) {
 function loadExample() {
   if (DATA.tools.length > 0 && !window.confirm("This adds two example tools to your list. Continue?")) return;
 
+  // Two chamber types, to show how a tool with mixed chambers works.
+  var etchType = { id: newId(), name: "Example Etch", points: [
+    { id: newId(), name: "Chamber pressure", unit: "mTorr", min: 8, max: 12 },
+    { id: newId(), name: "He leak rate", unit: "sccm", min: null, max: 2.5 },
+    { id: newId(), name: "RF hours", unit: "h", min: null, max: null },
+    { id: newId(), name: "Kit life used", unit: "%", min: null, max: 80 }
+  ] };
+  var stripType = { id: newId(), name: "Example Strip", points: [
+    { id: newId(), name: "Chamber pressure", unit: "mTorr", min: 800, max: 1200 },
+    { id: newId(), name: "Source hours", unit: "h", min: null, max: null }
+  ] };
+  DATA.chamberTypes.push(etchType);
+  DATA.chamberTypes.push(stripType);
+
+  // A cluster tool: three chambers of two different types, plus facilities
+  // readings that belong to the whole machine.
   DATA.tools.push({
     id: newId(), name: "Example Etcher 3",
     points: [
-      { id: newId(), name: "Chamber pressure", unit: "mTorr", min: 8, max: 12 },
-      { id: newId(), name: "He leak rate", unit: "sccm", min: null, max: 2.5 },
       { id: newId(), name: "Chiller temperature", unit: "C", min: 18, max: 22 },
-      { id: newId(), name: "RF hours", unit: "h", min: null, max: null }
+      { id: newId(), name: "N2 pressure", unit: "psi", min: 40, max: 60 }
+    ],
+    chambers: [
+      { id: newId(), name: "PM1", typeId: etchType.id },
+      { id: newId(), name: "PM2", typeId: etchType.id },
+      { id: newId(), name: "PM3", typeId: stripType.id }
     ]
   });
+
+  // A single-chamber tool, to show that nothing changes for the simple case.
   DATA.tools.push({
     id: newId(), name: "Example Wet Bench 1",
     points: [
       { id: newId(), name: "Bath temperature", unit: "C", min: 60, max: 65 },
       { id: newId(), name: "DI resistivity", unit: "Mohm-cm", min: 17, max: null },
       { id: newId(), name: "N2 pressure", unit: "psi", min: 40, max: 60 }
-    ]
+    ],
+    chambers: []
   });
   save();
   showTab("tools");
-  setMsg("toolsMsg", "ok", "Loaded two example tools. Delete them once you have added your real ones.");
+  setMsg("toolsMsg", "ok", "Loaded two example tools, one with chambers and one without. "
+    + "Delete them once you have added your real ones.");
 }
 
 // ---------------------------------------------------------------------------
@@ -1644,7 +2443,8 @@ function setDiagNames(on) {
 // ---------------------------------------------------------------------------
 // Pass a date to get just that day's round. Pass null to get everything.
 function buildCsv(onlyDate) {
-  var rows = [["Date", "Tool", "Data point", "Unit", "Value", "Min", "Max", "Status", "Saved at"]];
+  var rows = [["Date", "Tool", "Chamber", "Chamber type", "Data point", "Unit",
+               "Value", "Min", "Max", "Status", "Saved at"]];
 
   var dates = onlyDate ? [onlyDate] : Object.keys(DATA.entries).sort();
   for (var d = 0; d < dates.length; d++) {
@@ -1654,24 +2454,35 @@ function buildCsv(onlyDate) {
     // Walk the tools in round order, so the file reads the way you walk.
     for (var t = 0; t < DATA.tools.length; t++) {
       var tool = DATA.tools[t];
-      var entry = day[tool.id];
-      if (!entry) continue;
+      if (!day[tool.id]) continue;
 
-      for (var p = 0; p < tool.points.length; p++) {
-        var point = tool.points[p];
-        var value = entry.values[point.id];
-        if (value === undefined || String(value).trim() === "") continue;  // skip blanks
-        rows.push([
-          date,
-          tool.name,
-          point.name,
-          point.unit,
-          value,
-          point.min === null ? "" : point.min,
-          point.max === null ? "" : point.max,
-          rangeStatus(value, point),
-          entry.savedAt || ""
-        ]);
+      // Tool readings first, then each chamber, matching the tool screen.
+      var units = toolUnits(tool);
+      for (var u = 0; u < units.length; u++) {
+        var unit = units[u];
+        var stored = unitEntry(tool.id, unit.id, date);
+        if (!stored) continue;
+
+        for (var p = 0; p < unit.points.length; p++) {
+          var point = unit.points[p];
+          var value = stored.values[point.id];
+          if (value === undefined || String(value).trim() === "") continue;  // skip blanks
+          rows.push([
+            date,
+            tool.name,
+            // Tool-level readings leave the chamber columns empty, so an Excel
+            // filter on Chamber cleanly separates the two.
+            unit.kind === "chamber" ? unit.name : "",
+            unit.kind === "chamber" ? unit.typeName : "",
+            point.name,
+            point.unit,
+            value,
+            point.min === null ? "" : point.min,
+            point.max === null ? "" : point.max,
+            rangeStatus(value, point),
+            stored.savedAt || ""
+          ]);
+        }
       }
     }
   }
@@ -1733,10 +2544,11 @@ function countReadingsOnDate(date) {
   var total = 0;
   var toolIds = Object.keys(day);
   for (var t = 0; t < toolIds.length; t++) {
-    var values = day[toolIds[t]].values;
-    var keys = Object.keys(values);
-    for (var k = 0; k < keys.length; k++) {
-      if (String(values[keys[k]]).trim() !== "") total++;
+    var entry = day[toolIds[t]];
+    total += countFilled(entry.values || {});
+    var chamberIds = Object.keys(entry.chambers || {});
+    for (var c = 0; c < chamberIds.length; c++) {
+      total += countFilled(entry.chambers[chamberIds[c]].values);
     }
   }
   return total;
@@ -1858,7 +2670,7 @@ function fileChosen() {
   for (var i = 0; i < input.files.length; i++) files.push(input.files[i]);
   files.sort(function (a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); });
 
-  var combined = { tools: [], rows: [] };
+  var combined = { tools: [], chamberTypes: [], rows: [] };
   var problems = [];
   var waitingFor = files.length;
 
@@ -1893,6 +2705,7 @@ function fileChosen() {
         // Duplicate tools across files are harmless: ensureTool() matches on
         // name, so the second and later copies simply find the first one.
         combined.tools = combined.tools.concat(parsed.tools);
+        combined.chamberTypes = combined.chamberTypes.concat(parsed.chamberTypes || []);
         combined.rows = combined.rows.concat(parsed.rows);
       } catch (e) {
         problems.push(file.name + ": " + e.message);
@@ -1923,6 +2736,10 @@ function askMergeOrReplace(label, parsed, problems) {
 
   var toolNames = parsed.tools.map(function (t) { return t.name; });
   var dates = parsed.rows.map(function (r) { return r.date; });
+  var chamberCount = 0;
+  for (var i = 0; i < parsed.tools.length; i++) {
+    chamberCount += (parsed.tools[i].chambers || []).length;
+  }
 
   var trouble = "";
   if (problems && problems.length > 0) {
@@ -1932,7 +2749,9 @@ function askMergeOrReplace(label, parsed, problems) {
   }
 
   box.innerHTML = '<p class="hint" style="margin-top:12px"><strong>' + esc(label) + '</strong> holds '
-    + countDistinct(toolNames) + ' tools and ' + parsed.rows.length + ' readings across '
+    + countDistinct(toolNames) + ' tools'
+    + (chamberCount > 0 ? ', ' + chamberCount + ' chambers' : '')
+    + ' and ' + parsed.rows.length + ' readings across '
     + countDistinct(dates) + ' days. What should happen to '
     + 'what is already on this tablet?</p>'
     + trouble
@@ -1960,6 +2779,7 @@ function runImport(mode) {
     if (!window.confirm("Erase everything on this tablet and use the file instead?")) return;
     DATA.tools = [];
     DATA.entries = {};
+    DATA.chamberTypes = [];
   }
   bump(mode === "replace" ? "importsReplace" : "importsMerge");
 
@@ -1969,29 +2789,62 @@ function runImport(mode) {
   var dates = Object.keys(DATA.entries);
   for (var d = 0; d < dates.length; d++) {
     var toolIds = Object.keys(DATA.entries[dates[d]]);
-    for (var t = 0; t < toolIds.length; t++) alreadyHere[dates[d] + "|" + toolIds[t]] = true;
+    for (var t = 0; t < toolIds.length; t++) {
+      var existing = DATA.entries[dates[d]][toolIds[t]];
+      // An entry that holds nothing at all is a leftover scaffold, not real
+      // data, so it must not block an import from filling that day in.
+      var hasTool = !!existing.savedAt;
+      var hasChambers = Object.keys(existing.chambers || {}).length > 0;
+      if (hasTool || hasChambers) alreadyHere[dates[d] + "|" + toolIds[t]] = true;
+    }
   }
 
-  // Step 1: make sure every tool and reading in the file exists here.
+  // Step 1: chamber types first, because a chamber refers to one by name.
+  var incomingTypes = parsed.chamberTypes || [];
+  for (var y = 0; y < incomingTypes.length; y++) ensureChamberType(incomingTypes[y]);
+
+  // Step 2: make sure every tool, reading and chamber in the file exists here.
   for (var i = 0; i < parsed.tools.length; i++) ensureTool(parsed.tools[i]);
 
-  // Step 2: put the readings in.
+  // Step 3: put the readings in.
   var added = 0, skipped = 0;
   for (var r = 0; r < parsed.rows.length; r++) {
     var row = parsed.rows[r];
     var tool = findToolByName(row.tool);
     if (!tool) continue;
-    var point = findPointByName(tool, row.point);
-    if (!point) continue;
 
     if (alreadyHere[row.date + "|" + tool.id]) { skipped++; continue; }
 
-    if (!DATA.entries[row.date]) DATA.entries[row.date] = {};
-    if (!DATA.entries[row.date][tool.id]) {
-      DATA.entries[row.date][tool.id] = { savedAt: row.savedAt || "", values: {} };
+    var entry = ensureEntry(tool.id, row.date);
+
+    if (!row.chamber) {
+      // A tool-level reading.
+      var point = findPointByName(tool, row.point);
+      if (!point) continue;
+      if (!entry.savedAt) entry.savedAt = row.savedAt || "";
+      entry.values[point.id] = row.value;
+      added++;
+    } else {
+      // A chamber reading. Its reading list comes from the chamber's type.
+      var chamber = findChamberByName(tool, row.chamber);
+      if (!chamber) continue;
+      var type = findChamberType(chamber.typeId);
+      if (!type) continue;
+
+      var chamberPoint = null;
+      for (var q = 0; q < type.points.length; q++) {
+        if (type.points[q].name.trim().toLowerCase() === String(row.point).trim().toLowerCase()) {
+          chamberPoint = type.points[q];
+        }
+      }
+      if (!chamberPoint) continue;
+
+      if (!entry.chambers[chamber.id]) {
+        entry.chambers[chamber.id] = { savedAt: row.savedAt || "", values: {} };
+      }
+      entry.chambers[chamber.id].values[chamberPoint.id] = row.value;
+      added++;
     }
-    DATA.entries[row.date][tool.id].values[point.id] = row.value;
-    added++;
   }
 
   save();
@@ -2009,43 +2862,94 @@ function runImport(mode) {
 function ensureTool(incoming) {
   var tool = findToolByName(incoming.name);
   if (!tool) {
-    tool = { id: newId(), name: String(incoming.name).trim(), points: [] };
+    tool = { id: newId(), name: String(incoming.name).trim(), points: [], chambers: [] };
     DATA.tools.push(tool);
   }
+  if (!tool.chambers) tool.chambers = [];
+
   for (var i = 0; i < incoming.points.length; i++) {
     var wanted = incoming.points[i];
     if (findPointByName(tool, wanted.name)) continue;
-    tool.points.push({
+    tool.points.push(makePoint(wanted));
+  }
+
+  // Chambers point at a type by name. The type itself is created separately,
+  // by ensureChamberType, before this runs.
+  var incomingChambers = incoming.chambers || [];
+  for (var c = 0; c < incomingChambers.length; c++) {
+    if (findChamberByName(tool, incomingChambers[c].name)) continue;
+    var type = findChamberTypeByName(incomingChambers[c].typeName);
+    if (!type) continue;
+    tool.chambers.push({
       id: newId(),
-      name: String(wanted.name).trim(),
-      unit: wanted.unit || "",
-      min: wanted.min === undefined ? null : wanted.min,
-      max: wanted.max === undefined ? null : wanted.max
+      name: String(incomingChambers[c].name).trim(),
+      typeId: type.id
     });
   }
   return tool;
 }
 
-// Read a JSON backup into the common shape.
+// Find a chamber type by name or create it. Readings are only added when the
+// type is brand new here, so an import never quietly rewrites limits you have
+// tuned on this tablet.
+function ensureChamberType(incoming) {
+  var type = findChamberTypeByName(incoming.name);
+  if (!type) {
+    type = { id: newId(), name: String(incoming.name).trim(), points: [] };
+    DATA.chamberTypes.push(type);
+  }
+  for (var i = 0; i < incoming.points.length; i++) {
+    var wanted = incoming.points[i];
+    var already = false;
+    for (var k = 0; k < type.points.length; k++) {
+      if (type.points[k].name.trim().toLowerCase() === String(wanted.name).trim().toLowerCase()) {
+        already = true;
+      }
+    }
+    if (already) continue;
+    type.points.push(makePoint(wanted));
+  }
+  return type;
+}
+
+function makePoint(wanted) {
+  return {
+    id: newId(),
+    name: String(wanted.name).trim(),
+    unit: wanted.unit || "",
+    min: wanted.min === undefined ? null : wanted.min,
+    max: wanted.max === undefined ? null : wanted.max
+  };
+}
+
 function parseBackupJson(text) {
   var obj = JSON.parse(text);
   if (!obj || !obj.tools || !obj.entries) throw new Error("It is missing its tools or entries.");
+
+  // Chamber types, if the backup has any. A backup taken before chambers
+  // existed simply has none.
+  var typesById = {};
+  var chamberTypes = [];
+  var sourceTypes = obj.chamberTypes || [];
+  for (var y = 0; y < sourceTypes.length; y++) {
+    var st = sourceTypes[y];
+    typesById[st.id] = st;
+    chamberTypes.push({ name: st.name, points: copyPoints(st.points) });
+  }
 
   var tools = [];
   var byId = {};
   for (var i = 0; i < obj.tools.length; i++) {
     var t = obj.tools[i];
     byId[t.id] = t;
-    var points = [];
-    for (var p = 0; p < t.points.length; p++) {
-      points.push({
-        name: t.points[p].name,
-        unit: t.points[p].unit || "",
-        min: t.points[p].min === undefined ? null : t.points[p].min,
-        max: t.points[p].max === undefined ? null : t.points[p].max
-      });
+    var chambers = [];
+    var sourceChambers = t.chambers || [];
+    for (var c = 0; c < sourceChambers.length; c++) {
+      var type = typesById[sourceChambers[c].typeId];
+      chambers.push({ name: sourceChambers[c].name,
+                      typeName: type ? type.name : "Imported" });
     }
-    tools.push({ name: t.name, points: points });
+    tools.push({ name: t.name, points: copyPoints(t.points), chambers: chambers });
   }
 
   // Flatten the saved entries into one row per reading.
@@ -2058,19 +2962,59 @@ function parseBackupJson(text) {
       var tool = byId[toolIds[k]];
       if (!tool) continue;                       // an entry for a deleted tool
       var entry = day[toolIds[k]];
-      for (var q = 0; q < tool.points.length; q++) {
-        var point = tool.points[q];
-        var value = entry.values[point.id];
-        if (value === undefined || String(value).trim() === "") continue;
-        rows.push({
-          date: dates[d], tool: tool.name, point: point.name,
-          unit: point.unit || "", min: point.min, max: point.max,
-          value: String(value), savedAt: entry.savedAt || ""
-        });
+
+      // Tool-level readings.
+      if (entry.savedAt) {
+        addRows(rows, dates[d], tool.name, "", "", tool.points, entry.values, entry.savedAt);
+      }
+
+      // Chamber readings. Which readings a chamber has comes from its type.
+      var storedChambers = entry.chambers || {};
+      var chamberIds = Object.keys(storedChambers);
+      for (var q = 0; q < chamberIds.length; q++) {
+        var chamber = null;
+        var toolChambers = tool.chambers || [];
+        for (var w = 0; w < toolChambers.length; w++) {
+          if (toolChambers[w].id === chamberIds[q]) chamber = toolChambers[w];
+        }
+        if (!chamber) continue;                  // a reading for a deleted chamber
+        var chamberType = typesById[chamber.typeId];
+        if (!chamberType) continue;
+        addRows(rows, dates[d], tool.name, chamber.name, chamberType.name,
+          chamberType.points, storedChambers[chamberIds[q]].values,
+          storedChambers[chamberIds[q]].savedAt);
       }
     }
   }
-  return { tools: tools, rows: rows };
+  return { tools: tools, chamberTypes: chamberTypes, rows: rows };
+}
+
+// Copy a reading list, keeping only the parts a file needs to carry.
+function copyPoints(points) {
+  var out = [];
+  for (var i = 0; i < (points || []).length; i++) {
+    out.push({
+      name: points[i].name,
+      unit: points[i].unit || "",
+      min: points[i].min === undefined ? null : points[i].min,
+      max: points[i].max === undefined ? null : points[i].max
+    });
+  }
+  return out;
+}
+
+// Turn one set of saved values into rows, skipping anything left blank.
+function addRows(rows, date, toolName, chamberName, typeName, points, values, savedAt) {
+  for (var i = 0; i < points.length; i++) {
+    var value = (values || {})[points[i].id];
+    if (value === undefined || String(value).trim() === "") continue;
+    rows.push({
+      date: date, tool: toolName, chamber: chamberName, chamberType: typeName,
+      point: points[i].name, unit: points[i].unit || "",
+      min: points[i].min, max: points[i].max,
+      value: String(value), savedAt: savedAt || ""
+    });
+  }
 }
 
 // Read an exported CSV into the common shape. The CSV carries the limits as
@@ -2093,7 +3037,9 @@ function parseReadingsCsv(text) {
   }
 
   var toolsByName = {};
+  var typesByName = {};
   var tools = [];
+  var chamberTypes = [];
   var rows = [];
 
   for (var r = 1; r < table.length; r++) {
@@ -2111,30 +3057,62 @@ function parseReadingsCsv(text) {
     var max = numberOrNull(cell(line, col["max"]));
     var savedAt = cell(line, col["saved at"]);
 
-    // Collect the tool and reading definitions as we go.
+    // Chamber columns are optional. A file exported before chambers existed
+    // has none, and every row in it is a tool-level reading - which is exactly
+    // what it was. That is why older exports still import correctly.
+    var chamberName = cell(line, col["chamber"]);
+    var typeName = cell(line, col["chamber type"]);
+    if (chamberName !== "" && typeName === "") typeName = "Imported";
+
+    // Collect the tool, chamber and reading definitions as we go.
     // The "n:" in front of each key keeps a tool or reading named something
     // like "constructor" from colliding with a built-in property name.
     var key = "n:" + toolName.toLowerCase();
     if (toolsByName[key] === undefined) {
-      toolsByName[key] = { name: toolName, points: [], seen: {} };
+      toolsByName[key] = { name: toolName, points: [], chambers: [], seen: {} };
       tools.push(toolsByName[key]);
     }
     var holder = toolsByName[key];
-    var pkey = "n:" + pointName.toLowerCase();
-    if (holder.seen[pkey] === undefined) {
-      holder.seen[pkey] = true;
-      holder.points.push({ name: pointName, unit: unit, min: min, max: max });
+
+    if (chamberName === "") {
+      // A tool-level reading, belonging to the whole machine.
+      var pkey = "n:tool:" + pointName.toLowerCase();
+      if (holder.seen[pkey] === undefined) {
+        holder.seen[pkey] = true;
+        holder.points.push({ name: pointName, unit: unit, min: min, max: max });
+      }
+    } else {
+      // A chamber reading. The reading belongs to the chamber TYPE, so it is
+      // collected there; the chamber itself only records which type it is.
+      var ckey = "n:cham:" + chamberName.toLowerCase();
+      if (holder.seen[ckey] === undefined) {
+        holder.seen[ckey] = true;
+        holder.chambers.push({ name: chamberName, typeName: typeName });
+      }
+      var tkey = "n:type:" + typeName.toLowerCase();
+      if (typesByName[tkey] === undefined) {
+        typesByName[tkey] = { name: typeName, points: [], seen: {} };
+        chamberTypes.push(typesByName[tkey]);
+      }
+      var type = typesByName[tkey];
+      var tpkey = "n:" + pointName.toLowerCase();
+      if (type.seen[tpkey] === undefined) {
+        type.seen[tpkey] = true;
+        type.points.push({ name: pointName, unit: unit, min: min, max: max });
+      }
     }
 
     if (value !== "") {
-      rows.push({ date: date, tool: toolName, point: pointName, unit: unit,
-                  min: min, max: max, value: value, savedAt: savedAt });
+      rows.push({ date: date, tool: toolName, chamber: chamberName, chamberType: typeName,
+                  point: pointName, unit: unit, min: min, max: max,
+                  value: value, savedAt: savedAt });
     }
   }
   // "seen" was only a working note while parsing. Leave it behind.
   for (var i = 0; i < tools.length; i++) delete tools[i].seen;
+  for (var y = 0; y < chamberTypes.length; y++) delete chamberTypes[y].seen;
 
-  return { tools: tools, rows: rows };
+  return { tools: tools, chamberTypes: chamberTypes, rows: rows };
 }
 
 // Read one cell out of a CSV line, safely if the column is missing.
@@ -2271,6 +3249,8 @@ function buildReport() {
   var stats = dataStats();
   head("DATA");
   row("Tools", String(DATA.tools.length));
+  row("Chambers", String(stats.chamberCount) + " across " + stats.typeCount
+    + (stats.typeCount === 1 ? " type" : " types"));
   row("Readings defined", String(stats.pointCount));
   row("Days logged", String(stats.dayCount));
   row("Date range", stats.dayCount === 0 ? "nothing logged yet" : stats.first + " to " + stats.last);
@@ -2285,12 +3265,17 @@ function buildReport() {
     for (var t = 0; t < DATA.tools.length; t++) {
       var tool = DATA.tools[t];
       lines.push("  " + tool.name);
-      for (var q = 0; q < tool.points.length; q++) {
-        var point = tool.points[q];
-        lines.push("      " + padRight(point.name, 26)
-          + padRight(point.unit || "-", 12)
-          + "min " + (point.min === null ? "-" : point.min)
-          + "  max " + (point.max === null ? "-" : point.max));
+      var nameUnits = toolUnits(tool);
+      for (var n2 = 0; n2 < nameUnits.length; n2++) {
+        var nu = nameUnits[n2];
+        lines.push("    " + nu.name + (nu.typeName ? "  [" + nu.typeName + "]" : ""));
+        for (var q = 0; q < nu.points.length; q++) {
+          var point = nu.points[q];
+          lines.push("        " + padRight(point.name, 26)
+            + padRight(point.unit || "-", 12)
+            + "min " + (point.min === null ? "-" : point.min)
+            + "  max " + (point.max === null ? "-" : point.max));
+        }
       }
     }
   }
@@ -2349,8 +3334,14 @@ function kb(chars) {
 // Counts across the whole data set. No values, only tallies.
 function dataStats() {
   var out = { pointCount: 0, dayCount: 0, readingCount: 0, outOfRange: 0,
-              blankCount: 0, first: "", last: "" };
-  for (var t = 0; t < DATA.tools.length; t++) out.pointCount += DATA.tools[t].points.length;
+              blankCount: 0, first: "", last: "",
+              chamberCount: 0, typeCount: DATA.chamberTypes.length };
+
+  for (var t = 0; t < DATA.tools.length; t++) {
+    out.chamberCount += (DATA.tools[t].chambers || []).length;
+    var units = toolUnits(DATA.tools[t]);
+    for (var u = 0; u < units.length; u++) out.pointCount += units[u].points.length;
+  }
 
   var dates = Object.keys(DATA.entries).sort();
   out.dayCount = dates.length;
@@ -2359,15 +3350,20 @@ function dataStats() {
   for (var d = 0; d < dates.length; d++) {
     for (var i = 0; i < DATA.tools.length; i++) {
       var tool = DATA.tools[i];
-      var entry = DATA.entries[dates[d]][tool.id];
-      if (!entry) continue;
-      for (var p = 0; p < tool.points.length; p++) {
-        var point = tool.points[p];
-        var value = entry.values[point.id];
-        if (value === undefined || String(value).trim() === "") { out.blankCount++; continue; }
-        out.readingCount++;
-        var status = rangeStatus(value, point);
-        if (status === "LOW" || status === "HIGH") out.outOfRange++;
+      if (!DATA.entries[dates[d]][tool.id]) continue;
+      var toolUnitList = toolUnits(tool);
+      for (var q = 0; q < toolUnitList.length; q++) {
+        var unit = toolUnitList[q];
+        var stored = unitEntry(tool.id, unit.id, dates[d]);
+        if (!stored) continue;
+        for (var p = 0; p < unit.points.length; p++) {
+          var point = unit.points[p];
+          var value = stored.values[point.id];
+          if (value === undefined || String(value).trim() === "") { out.blankCount++; continue; }
+          out.readingCount++;
+          var status = rangeStatus(value, point);
+          if (status === "LOW" || status === "HIGH") out.outOfRange++;
+        }
       }
     }
   }
@@ -2426,24 +3422,42 @@ function runSelfTest() {
     DATA = {
       version: DATA_SHAPE, createdWith: "self-test", lastOpenedWith: "self-test",
       nextId: 0, lastExport: "",
-      tools: [{ id: "t1", name: 'Etch, "A"', points: [
-        { id: "p1", name: "Pressure, mTorr", unit: "mTorr", min: 8, max: 12 },
-        { id: "p2", name: "Hours", unit: "h", min: null, max: null }
+      chamberTypes: [{ id: "ct1", name: "Etch type", points: [
+        { id: "c1", name: "RF hours", unit: "h", min: null, max: 500 },
+        { id: "c2", name: "Kit life", unit: "%", min: null, max: 80 }
       ] }],
-      entries: { "2026-01-31": { t1: { savedAt: "2026-01-31 09:00",
-        values: { p1: "9.4", p2: "1875.5" } } } }
+      tools: [{ id: "t1", name: 'Etch, "A"',
+        points: [
+          { id: "p1", name: "Pressure, mTorr", unit: "mTorr", min: 8, max: 12 },
+          { id: "p2", name: "Hours", unit: "h", min: null, max: null }
+        ],
+        chambers: [
+          { id: "ch1", name: "PM1", typeId: "ct1" },
+          { id: "ch2", name: "PM2", typeId: "ct1" }
+        ] }],
+      entries: { "2026-01-31": { t1: {
+        savedAt: "2026-01-31 09:00",
+        values: { p1: "9.4", p2: "1875.5" },
+        chambers: {
+          ch1: { savedAt: "2026-01-31 09:05", values: { c1: "120", c2: "44" } },
+          ch2: { savedAt: "2026-01-31 09:08", values: { c1: "610", c2: "12" } }
+        }
+      } } }
     };
 
     var csv = buildCsv(null);
     check("CSV starts with the marker Excel needs", csv.charAt(0) === "\uFEFF");
 
     var parsed = parseReadingsCsv(csv);
-    check("every reading survives the round trip", parsed.rows.length === 2,
-      parsed.rows.length + " of 2 rows");
+    // Two tool readings plus two readings on each of two chambers.
+    check("every reading survives the round trip", parsed.rows.length === 6,
+      parsed.rows.length + " of 6 rows");
 
     var byName = {};
-    for (var r = 0; r < parsed.rows.length; r++) byName["n:" + parsed.rows[r].point] = parsed.rows[r];
-    var back = byName["n:Pressure, mTorr"];
+    for (var r = 0; r < parsed.rows.length; r++) {
+      byName["n:" + parsed.rows[r].chamber + "|" + parsed.rows[r].point] = parsed.rows[r];
+    }
+    var back = byName["n:|Pressure, mTorr"];
     check("a comma in a name survives", !!back);
     check("a quote in a name survives", back && back.tool === 'Etch, "A"', back ? back.tool : "missing");
     check("the value is unchanged", back && back.value === "9.4", back ? back.value : "missing");
@@ -2468,6 +3482,26 @@ function runSelfTest() {
     check("duplicate check copes with awkward names",
       countDistinct(["constructor", "constructor", "toString"]) === 2,
       String(countDistinct(["constructor", "constructor", "toString"])));
+
+    // Chambers: the two PMs share a type, so they log the same readings, but
+    // their values and their pass/fail must stay independent.
+    var pm1 = byName["n:PM1|RF hours"];
+    var pm2 = byName["n:PM2|RF hours"];
+    check("chamber readings carry their chamber name", !!pm1 && !!pm2);
+    check("chambers of one type keep separate values",
+      pm1 && pm2 && pm1.value === "120" && pm2.value === "610",
+      pm1 && pm2 ? pm1.value + " / " + pm2.value : "missing");
+    check("the chamber type travels with the reading",
+      pm1 && pm1.chamberType === "Etch type", pm1 ? pm1.chamberType : "missing");
+    check("one chamber can fail while its twin passes",
+      pm1 && pm2 && pm1.value !== undefined
+        && rangeStatus(pm1.value, { min: null, max: 500 }) === "OK"
+        && rangeStatus(pm2.value, { min: null, max: 500 }) === "HIGH");
+    check("tool readings leave the chamber column empty",
+      back && back.chamber === "", back ? '"' + back.chamber + '"' : "missing");
+    check("a tool knows how many things it has to log",
+      toolUnits(DATA.tools[0]).length === 3,
+      String(toolUnits(DATA.tools[0]).length) + " of 3");
   } catch (e) {
     check("the self-test ran without crashing", false, e.name + ": " + e.message);
   } finally {
