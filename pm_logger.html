@@ -214,6 +214,47 @@
   .pointedit .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
   .count { font-size: 15px; color: var(--muted); }
+
+  /* The diagnostics footnote. Deliberately quiet: small, grey, and right at
+     the bottom. There if you look for it, invisible if you are not. */
+  .footnote {
+    text-align: center;
+    margin: 4px 0 24px;
+    font-size: 12px;
+    color: var(--muted);
+    opacity: 0.65;
+  }
+  /* Small TEXT, but a full-size TAP AREA. Those are two different things, and
+     on a touchscreen both matter: it should be visually quiet without being
+     hard to hit. Do not shrink the padding to make it look smaller - shrink
+     the font size instead. */
+  .footnote button {
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font: inherit;
+    padding: 14px 18px;
+    min-height: 48px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  /* The report itself. Monospaced so columns line up when you paste it. */
+  #diagText {
+    width: 100%;
+    min-height: 260px;
+    font-family: Consolas, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px;
+    background: #fbfcfd;
+    color: var(--ink);
+  }
+  .checkline { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+  .checkline input { width: 22px; height: 22px; min-height: 0; }
   code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 14px; }
 </style>
 </head>
@@ -255,6 +296,30 @@
 // ---------------------------------------------------------------------------
 var STORAGE_KEY = "partybarte.pmlogger.v1";
 
+// ---------------------------------------------------------------------------
+// VERSION
+//
+// Bump APP_VERSION and BUILD_DATE every time this file changes. The version
+// shows in the diagnostics footnote at the bottom of the Data tab, so when
+// something goes wrong we both know exactly which build is on the tablet
+// instead of guessing.
+//
+// DATA_SHAPE is different, and changes far less often. It describes the LAYOUT
+// of the stored data, and only goes up if that layout changes in a way that
+// old data needs converting for. See migrateData().
+// ---------------------------------------------------------------------------
+var APP_VERSION = "1.2.0";
+var BUILD_DATE = "2026-08-24";
+var DATA_SHAPE = 1;
+
+// A second, separate storage slot for diagnostics: the error log, the usage
+// counters and the upgrade history.
+//
+// Deliberately kept apart from your readings. It means error text and counters
+// never end up inside a JSON backup, so exports stay clean and portable, and
+// clearing diagnostics can never touch a logged reading.
+var DEBUG_KEY = "partybarte.pmlogger.debug.v1";
+
 // Set to false if the browser refuses to store anything. We then warn loudly,
 // because in that case closing the page loses the day's work.
 var STORAGE_OK = true;
@@ -278,12 +343,61 @@ var DATA = blankData();
 // What an empty, brand new data set looks like.
 function blankData() {
   return {
-    version: 1,      // bumped only if the shape of this object ever changes
+    version: DATA_SHAPE,        // layout of this object, see migrateData()
+    createdWith: APP_VERSION,   // app version that first wrote this data
+    lastOpenedWith: APP_VERSION,// app version that last touched it
     nextId: 0,       // counter used to hand out ids, see newId()
     lastExport: "",  // date of the last export, as YYYY-MM-DD
     tools: [],       // see addTool() for the shape of a tool
     entries: {}      // entries[date][toolId] = { savedAt: "...", values: {} }
   };
+}
+
+// Set if the stored data came from a NEWER version of this page than the file
+// currently open. See migrateData() for why that matters.
+var VERSION_PROBLEM = "";
+
+// Set by migrateData() when it changed something that needs writing back.
+var MIGRATION_CHANGED = false;
+
+// ---------------------------------------------------------------------------
+// Bring stored data up to date with the version of the page now running.
+//
+// Right now there is only one layout, so there is nothing to convert and this
+// does almost nothing. That is the point: the hook exists BEFORE it is needed,
+// so a future change to the layout can upgrade your data instead of stranding
+// it. When that day comes, add a case below, oldest first.
+//
+// The awkward case is the other direction. If an old copy of this file is
+// still sitting in Downloads and gets double-clicked by mistake, it would find
+// data written by a newer version and could quietly wreck it. So going
+// backwards is refused, loudly, rather than guessed at.
+// ---------------------------------------------------------------------------
+function migrateData() {
+  var storedShape = Number(DATA.version || 1);
+
+  if (storedShape > DATA_SHAPE) {
+    VERSION_PROBLEM = "Your saved data was written by a newer version of this "
+      + "page (data layout " + storedShape + ", this file understands " + DATA_SHAPE
+      + "). Nothing has been changed. Find the newer pm_logger.html and use that one.";
+    return false;
+  }
+
+  // Convert older layouts, oldest first. Nothing to do yet.
+  // if (storedShape < 2) { ...change DATA in place...; DATA.version = 2; }
+
+  if (DATA.version !== DATA_SHAPE) { DATA.version = DATA_SHAPE; MIGRATION_CHANGED = true; }
+
+  // Note which version of the page has been handling this data. Data written
+  // before versions existed has neither field, so fill them in.
+  if (!DATA.createdWith) { DATA.createdWith = "before 1.2.0"; MIGRATION_CHANGED = true; }
+  var previous = DATA.lastOpenedWith || "before 1.2.0";
+  if (previous !== APP_VERSION) {
+    noteUpgrade(previous, APP_VERSION);
+    DATA.lastOpenedWith = APP_VERSION;
+    MIGRATION_CHANGED = true;
+  }
+  return true;
 }
 
 // Read the saved data back out of the browser.
@@ -300,7 +414,20 @@ function load() {
   if (!raw) return;                 // nothing saved yet, first ever run
   try {
     var parsed = JSON.parse(raw);
-    if (parsed && parsed.tools && parsed.entries) DATA = parsed;
+    if (parsed && parsed.tools && parsed.entries) {
+      DATA = parsed;
+      // If the data came from a newer version of this page, migrateData()
+      // refuses and we back out to an empty set rather than risk touching it.
+      // The real data stays untouched in storage: save() refuses to write
+      // while VERSION_PROBLEM is set, and the banner says what to do.
+      if (!migrateData()) {
+        DATA = blankData();
+      } else if (MIGRATION_CHANGED) {
+        // Write the new version stamp back, so the record of which build last
+        // touched this data is accurate rather than just correct in memory.
+        save();
+      }
+    }
   } catch (e) {
     // The saved text was damaged. Rather than crash, start fresh but do not
     // overwrite the damaged text until the user saves something new.
@@ -310,6 +437,12 @@ function load() {
 
 // Write the data back to the browser. Called after every change.
 function save() {
+  // If the stored data came from a newer version of this page, we must not
+  // write over it. migrateData() has already emptied DATA in memory to avoid
+  // showing half-understood data, so saving now would destroy the real thing.
+  // The banner tells the user to go and find the newer file.
+  if (VERSION_PROBLEM !== "") return;
+
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
     STORAGE_OK = true;
@@ -329,6 +462,108 @@ function storagePercent() {
   try { used = JSON.stringify(DATA).length; } catch (e) { return 0; }
   return Math.round((used / STORAGE_BUDGET) * 100);
 }
+
+// ---------------------------------------------------------------------------
+// THE DIAGNOSTICS SLOT
+//
+// Errors, usage counters and upgrade history. Kept in its own storage slot,
+// away from your readings. Everything here is capped so it cannot grow without
+// bound, and everything here stays on this tablet unless you export it and
+// send it on yourself.
+// ---------------------------------------------------------------------------
+var MAX_ERRORS = 20;
+var MAX_UPGRADES = 10;
+
+function blankDebug() {
+  return {
+    errors: [],     // {when, what, where, stack}
+    upgrades: [],   // {when, from, to}
+    stats: {}       // plain counters, see bump()
+  };
+}
+
+// Read the diagnostics slot. Never throws: diagnostics failing must never stop
+// the page you use to do your job.
+function loadDebug() {
+  try {
+    var raw = window.localStorage.getItem(DEBUG_KEY);
+    if (!raw) return blankDebug();
+    var parsed = JSON.parse(raw);
+    if (!parsed || !parsed.errors || !parsed.stats) return blankDebug();
+    if (!parsed.upgrades) parsed.upgrades = [];
+    return parsed;
+  } catch (e) {
+    return blankDebug();
+  }
+}
+
+function saveDebug(debug) {
+  try {
+    window.localStorage.setItem(DEBUG_KEY, JSON.stringify(debug));
+  } catch (e) {
+    // Out of room, or storage blocked. Diagnostics are the first thing that
+    // should be dropped when space runs short, so give up quietly.
+  }
+}
+
+// Add one to a named counter. These record WHAT YOU DO, never what you
+// measured: no reading value ever passes through here. They tell us which
+// parts of the tool are actually used, so it can be improved in the right
+// places.
+function bump(name) {
+  try {
+    var debug = loadDebug();
+    debug.stats[name] = (debug.stats[name] || 0) + 1;
+    saveDebug(debug);
+  } catch (e) { /* never let a counter break a round */ }
+}
+
+// Record that the page version changed under this data.
+function noteUpgrade(from, to) {
+  try {
+    var debug = loadDebug();
+    debug.upgrades.push({ when: todayStr(), from: from, to: to });
+    while (debug.upgrades.length > MAX_UPGRADES) debug.upgrades.shift();
+    saveDebug(debug);
+  } catch (e) { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------------
+// Catch errors as they happen and keep the last few.
+//
+// This is always on, and that is the whole point. The error worth seeing is
+// the one that happened mid-round on Tuesday, not one that can be reproduced
+// on demand. Because it is written to the diagnostics slot, it survives
+// closing the browser.
+//
+// Every part of this is wrapped, so a fault inside the error logger itself can
+// never cascade into the page.
+// ---------------------------------------------------------------------------
+function recordError(what, where, stack) {
+  try {
+    var debug = loadDebug();
+    debug.errors.push({
+      when: nowStamp(),
+      what: String(what).slice(0, 300),
+      where: String(where || "").slice(0, 200),
+      stack: String(stack || "").slice(0, 600)
+    });
+    while (debug.errors.length > MAX_ERRORS) debug.errors.shift();
+    saveDebug(debug);
+  } catch (e) { /* ignore */ }
+}
+
+window.onerror = function (message, source, lineNo, colNo, error) {
+  var where = String(source || "").split("/").pop() + " line " + lineNo + ":" + colNo;
+  recordError(message, where, error && error.stack);
+  return false;   // let the browser log it to the console as well
+};
+
+window.onunhandledrejection = function (event) {
+  var reason = event && event.reason;
+  recordError(reason && reason.message ? reason.message : reason,
+    "unhandled promise", reason && reason.stack);
+};
 
 // ---------------------------------------------------------------------------
 // SMALL HELPERS FOR THE DATA
@@ -558,6 +793,14 @@ function renderBanner() {
   var banner = document.getElementById("banner");
   var readings = countAllReadings();
 
+  // An old copy of the page opened against newer data beats everything else:
+  // carry on and you would damage data you cannot get back.
+  if (VERSION_PROBLEM !== "") {
+    banner.className = "banner show bad";
+    banner.innerHTML = "<span>" + esc(VERSION_PROBLEM) + "</span>";
+    return;
+  }
+
   // A failed save beats every other message: the round in front of you is at
   // risk right now, not at some point in the future.
   if (!STORAGE_OK) {
@@ -744,6 +987,7 @@ function pickDate(dateStr) {
 function openTool(toolId) {
   CURRENT_TOOL = toolId;
   VIEW = "entry";
+  bump("entryScreensOpened");
   render();
 }
 
@@ -837,9 +1081,21 @@ function saveEntry(mode) {
     values[point.id] = document.getElementById("val_" + point.id).value.trim();
   }
 
+  // Counters, for working out which parts of the tool actually get used.
+  // Taken before the save, so we can tell a first entry from a correction.
+  var wasComplete = (DATA.tools.length > 0 && countLogged(CURRENT_DATE) === DATA.tools.length);
+  var hadEntry = !!(DATA.entries[CURRENT_DATE] && DATA.entries[CURRENT_DATE][tool.id]);
+
   if (!DATA.entries[CURRENT_DATE]) DATA.entries[CURRENT_DATE] = {};
   DATA.entries[CURRENT_DATE][tool.id] = { savedAt: nowStamp(), values: values };
   save();
+
+  if (hadEntry) bump("reEditsOfASavedTool");
+  if (CURRENT_DATE !== todayStr()) bump("backFilledSaves");
+  // Only count the moment a round TIPS into complete, not every later re-save.
+  if (!wasComplete && DATA.tools.length > 0 && countLogged(CURRENT_DATE) === DATA.tools.length) {
+    bump("roundsCompleted");
+  }
 
   if (mode === "next") {
     var next = nextUnlogged(CURRENT_DATE, tool.id);
@@ -1275,7 +1531,71 @@ function renderData() {
     + '<div class="big-actions"><button class="danger" onclick="eraseAll()">Erase all data</button></div>'
     + '</div>';
 
+  // The diagnostics footnote. Closed on every visit, on purpose: it can never
+  // be left showing by accident, and nobody walking the round trips over it.
+  html += '<div id="diagPanel"></div>'
+    + '<p class="footnote"><button onclick="toggleDiagnostics()">Diagnostics</button>'
+    + ' &middot; v' + esc(APP_VERSION) + '</p>';
+
   host.innerHTML = html;
+
+  // Redrawing this tab wipes the panel out of the page. If it was open, put it
+  // back. Without this, leaving the tab and coming back leaves the panel
+  // invisible while the code still thinks it is open, and the footnote then
+  // looks broken because the next tap only closes it again.
+  renderDiagnostics();
+}
+
+// ---------------------------------------------------------------------------
+// DIAGNOSTICS PANEL
+//
+// None of this is needed to walk a round. It exists so that when something
+// goes wrong, there is a report you can hand over, instead of having to
+// describe the problem from memory.
+//
+// Nothing here is sent anywhere. It is written to the screen and, if you ask
+// for it, to a file. Getting it to anyone else is entirely your doing.
+// ---------------------------------------------------------------------------
+var DIAG_OPEN = false;
+var DIAG_NAMES = false;      // include tool and reading names in the report
+var DIAG_SELFTEST = null;    // results of the last self-test, if it was run
+
+function toggleDiagnostics() {
+  DIAG_OPEN = !DIAG_OPEN;
+  if (!DIAG_OPEN) DIAG_SELFTEST = null;
+  renderDiagnostics();
+}
+
+function renderDiagnostics() {
+  var box = document.getElementById("diagPanel");
+  if (!box) return;
+  if (!DIAG_OPEN) { box.innerHTML = ""; return; }
+
+  box.innerHTML = '<div class="card">'
+    + '<h2>Diagnostics</h2>'
+    + '<p class="hint">A description of this tablet and this tool, for sending on when '
+    + 'something is not working. It stays on this tablet unless you send it yourself.</p>'
+    + '<div class="checkline">'
+    + '<input type="checkbox" id="diagNames"' + (DIAG_NAMES ? ' checked' : '')
+    + ' onchange="setDiagNames(this.checked)">'
+    + '<label for="diagNames" style="margin:0;font-weight:400">Include tool and reading names '
+    + '(off by default, so your equipment names stay in the fab)</label>'
+    + '</div>'
+    + '<textarea id="diagText" readonly onclick="this.select()"></textarea>'
+    + '<div class="big-actions">'
+    + '<button onclick="copyDiagnostics()">Copy to clipboard</button>'
+    + '<button class="secondary" onclick="downloadDiagnostics()">Download as a file</button>'
+    + '<button class="secondary" onclick="runSelfTest()">Run self-test</button>'
+    + '<button class="secondary" onclick="clearErrorLog()">Clear error log</button>'
+    + '<button class="secondary" onclick="toggleDiagnostics()">Hide</button>'
+    + '</div><div class="msg" id="diagMsg"></div></div>';
+
+  document.getElementById("diagText").value = buildReport();
+}
+
+function setDiagNames(on) {
+  DIAG_NAMES = on;
+  document.getElementById("diagText").value = buildReport();
 }
 
 // ---------------------------------------------------------------------------
@@ -1349,6 +1669,7 @@ function exportRoundCsv() {
   }
   var name = "pm_round_" + date + ".csv";
   downloadFile(buildCsv(date), name, "text/csv");
+  bump("exportsRound");
   markExported(name, "exportMsg");
 }
 
@@ -1361,12 +1682,14 @@ function exportAllCsv() {
   }
   var name = "pm_readings_through_" + lastLoggedDate() + ".csv";
   downloadFile(buildCsv(null), name, "text/csv");
+  bump("exportsEverything");
   markExported(name, "exportMsg");
 }
 
 function exportJson() {
   var name = "pm_backup_through_" + lastLoggedDate() + ".json";
   downloadFile(JSON.stringify(DATA, null, 2), name, "application/json");
+  bump("exportsBackup");
   markExported(name, "exportMsg");
 }
 
@@ -1546,6 +1869,7 @@ function runImport(mode) {
     DATA.tools = [];
     DATA.entries = {};
   }
+  bump(mode === "replace" ? "importsReplace" : "importsMerge");
 
   // Note which tool-and-date combinations were already here BEFORE we start.
   // In merge mode those are left exactly as they are: the tablet wins.
@@ -1774,6 +2098,7 @@ function eraseAll() {
   if (!window.confirm("Erase every tool and all " + readings + " readings from this tablet?")) return;
   if (!window.confirm("This cannot be undone. Have you exported? Press OK only if you are sure.")) return;
 
+  bump("erases");
   DATA = blankData();
   save();
   showTab("data");
@@ -1798,6 +2123,323 @@ function setMsg(id, kind, text) {
   if (!box) return;
   box.className = "msg " + kind;
   box.textContent = text;
+}
+
+// ---------------------------------------------------------------------------
+// THE REPORT
+//
+// Plain text, laid out in columns so it stays readable when pasted into a
+// message. Everything in it is either about this tablet, about this tool, or a
+// count of something you did. No reading value ever appears, and tool names
+// only appear if you tick the box.
+// ---------------------------------------------------------------------------
+function buildReport() {
+  var lines = [];
+  function head(title) { lines.push(""); lines.push(title); }
+  function row(label, value) { lines.push("  " + padRight(label, 20) + value); }
+
+  lines.push("PM Round Logger - diagnostics");
+  lines.push("Generated " + nowStamp());
+
+  head("TOOL");
+  row("App version", APP_VERSION + " (built " + BUILD_DATE + ")");
+  row("Data shape", String(DATA.version || "unknown"));
+  row("Created with", String(DATA.createdWith || "unknown"));
+  row("Last opened with", String(DATA.lastOpenedWith || "unknown"));
+  var debug = loadDebug();
+  if (debug.upgrades.length === 0) {
+    row("Upgrades", "none recorded");
+  } else {
+    for (var u = 0; u < debug.upgrades.length; u++) {
+      var up = debug.upgrades[u];
+      row(u === 0 ? "Upgrades" : "", up.from + " -> " + up.to + " on " + up.when);
+    }
+  }
+  if (VERSION_PROBLEM !== "") row("PROBLEM", VERSION_PROBLEM);
+
+  head("BROWSER");
+  row("User agent", String(navigator.userAgent));
+  row("Protocol", String(location.protocol));
+  row("Secure context", window.isSecureContext ? "yes" : "no");
+  row("Window", window.innerWidth + " x " + window.innerHeight
+    + ", dpr " + (window.devicePixelRatio || 1));
+  row("Language", String(navigator.language || "unknown"));
+
+  var caps = probeCapabilities();
+  head("STORAGE");
+  row("localStorage", caps.localStorage);
+  row("Used by readings", kb(sizeOf(DATA)) + " of about " + kb(STORAGE_BUDGET)
+    + " (" + storagePercent() + "%)");
+  row("Used by diagnostics", kb(sizeOf(debug)));
+  if (!STORAGE_OK) row("Last save", "FAILED - " + STORAGE_PROBLEM);
+  row("IndexedDB", caps.indexedDB);
+  row("Save As API", caps.saveAs);
+  row("Folder picker", caps.folderPicker);
+
+  var stats = dataStats();
+  head("DATA");
+  row("Tools", String(DATA.tools.length));
+  row("Readings defined", String(stats.pointCount));
+  row("Days logged", String(stats.dayCount));
+  row("Date range", stats.dayCount === 0 ? "nothing logged yet" : stats.first + " to " + stats.last);
+  row("Readings stored", String(stats.readingCount));
+  row("Out of range", String(stats.outOfRange));
+  row("Blank readings", String(stats.blankCount));
+  row("Last export", DATA.lastExport === "" ? "never" : DATA.lastExport);
+  row("Names", DIAG_NAMES ? "included below" : "not included");
+
+  if (DIAG_NAMES) {
+    head("NAMES");
+    for (var t = 0; t < DATA.tools.length; t++) {
+      var tool = DATA.tools[t];
+      lines.push("  " + tool.name);
+      for (var q = 0; q < tool.points.length; q++) {
+        var point = tool.points[q];
+        lines.push("      " + padRight(point.name, 26)
+          + padRight(point.unit || "-", 12)
+          + "min " + (point.min === null ? "-" : point.min)
+          + "  max " + (point.max === null ? "-" : point.max));
+      }
+    }
+  }
+
+  head("USAGE (local only, never sent anywhere)");
+  var names = Object.keys(debug.stats).sort();
+  if (names.length === 0) {
+    row("nothing recorded yet", "");
+  } else {
+    for (var n = 0; n < names.length; n++) row(names[n], String(debug.stats[names[n]]));
+  }
+
+  head("ERRORS (newest last, at most " + MAX_ERRORS + ")");
+  if (debug.errors.length === 0) {
+    lines.push("  none recorded");
+  } else {
+    for (var e = 0; e < debug.errors.length; e++) {
+      var err = debug.errors[e];
+      lines.push("  " + err.when + "  " + err.what);
+      if (err.where) lines.push("      at " + err.where);
+      if (err.stack) lines.push("      " + err.stack.split("\n").slice(0, 3).join(" | "));
+    }
+  }
+
+  head("SELF-TEST");
+  if (!DIAG_SELFTEST) {
+    lines.push("  not run");
+  } else {
+    for (var c = 0; c < DIAG_SELFTEST.length; c++) {
+      var res = DIAG_SELFTEST[c];
+      lines.push("  " + (res.pass ? "pass  " : "FAIL  ") + res.name
+        + (res.detail ? "  (" + res.detail + ")" : ""));
+    }
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}
+
+function padRight(text, width) {
+  text = String(text);
+  while (text.length < width) text += " ";
+  return text;
+}
+
+function sizeOf(obj) {
+  try { return JSON.stringify(obj).length; } catch (e) { return 0; }
+}
+
+function kb(chars) {
+  if (chars < 1024) return chars + " bytes";
+  if (chars < 1024 * 1024) return (chars / 1024).toFixed(1) + " KB";
+  return (chars / 1048576).toFixed(2) + " MB";
+}
+
+// Counts across the whole data set. No values, only tallies.
+function dataStats() {
+  var out = { pointCount: 0, dayCount: 0, readingCount: 0, outOfRange: 0,
+              blankCount: 0, first: "", last: "" };
+  for (var t = 0; t < DATA.tools.length; t++) out.pointCount += DATA.tools[t].points.length;
+
+  var dates = Object.keys(DATA.entries).sort();
+  out.dayCount = dates.length;
+  if (dates.length > 0) { out.first = dates[0]; out.last = dates[dates.length - 1]; }
+
+  for (var d = 0; d < dates.length; d++) {
+    for (var i = 0; i < DATA.tools.length; i++) {
+      var tool = DATA.tools[i];
+      var entry = DATA.entries[dates[d]][tool.id];
+      if (!entry) continue;
+      for (var p = 0; p < tool.points.length; p++) {
+        var point = tool.points[p];
+        var value = entry.values[point.id];
+        if (value === undefined || String(value).trim() === "") { out.blankCount++; continue; }
+        out.readingCount++;
+        var status = rangeStatus(value, point);
+        if (status === "LOW" || status === "HIGH") out.outOfRange++;
+      }
+    }
+  }
+  return out;
+}
+
+// What this browser can do. Presence checks only - this deliberately never
+// OPENS a picker, because a dialog you did not ask for is worse than the
+// question it answers. To find out whether a chosen folder is REMEMBERED
+// between days, use the separate capability test page, which needs the real
+// dialogs to answer it.
+function probeCapabilities() {
+  var out = {};
+  out.saveAs = (typeof window.showSaveFilePicker === "function") ? "available" : "not available";
+  out.folderPicker = (typeof window.showDirectoryPicker === "function") ? "available" : "not available";
+  out.indexedDB = window.indexedDB ? "available" : "not available";
+  try {
+    window.localStorage.setItem("partybarte.pmlogger.probe", "1");
+    window.localStorage.removeItem("partybarte.pmlogger.probe");
+    out.localStorage = "working";
+  } catch (e) {
+    out.localStorage = "BLOCKED (" + e.name + ")";
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// SELF-TEST
+//
+// Checks the fiddly parts still behave on THIS tablet: the CSV round trip,
+// limit checking at its boundaries, and the date arithmetic.
+//
+// SAFETY. This must never touch your readings. Two rules make that true, and
+// both matter:
+//
+//   1. It swaps in a made-up data set, runs, and puts the real one back in a
+//      "finally" block, so even a crash mid-test restores it.
+//   2. It only calls functions that READ. Nothing here calls save(), so
+//      nothing can reach browser storage at all.
+//
+// It then compares stored data before and after, and reports that comparison
+// as a check of its own. A self-test that could damage a round would be worse
+// than having no self-test.
+// ---------------------------------------------------------------------------
+function runSelfTest() {
+  var results = [];
+  function check(name, pass, detail) { results.push({ name: name, pass: !!pass, detail: detail || "" }); }
+
+  var storedBefore = null;
+  try { storedBefore = window.localStorage.getItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+
+  var realData = DATA;
+  try {
+    // Deliberately awkward names: a comma and a quote in a tool name are
+    // exactly what breaks a careless CSV writer.
+    DATA = {
+      version: DATA_SHAPE, createdWith: "self-test", lastOpenedWith: "self-test",
+      nextId: 0, lastExport: "",
+      tools: [{ id: "t1", name: 'Etch, "A"', points: [
+        { id: "p1", name: "Pressure, mTorr", unit: "mTorr", min: 8, max: 12 },
+        { id: "p2", name: "Hours", unit: "h", min: null, max: null }
+      ] }],
+      entries: { "2026-01-31": { t1: { savedAt: "2026-01-31 09:00",
+        values: { p1: "9.4", p2: "1875.5" } } } }
+    };
+
+    var csv = buildCsv(null);
+    check("CSV starts with the marker Excel needs", csv.charAt(0) === "\uFEFF");
+
+    var parsed = parseReadingsCsv(csv);
+    check("every reading survives the round trip", parsed.rows.length === 2,
+      parsed.rows.length + " of 2 rows");
+
+    var byName = {};
+    for (var r = 0; r < parsed.rows.length; r++) byName["n:" + parsed.rows[r].point] = parsed.rows[r];
+    var back = byName["n:Pressure, mTorr"];
+    check("a comma in a name survives", !!back);
+    check("a quote in a name survives", back && back.tool === 'Etch, "A"', back ? back.tool : "missing");
+    check("the value is unchanged", back && back.value === "9.4", back ? back.value : "missing");
+    check("limits come back out of the file", back && back.min === 8 && back.max === 12,
+      back ? back.min + "/" + back.max : "missing");
+
+    var limited = { min: 8, max: 12 };
+    var unlimited = { min: null, max: null };
+    check("blank reading has no status", rangeStatus("", limited) === "");
+    check("a value on the min counts as in range", rangeStatus("8", limited) === "OK");
+    check("a value on the max counts as in range", rangeStatus("12", limited) === "OK");
+    check("just under the min reads LOW", rangeStatus("7.9", limited) === "LOW");
+    check("just over the max reads HIGH", rangeStatus("12.1", limited) === "HIGH");
+    check("no limits set means no status", rangeStatus("5", unlimited) === "");
+
+    check("date steps over a month end", shiftDate("2026-01-31", 1) === "2026-02-01",
+      shiftDate("2026-01-31", 1));
+    check("date steps back over a month end", shiftDate("2026-03-01", -1) === "2026-02-28",
+      shiftDate("2026-03-01", -1));
+    check("days between two dates", daysBetween("2026-08-20", "2026-08-24") === 4);
+
+    check("duplicate check copes with awkward names",
+      countDistinct(["constructor", "constructor", "toString"]) === 2,
+      String(countDistinct(["constructor", "constructor", "toString"])));
+  } catch (e) {
+    check("the self-test ran without crashing", false, e.name + ": " + e.message);
+  } finally {
+    // Whatever happened above, your real data goes back.
+    DATA = realData;
+  }
+
+  var storedAfter = null;
+  try { storedAfter = window.localStorage.getItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+  check("YOUR SAVED DATA WAS NOT TOUCHED", storedBefore === storedAfter);
+
+  bump("selfTestRuns");
+  DIAG_SELFTEST = results;
+  renderDiagnostics();
+
+  var failed = 0;
+  for (var i = 0; i < results.length; i++) if (!results[i].pass) failed++;
+  setMsg("diagMsg", failed === 0 ? "ok" : "err",
+    failed === 0 ? "All " + results.length + " checks passed."
+                 : failed + " of " + results.length + " checks FAILED. Send me this report.");
+}
+
+// ---------------------------------------------------------------------------
+// GETTING THE REPORT TO SOMEONE
+// ---------------------------------------------------------------------------
+
+// Downloading is the reliable route, so it is the one to trust. Copying is
+// best effort, because clipboard permissions on a page opened from a file are
+// inconsistent between browsers. If it fails, the text box is already
+// selected and can be copied by hand.
+function copyDiagnostics() {
+  var box = document.getElementById("diagText");
+  box.select();
+  var done = function () { setMsg("diagMsg", "ok", "Copied. Paste it into your message."); };
+  var failed = function () {
+    setMsg("diagMsg", "info", "This browser would not let the page copy for you. "
+      + "The text is selected - press Ctrl+C, or use Download as a file.");
+  };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(box.value).then(done, failed);
+      return;
+    }
+    if (document.execCommand && document.execCommand("copy")) { done(); return; }
+    failed();
+  } catch (e) {
+    failed();
+  }
+}
+
+function downloadDiagnostics() {
+  var name = "pm_diagnostics_" + todayStr() + ".txt";
+  downloadFile(buildReport(), name, "text/plain");
+  setMsg("diagMsg", "ok", "Saved " + name + " to this tablet's download folder.");
+}
+
+function clearErrorLog() {
+  if (!window.confirm("Clear the recorded errors?\n\nYour readings are not affected.")) return;
+  var debug = loadDebug();
+  debug.errors = [];
+  saveDebug(debug);
+  DIAG_SELFTEST = null;
+  renderDiagnostics();
+  setMsg("diagMsg", "ok", "Error log cleared. Readings untouched.");
 }
 
 // ---------------------------------------------------------------------------

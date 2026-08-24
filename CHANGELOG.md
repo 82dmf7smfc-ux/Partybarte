@@ -25,6 +25,24 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+- PM Round Logger: version numbers. `APP_VERSION` is shown in the Data tab
+  footnote and leads every diagnostics report, and the data records which
+  version created it and which last touched it. A `migrateData()` hook exists
+  ready for any future change to the stored layout, and refuses to run
+  backwards: an older build opened against newer data warns, declines to save
+  at all, and leaves the data intact.
+- PM Round Logger: a diagnostics panel behind a small footnote on the Data
+  tab, closed by default. Reports versions, browser, storage use, data counts,
+  browser capabilities, captured errors and usage counters. Tool and reading
+  names are excluded unless explicitly ticked, and no reading value ever
+  appears. Copy, download as a text file, or clear the error log.
+- PM Round Logger: JavaScript errors are captured as they happen into a
+  separate storage slot, capped at 20, surviving a browser restart. Kept apart
+  from the readings so exports stay clean and clearing them is always safe.
+- PM Round Logger: a built-in self-test covering the CSV round trip with
+  awkward characters, limit checking at its boundaries, and date arithmetic
+  across month ends. It runs against synthetic data, never calls save, and
+  verifies the stored readings are byte-identical afterwards.
 - `packaging/pm_logger_READ_ME_FIRST.txt`, plain-language instructions for the
   PM Round Logger, including pointing Edge's download folder at OneDrive, how
   to pivot the CSV in Excel, and how to combine a folder of daily files with

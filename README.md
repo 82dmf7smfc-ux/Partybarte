@@ -59,6 +59,17 @@ Once daily files are piling up in one folder, Excel's
 Data > Get Data > From Folder reads the whole folder as one table and
 refreshes as new days appear.
 
+**Updating:** replace `pm_logger.html` with the new file. Readings are untouched,
+because the browser stores them separately from the file itself. The version
+number sits next to `Diagnostics` at the bottom of the Data tab. Delete old
+copies rather than leaving them in Downloads: an older build opened against
+newer data refuses to touch it and says so, which is safe but confusing.
+
+**Diagnostics:** a small grey footnote at the bottom of the Data tab opens a
+report - versions, storage, counts, captured errors, and a self-test - for
+sending on when something is wrong. Tool names are excluded unless you tick a
+box, and no reading value ever appears in it.
+
 Full instructions, including how to build the pivot chart, are in
 `packaging/pm_logger_READ_ME_FIRST.txt`.
 

@@ -212,6 +212,59 @@ that: export everything, then Erase all data, then import back just the recent
 months you still want on the tablet.
 
 
+Updating to a newer version
+---------------------------
+Just replace pm_logger.html with the new one. Your readings are untouched.
+
+That works because the browser keeps your data separately from the file, not
+inside it. So a new file - even one with a different name, in a different
+folder - picks up exactly the same data. Nothing to export first, nothing to
+import afterwards.
+
+The version number is at the bottom right of the Data tab, next to
+"Diagnostics". Quote it if you ever report a problem.
+
+One thing to avoid: do not keep old copies of pm_logger.html lying around in
+Downloads. If you open an old one by mistake it will notice that your data
+came from a newer version, refuse to touch it, and say so in red at the top.
+Nothing is lost, but it is a confusing five minutes. Delete old copies.
+
+
+If something goes wrong
+-----------------------
+At the very bottom of the Data tab there is a small grey "Diagnostics" line.
+It is deliberately out of the way. Tap it and you get a description of this
+tablet and this tool: version numbers, how full storage is, how much you have
+logged, and any errors the page has hit.
+
+Send that report and I can usually work out what happened. Without it, I am
+guessing.
+
+  Copy to clipboard    Copies the report, ready to paste into a message.
+  Download as a file   Saves pm_diagnostics_<date>.txt. Use this if the copy
+                       button will not work.
+  Run self-test        Checks the fiddly parts still work on this tablet -
+                       the CSV round trip, the limit checking, the dates. It
+                       cannot touch your readings, and it proves that by
+                       checking them before and after.
+  Clear error log      Wipes the recorded errors. Your readings are not
+                       affected.
+
+Two things worth knowing about that report:
+
+Tool and reading names are NOT included unless you tick the box. Counts and
+structure are enough to diagnose almost anything, so your equipment names do
+not need to leave the fab. Tick it only if you are asked to.
+
+No reading value ever appears in it, ticked or not. It counts things - how
+many rounds, how many out of range - never what the numbers were.
+
+There is also a USAGE section counting what you do: rounds finished, exports
+taken, how often you back-fill a missed day. Nothing is sent anywhere from it.
+It is there so that when you do send a report, the tool can be improved in the
+places you actually use.
+
+
 Files in this folder
 --------------------
 pm_logger.html    The tool. This is the only file you need.
