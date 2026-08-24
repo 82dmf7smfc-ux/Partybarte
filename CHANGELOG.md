@@ -7,6 +7,16 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- PM Round Logger, `pm_logger.html`. A second self-contained browser tool, for
+  logging preventative maintenance readings on a daily round. Runs fully
+  offline from a local file. Define tools and the readings taken at each, work
+  down a round that shows what is still outstanding, and keep the data in
+  browser storage. Optional min and max per reading colour an out-of-range
+  value without ever refusing to save it. Exports a tidy one-row-per-reading
+  CSV for Excel and an exact JSON backup, and imports either one back with a
+  merge or replace choice.
+- `packaging/pm_logger_READ_ME_FIRST.txt`, plain-language instructions for the
+  PM Round Logger, including how to pivot the CSV in Excel.
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,
   across Python 3.11 and 3.12.

@@ -1,3 +1,55 @@
+# Partybarte bench tools
+
+Offline tools for a semiconductor bench. Each one runs with no install and no
+IT approval, and none of them ever makes a network call.
+
+| Tool | What it does |
+|---|---|
+| `alarm_pareto.html` and the `alarm_pareto` package | Rank alarm faults from a tool's elog by frequency and by downtime. |
+| `pm_logger.html` | Log preventative maintenance readings on a daily round, and export them for Excel. |
+
+---
+
+# PM Round Logger
+
+Open `pm_logger.html` in a browser. There is nothing to install.
+
+It is for walking a daily round: you pick a tool, type the readings off its
+screen, save, and move to the next one. It keeps track of which tools you have
+not done yet today.
+
+1. First time only, on the Tools tab: add the machines you walk and the
+   readings you take at each. Give each reading a unit, and a min and max if
+   you want it checked. "Load an example setup" fills in two made-up tools if
+   you would rather see it working first.
+2. Each day, on the Today tab: tap a tool, type its readings, tap "Save and
+   next tool". Tools you have not logged sort to the top.
+3. On the Data tab: export a CSV for Excel, or a JSON backup. Import either
+   one back after a browser wipe or on a new tablet.
+
+A reading outside its limits turns red and says why, but **always saves**. On a
+round you record what the screen says, good or bad. A tool that refuses a bad
+number is a tool that gets fed made-up ones.
+
+The exported CSV has one row per reading, which is the shape an Excel
+PivotTable wants:
+
+```
+Date,Tool,Data point,Unit,Value,Min,Max,Status,Saved at
+2026-08-24,Etcher 3,Chamber pressure,mTorr,9.4,8,12,OK,2026-08-24 09:12
+2026-08-24,Etcher 3,He leak rate,sccm,2.9,,2.5,HIGH,2026-08-24 09:12
+```
+
+**Export regularly.** Readings live in the browser's own storage on one
+tablet. That storage is wiped with no warning by "Clear browsing data" or by a
+tablet re-image. The page nags you about this after a day and gets insistent
+after three. The exported file is the record; the tablet is a clipboard.
+
+Full instructions, including how to build the pivot chart, are in
+`packaging/pm_logger_READ_ME_FIRST.txt`.
+
+---
+
 # Alarm Log Pareto Tool
 
 This tool reads an alarm log from a semiconductor tool. It looks at the last 30
@@ -175,6 +227,7 @@ The same tests run automatically on GitHub for every push and pull request. See
 | `ROADMAP.md` | Ideas and future improvements, so they are not lost. |
 | `CHANGELOG.md` | A dated record of what changed in each version. |
 | `tools/build_zips.py` | Rebuilds the two download packages the same way every time. |
+| `packaging/pm_logger_READ_ME_FIRST.txt` | How to use the PM Round Logger, in plain language. |
 
 ## Downloads
 

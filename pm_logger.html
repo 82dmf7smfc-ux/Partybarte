@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PM Round Logger</title>
+
+<!--
+  PM Round Logger
+  ===============
+  A single-file, fully offline tool for logging preventative maintenance
+  readings on a daily round.
+
+  It makes no network calls of any kind. There are no libraries, no fonts,
+  and no images loaded from anywhere. Everything it needs is in this one
+  file, which is why it works when you just double-click it.
+
+  Your data lives in the browser's "local storage" on this tablet only.
+  That storage is wiped if anyone clears browsing data, or if the tablet is
+  re-imaged. So export regularly. The exported file is the real record.
+  The tablet is a clipboard.
+
+  To change anything, open this file in Notepad. The code is at the bottom,
+  split into labelled sections. Each section says what it does.
+-->
+
+<style>
+  /* -----------------------------------------------------------------------
+     Colours are defined once here and used by name everywhere below.
+     Change a colour in this block and it changes across the whole page.
+     ----------------------------------------------------------------------- */
+  :root {
+    --ink: #1b1f24;          /* main text */
+    --muted: #5b6570;        /* quiet text, hints */
+    --line: #d7dce2;         /* borders */
+    --bar: #305496;          /* header blue, main buttons */
+    --bar2: #5b9bd5;         /* lighter blue */
+    --accent: #c00000;       /* red, for out-of-range and warnings */
+    --bg: #f4f6f8;           /* page background */
+    --card: #ffffff;         /* card background */
+    --ok: #2e7d32;           /* green, in range */
+    --ok-bg: #e8f5e9;
+    --warn: #b26a00;         /* amber, needs attention */
+    --warn-bg: #fff4e0;
+    --bad-bg: #fdecec;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Segoe UI, Tahoma, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    font-size: 16px;        /* 16px keeps the tablet from zooming on focus */
+    line-height: 1.45;
+  }
+
+  header {
+    background: var(--bar);
+    color: #fff;
+    padding: 14px 18px;
+  }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 3px 0 0; opacity: 0.9; font-size: 13px; }
+
+  main { padding: 14px; max-width: 900px; margin: 0 auto; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 { margin: 0 0 8px; font-size: 17px; }
+  .hint { color: var(--muted); font-size: 14px; margin: 2px 0 10px; }
+
+  /* -----------------------------------------------------------------------
+     Buttons. Everything you tap is at least 48px tall so it is easy to hit
+     with a finger. Nothing on this page relies on hovering a mouse.
+     ----------------------------------------------------------------------- */
+  button {
+    font: inherit;
+    background: var(--bar);
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    padding: 12px 18px;
+    min-height: 48px;
+    cursor: pointer;
+  }
+  button.secondary { background: #eef1f5; color: var(--ink); border: 1px solid var(--line); }
+  button.danger { background: var(--accent); }
+  button.small { min-height: 44px; padding: 8px 12px; font-size: 15px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button:active { filter: brightness(0.92); }
+
+  /* The tab strip across the top. */
+  .tabs { display: flex; gap: 6px; padding: 10px 14px 0; max-width: 900px; margin: 0 auto; }
+  .tabs button {
+    flex: 1;
+    background: #e7ebf1;
+    color: var(--ink);
+    border-radius: 8px 8px 0 0;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+  }
+  .tabs button.active { background: var(--card); font-weight: 600; }
+
+  /* Only one view is shown at a time. */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* -----------------------------------------------------------------------
+     Inputs. Large, with plenty of padding, for typing with a finger.
+     ----------------------------------------------------------------------- */
+  input[type=text], input[type=number], input[type=date], select {
+    font: inherit;
+    font-size: 16px;
+    padding: 11px 10px;
+    min-height: 48px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+    width: 100%;
+  }
+  input.reading { font-size: 20px; font-weight: 600; }
+  input.reading.ok  { border-color: var(--ok);     background: var(--ok-bg); }
+  input.reading.bad { border-color: var(--accent); background: var(--bad-bg); }
+
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+
+  /* -----------------------------------------------------------------------
+     The tool list on the Today tab. Each row is one big tap target.
+     ----------------------------------------------------------------------- */
+  .toolrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-height: 64px;
+    margin-bottom: 8px;
+    font-size: 17px;
+  }
+  .toolrow .name { font-weight: 600; }
+  .toolrow .sub { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+  .toolrow.done { background: var(--ok-bg); border-color: #b7dfb9; }
+  .toolrow.attention { background: var(--warn-bg); border-color: #f0cf9a; }
+
+  /* Small coloured status labels. */
+  .chip, .pill {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .chip.todo { background: #e7ebf1; color: var(--muted); }
+  .chip.ok   { background: var(--ok);     color: #fff; }
+  .chip.bad  { background: var(--accent); color: #fff; }
+  .pill.blank { display: none; }
+  .pill.ok   { background: var(--ok-bg);   color: var(--ok); }
+  .pill.bad  { background: var(--bad-bg);  color: var(--accent); }
+
+  /* -----------------------------------------------------------------------
+     The export reminder banner that sits under the page header.
+     ----------------------------------------------------------------------- */
+  .banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    max-width: 900px;
+    margin: 12px auto 0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    font-size: 15px;
+  }
+  .banner.show { display: flex; }
+  .banner.calm { background: #eef1f5; color: var(--muted); }
+  .banner.warn { background: var(--warn-bg); border-color: #f0cf9a; color: var(--warn); font-weight: 600; }
+  .banner.bad  { background: var(--bad-bg);  border-color: #f2c4c4; color: var(--accent); font-weight: 600; }
+
+  /* Message lines under buttons: green for done, red for a problem. */
+  .msg { font-size: 15px; margin-top: 10px; min-height: 22px; }
+  .msg.ok  { color: var(--ok); }
+  .msg.err { color: var(--accent); }
+  .msg.info { color: var(--muted); }
+
+  /* Layout helpers used in a few places. */
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row > .grow { flex: 1; min-width: 140px; }
+  .stack > * { margin-bottom: 10px; }
+  .spread { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .big-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .big-actions button { width: 100%; font-size: 17px; min-height: 56px; }
+
+  .field { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .field:last-child { border-bottom: 0; }
+
+  .pointedit { border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 8px; background: #fafbfc; }
+  .pointedit .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .count { font-size: 15px; color: var(--muted); }
+  code { background: #eef1f5; padding: 1px 5px; border-radius: 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PM Round Logger</h1>
+  <p>Runs offline on this tablet. Nothing you type is ever sent anywhere.</p>
+</header>
+
+<div id="banner" class="banner"></div>
+
+<nav class="tabs">
+  <button id="tabToday" onclick="showTab('today')">Today</button>
+  <button id="tabTools" onclick="showTab('tools')">Tools</button>
+  <button id="tabData"  onclick="showTab('data')">Data</button>
+</nav>
+
+<main>
+  <!-- Each of these is filled in by JavaScript. Only one shows at a time. -->
+  <section id="viewToday" class="view"></section>
+  <section id="viewEntry" class="view"></section>
+  <section id="viewTools" class="view"></section>
+  <section id="viewData"  class="view"></section>
+</main>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// STORAGE
+//
+// Everything is kept in one browser storage slot, saved as text. The key name
+// starts with "partybarte" so this tool can never clash with another local
+// HTML file on the same tablet. In Edge and Chrome every file you open from
+// your hard drive shares one storage area, so a unique key name matters.
+//
+// Every change saves straight away. There is no "save" button for setup.
+// ---------------------------------------------------------------------------
+var STORAGE_KEY = "partybarte.pmlogger.v1";
+
+// Set to false if the browser refuses to store anything. We then warn loudly,
+// because in that case closing the page loses the day's work.
+var STORAGE_OK = true;
+
+// The whole data set lives in this one variable while the page is open.
+var DATA = blankData();
+
+// What an empty, brand new data set looks like.
+function blankData() {
+  return {
+    version: 1,      // bumped only if the shape of this object ever changes
+    nextId: 0,       // counter used to hand out ids, see newId()
+    lastExport: "",  // date of the last export, as YYYY-MM-DD
+    tools: [],       // see addTool() for the shape of a tool
+    entries: {}      // entries[date][toolId] = { savedAt: "...", values: {} }
+  };
+}
+
+// Read the saved data back out of the browser.
+function load() {
+  var raw = null;
+  try {
+    raw = window.localStorage.getItem(STORAGE_KEY);
+  } catch (e) {
+    // Some browsers block storage on files opened from disk. Keep going in
+    // memory so the page still works, but warn the user.
+    STORAGE_OK = false;
+    return;
+  }
+  if (!raw) return;                 // nothing saved yet, first ever run
+  try {
+    var parsed = JSON.parse(raw);
+    if (parsed && parsed.tools && parsed.entries) DATA = parsed;
+  } catch (e) {
+    // The saved text was damaged. Rather than crash, start fresh but do not
+    // overwrite the damaged text until the user saves something new.
+    DATA = blankData();
+  }
+}
+
+// Write the data back to the browser. Called after every change.
+function save() {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+    STORAGE_OK = true;
+  } catch (e) {
+    STORAGE_OK = false;
+  }
+  renderBanner();
+}
+
+// ---------------------------------------------------------------------------
+// SMALL HELPERS FOR THE DATA
+//
+// Ids: every tool and every data point gets a short hidden id like "i7". The
+// id, not the name, is what links a saved reading to its data point. That is
+// why you can rename "Etcher 3" to "Etch 03" without losing its history.
+// Ids never appear in the exported CSV, which stays fully readable.
+// ---------------------------------------------------------------------------
+function newId() {
+  DATA.nextId = DATA.nextId + 1;
+  return "i" + DATA.nextId;
+}
+
+// Find a tool by its id. Returns null if it is not there.
+function findTool(toolId) {
+  for (var i = 0; i < DATA.tools.length; i++) {
+    if (DATA.tools[i].id === toolId) return DATA.tools[i];
+  }
+  return null;
+}
+
+// Find a data point inside one tool, by its id.
+function findPoint(tool, pointId) {
+  for (var i = 0; i < tool.points.length; i++) {
+    if (tool.points[i].id === pointId) return tool.points[i];
+  }
+  return null;
+}
+
+// Find a tool by name, ignoring case and spare spaces. Used when importing,
+// because a file coming back in has names in it, not ids.
+function findToolByName(name) {
+  var want = String(name).trim().toLowerCase();
+  for (var i = 0; i < DATA.tools.length; i++) {
+    if (DATA.tools[i].name.trim().toLowerCase() === want) return DATA.tools[i];
+  }
+  return null;
+}
+
+function findPointByName(tool, name) {
+  var want = String(name).trim().toLowerCase();
+  for (var i = 0; i < tool.points.length; i++) {
+    if (tool.points[i].name.trim().toLowerCase() === want) return tool.points[i];
+  }
+  return null;
+}
+
+// Today's date on this tablet, as YYYY-MM-DD. We build it by hand rather than
+// using toISOString(), because that one converts to UTC and can hand you
+// yesterday's date late in the evening.
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+
+// A timestamp for when a reading was saved: "2026-08-24 09:12".
+function nowStamp() {
+  var d = new Date();
+  return todayStr() + " " + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+}
+
+function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+// Move a YYYY-MM-DD date string forward or back by a number of days.
+function shiftDate(dateStr, days) {
+  var bits = dateStr.split("-");
+  var d = new Date(Number(bits[0]), Number(bits[1]) - 1, Number(bits[2]));
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+
+// How many whole days between two YYYY-MM-DD dates.
+function daysBetween(fromStr, toStr) {
+  var a = fromStr.split("-"), b = toStr.split("-");
+  var from = new Date(Number(a[0]), Number(a[1]) - 1, Number(a[2]));
+  var to = new Date(Number(b[0]), Number(b[1]) - 1, Number(b[2]));
+  return Math.round((to - from) / 86400000);
+}
+
+// ---------------------------------------------------------------------------
+// LIMIT CHECKING
+//
+// Each data point may have a min, a max, both, or neither. Leave them blank
+// and nothing is checked. A reading is NEVER blocked or refused because of a
+// limit. You record what the tool screen actually says, good or bad.
+//
+// Returns one of:
+//   ""      nothing to say (no value typed, or no limits set)
+//   "OK"    inside the limits
+//   "LOW"   below the min
+//   "HIGH"  above the max
+// ---------------------------------------------------------------------------
+function rangeStatus(value, point) {
+  if (value === undefined || value === null || String(value).trim() === "") return "";
+  if (point.min === null && point.max === null) return "";
+  var n = Number(value);
+  if (isNaN(n)) return "";
+  if (point.min !== null && n < point.min) return "LOW";
+  if (point.max !== null && n > point.max) return "HIGH";
+  return "OK";
+}
+
+// Turns a status into the CSS class that colours it.
+function statusClass(status) {
+  if (status === "OK") return "ok";
+  if (status === "LOW" || status === "HIGH") return "bad";
+  return "blank";
+}
+
+// Turns a status into words for the screen.
+function statusText(status, point) {
+  if (status === "OK") return "In range";
+  if (status === "LOW") return "Below min " + point.min;
+  if (status === "HIGH") return "Above max " + point.max;
+  return "";
+}
+
+// Describes a point's limits in plain words, for the hint under an input.
+function limitHint(point) {
+  if (point.min !== null && point.max !== null) return "Expected " + point.min + " to " + point.max;
+  if (point.min !== null) return "Expected " + point.min + " or above";
+  if (point.max !== null) return "Expected " + point.max + " or below";
+  return "No limits set";
+}
+
+// ---------------------------------------------------------------------------
+// WHAT HAS BEEN LOGGED
+//
+// Works out, for one tool on one date, whether it has been logged and how
+// many of its readings fell outside their limits.
+// ---------------------------------------------------------------------------
+function toolStatus(tool, date) {
+  var day = DATA.entries[date];
+  var entry = day ? day[tool.id] : null;
+  if (!entry) return { logged: false, outOfRange: 0, savedAt: "", filled: 0 };
+
+  var outOfRange = 0;
+  var filled = 0;
+  for (var i = 0; i < tool.points.length; i++) {
+    var point = tool.points[i];
+    var value = entry.values[point.id];
+    if (value !== undefined && String(value).trim() !== "") filled++;
+    var status = rangeStatus(value, point);
+    if (status === "LOW" || status === "HIGH") outOfRange++;
+  }
+  return { logged: true, outOfRange: outOfRange, savedAt: entry.savedAt || "", filled: filled };
+}
+
+// How many tools still need doing on a given date.
+function countLogged(date) {
+  var n = 0;
+  for (var i = 0; i < DATA.tools.length; i++) {
+    if (toolStatus(DATA.tools[i], date).logged) n++;
+  }
+  return n;
+}
+
+// The next tool on the round that has not been logged yet. Used by the
+// "Save and next tool" button so the round drives itself.
+function nextUnlogged(date, afterToolId) {
+  var seenCurrent = false;
+  var i, tool;
+  // First look after the tool we are on, so the round keeps its order.
+  for (i = 0; i < DATA.tools.length; i++) {
+    tool = DATA.tools[i];
+    if (tool.id === afterToolId) { seenCurrent = true; continue; }
+    if (!seenCurrent) continue;
+    if (!toolStatus(tool, date).logged) return tool;
+  }
+  // Then wrap round to the start and pick up anything skipped.
+  for (i = 0; i < DATA.tools.length; i++) {
+    tool = DATA.tools[i];
+    if (tool.id === afterToolId) continue;
+    if (!toolStatus(tool, date).logged) return tool;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// WHICH SCREEN IS SHOWING
+//
+// There are four screens. Three are tabs. The fourth, the entry form, opens
+// when you tap a tool and closes when you save or cancel.
+// ---------------------------------------------------------------------------
+var VIEW = "today";          // "today", "entry", "tools" or "data"
+var CURRENT_DATE = todayStr();  // the date the Today tab is showing
+var CURRENT_TOOL = null;     // id of the tool being entered, while on "entry"
+
+function showTab(name) {
+  VIEW = name;
+  CURRENT_TOOL = null;
+  render();
+}
+
+// Draw whichever screen is current, plus the banner and the tab highlights.
+function render() {
+  document.getElementById("viewToday").className = "view" + (VIEW === "today" ? " active" : "");
+  document.getElementById("viewEntry").className = "view" + (VIEW === "entry" ? " active" : "");
+  document.getElementById("viewTools").className = "view" + (VIEW === "tools" ? " active" : "");
+  document.getElementById("viewData").className  = "view" + (VIEW === "data"  ? " active" : "");
+
+  // The Today tab stays highlighted while the entry form is open, because the
+  // entry form is part of doing the round.
+  document.getElementById("tabToday").className = (VIEW === "today" || VIEW === "entry") ? "active" : "";
+  document.getElementById("tabTools").className = (VIEW === "tools") ? "active" : "";
+  document.getElementById("tabData").className  = (VIEW === "data")  ? "active" : "";
+
+  if (VIEW === "today") renderToday();
+  if (VIEW === "entry") renderEntry();
+  if (VIEW === "tools") renderTools();
+  if (VIEW === "data")  renderData();
+  renderBanner();
+}
+
+// ---------------------------------------------------------------------------
+// THE EXPORT REMINDER BANNER
+//
+// This is the most important safety feature in the tool. Browser storage is
+// not a database. It disappears if anyone clears browsing data or the tablet
+// is re-imaged, with no warning and no undo. So the page nags you, gently at
+// first and then loudly, until you export.
+//
+// To change how patient it is, edit the day numbers below.
+// ---------------------------------------------------------------------------
+function renderBanner() {
+  var banner = document.getElementById("banner");
+  var readings = countAllReadings();
+
+  // If the browser will not store anything, that beats every other message.
+  if (!STORAGE_OK) {
+    banner.className = "banner show bad";
+    banner.innerHTML = "<span>This browser is blocking local storage, so nothing will be "
+      + "remembered after you close this page. Export before you close it.</span>"
+      + "<button class=\"small\" onclick=\"exportCsv()\">Export now</button>";
+    return;
+  }
+
+  // Nothing logged yet, so nothing to lose. Stay out of the way.
+  if (readings === 0) { banner.className = "banner"; banner.innerHTML = ""; return; }
+
+  var text, tone;
+  if (DATA.lastExport === "") {
+    tone = "bad";
+    text = "You have never exported. The only copy of these readings is in this browser.";
+  } else {
+    var days = daysBetween(DATA.lastExport, todayStr());
+    if (days <= 0)      { tone = "calm"; text = "Exported today. You are backed up."; }
+    else if (days === 1){ tone = "warn"; text = "Last export was yesterday."; }
+    else if (days < 3)  { tone = "warn"; text = "Last export was " + days + " days ago."; }
+    else                { tone = "bad";  text = "Last export was " + days + " days ago. Export now."; }
+  }
+
+  banner.className = "banner show " + tone;
+  banner.innerHTML = "<span>" + esc(text) + "</span>"
+    + "<button class=\"small\" onclick=\"exportCsv()\">Export now</button>";
+}
+
+// Total number of readings actually typed in, across every day.
+function countAllReadings() {
+  var total = 0;
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var day = DATA.entries[dates[d]];
+    var toolIds = Object.keys(day);
+    for (var t = 0; t < toolIds.length; t++) {
+      var values = day[toolIds[t]].values;
+      var keys = Object.keys(values);
+      for (var k = 0; k < keys.length; k++) {
+        if (String(values[keys[k]]).trim() !== "") total++;
+      }
+    }
+  }
+  return total;
+}
+
+// ---------------------------------------------------------------------------
+// SCREEN 1: TODAY
+//
+// The round itself. Shows the date, how many tools are done, and one big row
+// per tool. Tools you have not logged sort to the top so you can work down
+// the list without thinking about it.
+// ---------------------------------------------------------------------------
+function renderToday() {
+  var host = document.getElementById("viewToday");
+
+  // No tools set up yet. Point the user at the Tools tab instead of showing
+  // them an empty list with no explanation.
+  if (DATA.tools.length === 0) {
+    host.innerHTML =
+      '<div class="card">'
+      + '<h2>No tools set up yet</h2>'
+      + '<p class="hint">Before you can log a round, tell the tool which machines you '
+      + 'walk and which readings you take at each one. You only do this once.</p>'
+      + '<div class="big-actions">'
+      + '<button onclick="showTab(\'tools\')">Set up my tools</button>'
+      + '<button class="secondary" onclick="loadExample()">Load an example setup to try it</button>'
+      + '</div></div>';
+    return;
+  }
+
+  var done = countLogged(CURRENT_DATE);
+  var total = DATA.tools.length;
+  var isToday = (CURRENT_DATE === todayStr());
+
+  var html = '<div class="card">';
+
+  // Date picker with a day back / day forward button either side, so you can
+  // review yesterday or fill in a day you missed.
+  html += '<div class="row">'
+    + '<button class="secondary small" onclick="stepDate(-1)">&#9664; Day</button>'
+    + '<div class="grow"><input type="date" id="dateBox" value="' + esc(CURRENT_DATE) + '" onchange="pickDate(this.value)"></div>'
+    + '<button class="secondary small" onclick="stepDate(1)">Day &#9654;</button>'
+    + '</div>';
+
+  if (!isToday) {
+    html += '<p class="hint" style="margin-top:10px">You are looking at a past date, not today. '
+      + '<a href="#" onclick="pickDate(todayStr());return false;">Jump back to today</a>.</p>';
+  }
+
+  html += '<div class="spread" style="margin-top:12px">'
+    + '<strong>' + done + ' of ' + total + ' tools logged</strong>'
+    + '</div></div>';
+
+  // When the round is finished, offer the export right here rather than
+  // making the user go and find the Data tab.
+  if (done === total) {
+    html += '<div class="card" style="background:var(--ok-bg);border-color:#b7dfb9">'
+      + '<h2>Round complete</h2>'
+      + '<p class="hint">Every tool is logged for this date. Get the readings off the tablet now, '
+      + 'while you are thinking about it.</p>'
+      + '<div class="big-actions"><button onclick="exportCsv()">Export for Excel</button></div>'
+      + '</div>';
+  }
+
+  // Build the list: not-logged tools first, then logged ones. Within each
+  // group the tools keep the order you set up on the Tools tab.
+  var pending = [];
+  var complete = [];
+  for (var i = 0; i < DATA.tools.length; i++) {
+    var tool = DATA.tools[i];
+    if (toolStatus(tool, CURRENT_DATE).logged) complete.push(tool); else pending.push(tool);
+  }
+
+  html += '<div class="card"><h2>Tools</h2>';
+  html += '<p class="hint">Tap a tool to enter its readings. Tools still to do are at the top.</p>';
+  html += pending.concat(complete).map(toolRowHtml).join("");
+  html += '</div>';
+
+  host.innerHTML = html;
+}
+
+// One row in the tool list.
+function toolRowHtml(tool) {
+  var st = toolStatus(tool, CURRENT_DATE);
+  var rowClass = "toolrow";
+  var chip;
+  var sub = tool.points.length + (tool.points.length === 1 ? " reading" : " readings");
+
+  if (!st.logged) {
+    chip = '<span class="chip todo">Not logged</span>';
+  } else if (st.outOfRange > 0) {
+    rowClass += " attention";
+    chip = '<span class="chip bad">' + st.outOfRange + ' out of range</span>';
+    sub = "Logged " + esc(shortTime(st.savedAt));
+  } else {
+    rowClass += " done";
+    chip = '<span class="chip ok">Logged</span>';
+    sub = "Logged " + esc(shortTime(st.savedAt));
+  }
+
+  return '<button class="' + rowClass + '" onclick="openTool(\'' + tool.id + '\')">'
+    + '<span><span class="name">' + esc(tool.name) + '</span>'
+    + '<span class="sub">' + sub + '</span></span>'
+    + chip + '</button>';
+}
+
+// Pull just the time out of a "2026-08-24 09:12" stamp.
+function shortTime(stamp) {
+  var bits = String(stamp).split(" ");
+  return bits.length > 1 ? bits[1] : stamp;
+}
+
+function stepDate(days) { pickDate(shiftDate(CURRENT_DATE, days)); }
+
+function pickDate(dateStr) {
+  if (!dateStr) return;
+  CURRENT_DATE = dateStr;
+  VIEW = "today";
+  render();
+}
+
+// ---------------------------------------------------------------------------
+// SCREEN 2: THE ENTRY FORM
+//
+// One big numeric box per reading. Values colour themselves as you type, but
+// nothing is ever refused. If a tool reads badly, you record the bad number.
+// ---------------------------------------------------------------------------
+function openTool(toolId) {
+  CURRENT_TOOL = toolId;
+  VIEW = "entry";
+  render();
+}
+
+function renderEntry() {
+  var host = document.getElementById("viewEntry");
+  var tool = findTool(CURRENT_TOOL);
+  if (!tool) { showTab("today"); return; }
+
+  // If this tool was already logged on this date, put those values back in
+  // the boxes so correcting a typo is easy.
+  var day = DATA.entries[CURRENT_DATE];
+  var entry = day ? day[tool.id] : null;
+  var saved = entry ? entry.values : {};
+
+  var html = '<div class="card">'
+    + '<div class="spread"><h2 style="margin:0">' + esc(tool.name) + '</h2>'
+    + '<span class="count">' + esc(CURRENT_DATE) + '</span></div>';
+
+  if (entry) {
+    html += '<p class="hint" style="margin-top:8px">Already logged at ' + esc(shortTime(entry.savedAt))
+      + '. Saving again replaces what is there.</p>';
+  }
+  html += '</div>';
+
+  if (tool.points.length === 0) {
+    html += '<div class="card"><p class="hint">This tool has no readings set up yet. '
+      + 'Add some on the Tools tab.</p>'
+      + '<div class="big-actions"><button onclick="showTab(\'tools\')">Go to Tools</button>'
+      + '<button class="secondary" onclick="showTab(\'today\')">Back</button></div></div>';
+    host.innerHTML = html;
+    return;
+  }
+
+  // One block per data point.
+  html += '<div class="card">';
+  for (var i = 0; i < tool.points.length; i++) {
+    var point = tool.points[i];
+    var value = saved[point.id] !== undefined ? saved[point.id] : "";
+    var status = rangeStatus(value, point);
+    var unitLabel = point.unit ? " (" + esc(point.unit) + ")" : "";
+
+    html += '<div class="field">'
+      + '<label for="val_' + point.id + '">' + esc(point.name) + unitLabel + '</label>'
+      + '<input type="number" inputmode="decimal" step="any" '
+      + 'id="val_' + point.id + '" class="reading ' + statusClass(status) + '" '
+      + 'value="' + esc(value) + '" oninput="colorField(\'' + point.id + '\')">'
+      + '<div class="spread" style="margin-top:6px">'
+      + '<span class="hint" style="margin:0">' + esc(limitHint(point)) + '</span>'
+      + '<span class="pill ' + statusClass(status) + '" id="st_' + point.id + '">'
+      + esc(statusText(status, point)) + '</span>'
+      + '</div></div>';
+  }
+  html += '</div>';
+
+  // The buttons. Full width and extra tall, because these get tapped most.
+  var next = nextUnlogged(CURRENT_DATE, tool.id);
+  html += '<div class="card"><div class="big-actions">';
+  if (next) {
+    html += '<button onclick="saveEntry(\'next\')">Save and next tool (' + esc(next.name) + ')</button>';
+  }
+  html += '<button' + (next ? ' class="secondary"' : '') + ' onclick="saveEntry(\'close\')">Save and close</button>'
+    + '<button class="secondary" onclick="showTab(\'today\')">Cancel, do not save</button>'
+    + '</div><div class="msg" id="entryMsg"></div></div>';
+
+  host.innerHTML = html;
+}
+
+// Recolour one box while the user types. Purely cosmetic, changes no data.
+function colorField(pointId) {
+  var tool = findTool(CURRENT_TOOL);
+  if (!tool) return;
+  var point = findPoint(tool, pointId);
+  var input = document.getElementById("val_" + pointId);
+  var pill = document.getElementById("st_" + pointId);
+  var status = rangeStatus(input.value, point);
+  input.className = "reading " + statusClass(status);
+  pill.className = "pill " + statusClass(status);
+  pill.textContent = statusText(status, point);
+}
+
+// Save what is in the boxes, then either move to the next tool or go back to
+// the round list. Blank boxes are saved as blank, which is fine: a blank
+// reading simply does not appear in the export.
+function saveEntry(mode) {
+  var tool = findTool(CURRENT_TOOL);
+  if (!tool) return;
+
+  var values = {};
+  for (var i = 0; i < tool.points.length; i++) {
+    var point = tool.points[i];
+    values[point.id] = document.getElementById("val_" + point.id).value.trim();
+  }
+
+  if (!DATA.entries[CURRENT_DATE]) DATA.entries[CURRENT_DATE] = {};
+  DATA.entries[CURRENT_DATE][tool.id] = { savedAt: nowStamp(), values: values };
+  save();
+
+  if (mode === "next") {
+    var next = nextUnlogged(CURRENT_DATE, tool.id);
+    if (next) { openTool(next.id); return; }
+  }
+  showTab("today");
+}
+
+// ---------------------------------------------------------------------------
+// SCREEN 3: TOOLS SETUP
+//
+// Add the machines you walk, and the readings you take at each one. You do
+// this once, then only touch it when the round changes.
+//
+// Every box on this screen saves the moment you leave it. There is no save
+// button, on purpose: fewer taps, and nothing to forget.
+// ---------------------------------------------------------------------------
+function renderTools() {
+  var host = document.getElementById("viewTools");
+
+  var html = '<div id="dupWarn"></div>'
+    + '<div class="card">'
+    + '<h2>Add a tool</h2>'
+    + '<p class="hint">The name you type here is what shows on your round and in the export.</p>'
+    + '<div class="row">'
+    + '<div class="grow"><input type="text" id="newToolName" placeholder="For example: Etcher 3"></div>'
+    + '<button onclick="addTool()">Add tool</button>'
+    + '</div><div class="msg" id="toolsMsg"></div>';
+
+  if (DATA.tools.length === 0) {
+    html += '<div class="big-actions">'
+      + '<button class="secondary" onclick="loadExample()">Load an example setup to try it</button>'
+      + '</div>';
+  }
+  html += '</div>';
+
+  // One card per tool, holding that tool's data points.
+  for (var i = 0; i < DATA.tools.length; i++) {
+    html += toolEditorHtml(DATA.tools[i], i);
+  }
+
+  host.innerHTML = html;
+  warnAboutDuplicateNames();
+}
+
+// ---------------------------------------------------------------------------
+// Two tools with the same name, or two readings on one tool with the same
+// name, are a problem only in one place: importing. A file has names in it,
+// not ids, so two tools called "Etcher 3" would collapse into one on the way
+// back in. We do not stop you renaming, because blocking you halfway through
+// typing a name is worse. We just say so, right on the setup screen.
+//
+// This updates one small box on its own instead of redrawing the screen, so
+// it is safe to call while someone is typing.
+// ---------------------------------------------------------------------------
+function warnAboutDuplicateNames() {
+  var box = document.getElementById("dupWarn");
+  if (!box) return;
+
+  var problems = [];
+  var toolSeen = {};
+  for (var i = 0; i < DATA.tools.length; i++) {
+    var tool = DATA.tools[i];
+    // The "n:" in front of the key stops a tool named something like
+    // "constructor" from colliding with a built-in property name.
+    var key = "n:" + tool.name.trim().toLowerCase();
+    if (toolSeen[key] === true) problems.push('Two tools are both called "' + tool.name + '".');
+    toolSeen[key] = true;
+
+    var pointSeen = {};
+    for (var p = 0; p < tool.points.length; p++) {
+      var pkey = "n:" + tool.points[p].name.trim().toLowerCase();
+      if (pointSeen[pkey] === true) {
+        problems.push('"' + tool.name + '" has two readings called "' + tool.points[p].name + '".');
+      }
+      pointSeen[pkey] = true;
+    }
+  }
+
+  if (problems.length === 0) { box.innerHTML = ""; return; }
+
+  box.innerHTML = '<div class="card" style="background:var(--warn-bg);border-color:#f0cf9a">'
+    + '<h2>Two things share a name</h2>'
+    + '<p class="hint">' + problems.map(esc).join("<br>") + '</p>'
+    + '<p class="hint">Give them different names. Names are how an imported file '
+    + 'finds its way back to the right tool, so duplicates would merge together '
+    + 'if you ever restore from a backup.</p></div>';
+}
+
+// The editor card for one tool.
+function toolEditorHtml(tool, index) {
+  var html = '<div class="card">';
+
+  // Tool name, plus move up / move down / delete.
+  html += '<label>Tool name</label>'
+    + '<div class="row">'
+    + '<div class="grow"><input type="text" value="' + esc(tool.name) + '" '
+    + 'oninput="renameTool(\'' + tool.id + '\', this.value)"></div>'
+    + '<button class="secondary small" onclick="moveTool(\'' + tool.id + '\', -1)"'
+    + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
+    + '<button class="secondary small" onclick="moveTool(\'' + tool.id + '\', 1)"'
+    + (index === DATA.tools.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
+    + '<button class="danger small" onclick="deleteTool(\'' + tool.id + '\')">Delete</button>'
+    + '</div>';
+
+  html += '<h2 style="margin-top:16px">Readings logged at this tool</h2>';
+
+  if (tool.points.length === 0) {
+    html += '<p class="hint">No readings yet. Add the first one below.</p>';
+  }
+
+  // One editable block per data point.
+  for (var i = 0; i < tool.points.length; i++) {
+    var point = tool.points[i];
+    html += '<div class="pointedit">'
+      + '<div class="row">'
+      + '<div class="grow"><label>Reading name</label>'
+      + '<input type="text" value="' + esc(point.name) + '" '
+      + 'oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'name\',this.value)"></div>'
+      + '</div>'
+      + '<div class="grid" style="margin-top:8px">'
+      + '<div><label>Unit</label><input type="text" value="' + esc(point.unit) + '" '
+      + 'placeholder="mTorr" oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'unit\',this.value)"></div>'
+      + '<div><label>&nbsp;</label>'
+      + '<div class="row">'
+      + '<button class="secondary small" onclick="movePoint(\'' + tool.id + '\',\'' + point.id + '\',-1)"'
+      + (i === 0 ? ' disabled' : '') + '>&#9650;</button>'
+      + '<button class="secondary small" onclick="movePoint(\'' + tool.id + '\',\'' + point.id + '\',1)"'
+      + (i === tool.points.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
+      + '<button class="danger small" onclick="deletePoint(\'' + tool.id + '\',\'' + point.id + '\')">Delete</button>'
+      + '</div></div>'
+      + '</div>'
+      + '<div class="grid" style="margin-top:8px">'
+      + '<div><label>Min (optional)</label><input type="number" step="any" value="'
+      + (point.min === null ? "" : esc(point.min)) + '" placeholder="no min" '
+      + 'oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'min\',this.value)"></div>'
+      + '<div><label>Max (optional)</label><input type="number" step="any" value="'
+      + (point.max === null ? "" : esc(point.max)) + '" placeholder="no max" '
+      + 'oninput="updatePoint(\'' + tool.id + '\',\'' + point.id + '\',\'max\',this.value)"></div>'
+      + '</div>'
+      + '<p class="hint" style="margin:8px 0 0">Leave min and max blank to log the number '
+      + 'without checking it. A reading outside its limits is coloured, never refused.</p>'
+      + '</div>';
+  }
+
+  // Add a new data point to this tool.
+  html += '<div class="row" style="margin-top:10px">'
+    + '<div class="grow"><input type="text" id="newPoint_' + tool.id + '" '
+    + 'placeholder="For example: Chamber pressure"></div>'
+    + '<button onclick="addPoint(\'' + tool.id + '\')">Add reading</button>'
+    + '</div>';
+
+  // Copy the whole reading list from another tool, so setting up a second
+  // machine of the same type is one tap instead of ten.
+  var others = [];
+  for (var k = 0; k < DATA.tools.length; k++) {
+    if (DATA.tools[k].id !== tool.id && DATA.tools[k].points.length > 0) others.push(DATA.tools[k]);
+  }
+  if (others.length > 0) {
+    html += '<div class="row" style="margin-top:10px">'
+      + '<div class="grow"><select id="copyFrom_' + tool.id + '">';
+    for (var m = 0; m < others.length; m++) {
+      html += '<option value="' + others[m].id + '">' + esc(others[m].name) + '</option>';
+    }
+    html += '</select></div>'
+      + '<button class="secondary" onclick="copyPoints(\'' + tool.id + '\')">Copy its readings here</button>'
+      + '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function addTool() {
+  var box = document.getElementById("newToolName");
+  var name = box.value.trim();
+  if (name === "") { setMsg("toolsMsg", "err", "Type a name for the tool first."); return; }
+  if (findToolByName(name)) { setMsg("toolsMsg", "err", "There is already a tool called that."); return; }
+
+  DATA.tools.push({ id: newId(), name: name, points: [] });
+  save();
+  box.value = "";
+  render();
+  setMsg("toolsMsg", "ok", "Added " + name + ". Now add the readings you take at it.");
+}
+
+function renameTool(toolId, name) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  name = name.trim();
+  // An empty box means the user is mid-way through retyping. Keep the old name
+  // until they have typed a new one, rather than leaving a nameless tool.
+  if (name === "") return;
+  tool.name = name;
+  save();
+  warnAboutDuplicateNames();
+}
+
+// Deleting a tool also deletes its logged readings. There is no way to keep
+// readings for a tool that no longer exists, so we say so plainly and ask
+// twice when there is real data at stake.
+function deleteTool(toolId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+
+  var readings = countReadingsForTool(toolId);
+  var question = "Delete the tool \"" + tool.name + "\"?";
+  if (readings > 0) question += "\n\nThis also deletes " + readings + " logged readings for it. This cannot be undone.";
+  if (!window.confirm(question)) return;
+  if (readings > 0 && !window.confirm("Really delete " + readings + " readings? Export first if you are not sure.")) return;
+
+  // Remove the tool.
+  var kept = [];
+  for (var i = 0; i < DATA.tools.length; i++) {
+    if (DATA.tools[i].id !== toolId) kept.push(DATA.tools[i]);
+  }
+  DATA.tools = kept;
+
+  // Remove its entries on every date.
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    delete DATA.entries[dates[d]][toolId];
+    if (Object.keys(DATA.entries[dates[d]]).length === 0) delete DATA.entries[dates[d]];
+  }
+
+  save();
+  render();
+  setMsg("toolsMsg", "ok", "Deleted " + tool.name + ".");
+}
+
+function countReadingsForTool(toolId) {
+  var total = 0;
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var entry = DATA.entries[dates[d]][toolId];
+    if (!entry) continue;
+    var keys = Object.keys(entry.values);
+    for (var k = 0; k < keys.length; k++) {
+      if (String(entry.values[keys[k]]).trim() !== "") total++;
+    }
+  }
+  return total;
+}
+
+// Move a tool up or down the round order.
+function moveTool(toolId, step) {
+  for (var i = 0; i < DATA.tools.length; i++) {
+    if (DATA.tools[i].id !== toolId) continue;
+    var to = i + step;
+    if (to < 0 || to >= DATA.tools.length) return;
+    var moved = DATA.tools[i];
+    DATA.tools[i] = DATA.tools[to];
+    DATA.tools[to] = moved;
+    save();
+    render();
+    return;
+  }
+}
+
+function addPoint(toolId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var box = document.getElementById("newPoint_" + toolId);
+  var name = box.value.trim();
+  if (name === "") { setMsg("toolsMsg", "err", "Type a name for the reading first."); return; }
+  if (findPointByName(tool, name)) { setMsg("toolsMsg", "err", tool.name + " already has a reading called that."); return; }
+
+  tool.points.push({ id: newId(), name: name, unit: "", min: null, max: null });
+  save();
+  render();
+  setMsg("toolsMsg", "ok", "Added " + name + " to " + tool.name + ".");
+}
+
+// Change one field of one data point. Min and max come in as text from the
+// box: an empty box means "no limit", which we store as null.
+//
+// IMPORTANT: this is called from oninput, which fires on every keystroke, and
+// it deliberately does NOT redraw the screen. Two reasons. Redrawing while you
+// are typing throws away the box you are typing in, which on a touchscreen
+// means a lost keypress and a lost cursor. And an earlier version used
+// onchange, which only fires when a box loses focus: type a limit, tap
+// straight to another tab, and the limit was never saved. Saving on every
+// keystroke has neither problem.
+function updatePoint(toolId, pointId, field, value) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var point = findPoint(tool, pointId);
+  if (!point) return;
+
+  if (field === "name") {
+    var name = value.trim();
+    if (name !== "") point.name = name;
+  } else if (field === "unit") {
+    point.unit = value.trim();
+  } else if (field === "min" || field === "max") {
+    var text = String(value).trim();
+    point[field] = (text === "" || isNaN(Number(text))) ? null : Number(text);
+  }
+  save();
+  warnAboutDuplicateNames();
+}
+
+function deletePoint(toolId, pointId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var point = findPoint(tool, pointId);
+  if (!point) return;
+  if (!window.confirm("Delete the reading \"" + point.name + "\" from " + tool.name
+      + "?\n\nAny values already logged for it are deleted too.")) return;
+
+  var kept = [];
+  for (var i = 0; i < tool.points.length; i++) {
+    if (tool.points[i].id !== pointId) kept.push(tool.points[i]);
+  }
+  tool.points = kept;
+
+  // Drop the values for that point on every date.
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var entry = DATA.entries[dates[d]][toolId];
+    if (entry) delete entry.values[pointId];
+  }
+
+  save();
+  render();
+}
+
+function movePoint(toolId, pointId, step) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  for (var i = 0; i < tool.points.length; i++) {
+    if (tool.points[i].id !== pointId) continue;
+    var to = i + step;
+    if (to < 0 || to >= tool.points.length) return;
+    var moved = tool.points[i];
+    tool.points[i] = tool.points[to];
+    tool.points[to] = moved;
+    save();
+    render();
+    return;
+  }
+}
+
+// Copy every reading from another tool into this one. Readings this tool
+// already has, by name, are left alone rather than duplicated.
+function copyPoints(toolId) {
+  var tool = findTool(toolId);
+  var fromId = document.getElementById("copyFrom_" + toolId).value;
+  var source = findTool(fromId);
+  if (!tool || !source) return;
+
+  var added = 0;
+  for (var i = 0; i < source.points.length; i++) {
+    var point = source.points[i];
+    if (findPointByName(tool, point.name)) continue;
+    tool.points.push({ id: newId(), name: point.name, unit: point.unit, min: point.min, max: point.max });
+    added++;
+  }
+  save();
+  render();
+  setMsg("toolsMsg", "ok", "Copied " + added + " readings from " + source.name + " into " + tool.name + ".");
+}
+
+// A small made-up setup so you can try the whole flow before typing your own.
+function loadExample() {
+  if (DATA.tools.length > 0 && !window.confirm("This adds two example tools to your list. Continue?")) return;
+
+  DATA.tools.push({
+    id: newId(), name: "Example Etcher 3",
+    points: [
+      { id: newId(), name: "Chamber pressure", unit: "mTorr", min: 8, max: 12 },
+      { id: newId(), name: "He leak rate", unit: "sccm", min: null, max: 2.5 },
+      { id: newId(), name: "Chiller temperature", unit: "C", min: 18, max: 22 },
+      { id: newId(), name: "RF hours", unit: "h", min: null, max: null }
+    ]
+  });
+  DATA.tools.push({
+    id: newId(), name: "Example Wet Bench 1",
+    points: [
+      { id: newId(), name: "Bath temperature", unit: "C", min: 60, max: 65 },
+      { id: newId(), name: "DI resistivity", unit: "Mohm-cm", min: 17, max: null },
+      { id: newId(), name: "N2 pressure", unit: "psi", min: 40, max: 60 }
+    ]
+  });
+  save();
+  showTab("tools");
+  setMsg("toolsMsg", "ok", "Loaded two example tools. Delete them once you have added your real ones.");
+}
+
+// ---------------------------------------------------------------------------
+// SCREEN 4: DATA AND BACKUP
+// ---------------------------------------------------------------------------
+function renderData() {
+  var host = document.getElementById("viewData");
+  var days = Object.keys(DATA.entries).length;
+  var readings = countAllReadings();
+
+  var html = '<div class="card">'
+    + '<h2>What is stored on this tablet</h2>'
+    + '<p class="hint">' + DATA.tools.length + ' tools &middot; ' + days + ' days logged &middot; '
+    + readings + ' readings &middot; last export: '
+    + (DATA.lastExport === "" ? "never" : esc(DATA.lastExport)) + '</p>'
+    + '</div>';
+
+  html += '<div class="card">'
+    + '<h2>Export</h2>'
+    + '<p class="hint">The CSV is the one you open in Excel. The JSON is an exact backup, '
+    + 'including tools you have set up but not logged yet. Take a JSON before anything risky, '
+    + 'like swapping tablets.</p>'
+    + '<div class="big-actions">'
+    + '<button onclick="exportCsv()">Export for Excel (CSV)</button>'
+    + '<button class="secondary" onclick="exportJson()">Export full backup (JSON)</button>'
+    + '</div><div class="msg" id="exportMsg"></div></div>';
+
+  html += '<div class="card">'
+    + '<h2>Import</h2>'
+    + '<p class="hint">Pick a CSV or JSON file this tool exported earlier. Use this after a '
+    + 'browser wipe, or to move your data onto a different tablet.</p>'
+    + '<input type="file" id="importFile" accept=".csv,.json,text/csv,application/json" onchange="fileChosen()">'
+    + '<div id="importChoice"></div>'
+    + '<div class="msg" id="importMsg"></div></div>';
+
+  html += '<div class="card">'
+    + '<h2>Erase everything</h2>'
+    + '<p class="hint">Removes every tool and every reading from this tablet. Export first.</p>'
+    + '<div class="big-actions"><button class="danger" onclick="eraseAll()">Erase all data</button></div>'
+    + '</div>';
+
+  host.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// EXPORT
+//
+// The CSV has one row per reading. That shape is called "long" or "tidy". It
+// is deliberately not a grid with one column per reading, because your tools
+// each log different things and a grid would be full of holes. Long format is
+// also exactly what an Excel PivotTable wants.
+//
+// To change which columns come out, edit the header row and the row built
+// just below it. Keep the two in the same order.
+// ---------------------------------------------------------------------------
+function buildCsv() {
+  var rows = [["Date", "Tool", "Data point", "Unit", "Value", "Min", "Max", "Status", "Saved at"]];
+
+  var dates = Object.keys(DATA.entries).sort();
+  for (var d = 0; d < dates.length; d++) {
+    var date = dates[d];
+    // Walk the tools in round order, so the file reads the way you walk.
+    for (var t = 0; t < DATA.tools.length; t++) {
+      var tool = DATA.tools[t];
+      var entry = DATA.entries[date][tool.id];
+      if (!entry) continue;
+
+      for (var p = 0; p < tool.points.length; p++) {
+        var point = tool.points[p];
+        var value = entry.values[point.id];
+        if (value === undefined || String(value).trim() === "") continue;  // skip blanks
+        rows.push([
+          date,
+          tool.name,
+          point.name,
+          point.unit,
+          value,
+          point.min === null ? "" : point.min,
+          point.max === null ? "" : point.max,
+          rangeStatus(value, point),
+          entry.savedAt || ""
+        ]);
+      }
+    }
+  }
+
+  // The "\uFEFF" at the front is a byte order mark: an invisible marker
+  // that tells Excel to read the file as UTF-8. Without it, degree signs and
+  // other symbols come out as gibberish when Excel opens the file.
+  // \r\n line endings are what Excel on Windows expects.
+  return "\uFEFF" + rows.map(csvLine).join("\r\n") + "\r\n";
+}
+
+// Turn one row into a line of CSV, quoting anything that needs it.
+function csvLine(row) {
+  return row.map(function (cell) {
+    var s = String(cell === undefined || cell === null ? "" : cell);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(",");
+}
+
+function exportCsv() {
+  if (countAllReadings() === 0) {
+    setMsg("exportMsg", "err", "There are no readings to export yet.");
+    return;
+  }
+  var name = "pm_readings_" + todayStr() + ".csv";
+  downloadFile(buildCsv(), name, "text/csv");
+  markExported(name, "exportMsg");
+}
+
+function exportJson() {
+  var name = "pm_backup_" + todayStr() + ".json";
+  downloadFile(JSON.stringify(DATA, null, 2), name, "application/json");
+  markExported(name, "exportMsg");
+}
+
+// Remember that we exported today, so the reminder banner goes quiet.
+function markExported(filename, msgId) {
+  DATA.lastExport = todayStr();
+  save();
+  setMsg(msgId, "ok", "Saved " + filename + " to this tablet's Downloads folder. "
+    + "Move it somewhere safe now.");
+  renderBanner();
+}
+
+// Hand the browser a file to save. This is all done in memory. Nothing is
+// uploaded and no network connection is opened.
+function downloadFile(text, filename, mimeType) {
+  var blob = new Blob([text], { type: mimeType });
+  var link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// ---------------------------------------------------------------------------
+// IMPORT
+//
+// Both file types end up in the same shape before anything is changed:
+//
+//   { tools: [ {name, points:[{name,unit,min,max}]} ],
+//     rows:  [ {date, tool, point, unit, min, max, value, savedAt} ] }
+//
+// That way there is only one piece of code that actually changes your data,
+// no matter which kind of file you picked. Tools and readings are matched by
+// NAME on the way in, because a file has names in it, not ids.
+// ---------------------------------------------------------------------------
+var PENDING_IMPORT = null;   // the parsed file, waiting for merge or replace
+
+function fileChosen() {
+  var input = document.getElementById("importFile");
+  if (!input.files || input.files.length === 0) return;
+  var file = input.files[0];
+
+  var reader = new FileReader();
+  reader.onerror = function () {
+    setMsg("importMsg", "err", "Could not read that file.");
+  };
+  reader.onload = function () {
+    var text = String(reader.result);
+    var parsed;
+    try {
+      parsed = (file.name.toLowerCase().indexOf(".json") !== -1 || text.trim().charAt(0) === "{")
+        ? parseBackupJson(text)
+        : parseReadingsCsv(text);
+    } catch (e) {
+      setMsg("importMsg", "err", "That file is not one this tool exported. " + e.message);
+      return;
+    }
+    if (parsed.tools.length === 0 && parsed.rows.length === 0) {
+      setMsg("importMsg", "err", "That file has no tools or readings in it.");
+      return;
+    }
+    PENDING_IMPORT = parsed;
+    askMergeOrReplace(file.name, parsed);
+  };
+  reader.readAsText(file);
+}
+
+// Show the two big choices once a file has been read successfully.
+function askMergeOrReplace(filename, parsed) {
+  var box = document.getElementById("importChoice");
+  box.innerHTML = '<p class="hint" style="margin-top:12px"><strong>' + esc(filename) + '</strong> holds '
+    + parsed.tools.length + ' tools and ' + parsed.rows.length + ' readings. What should happen to '
+    + 'what is already on this tablet?</p>'
+    + '<div class="big-actions">'
+    + '<button onclick="runImport(\'merge\')">Merge &ndash; keep what is here, add what is missing</button>'
+    + '<button class="secondary" onclick="runImport(\'replace\')">Replace &ndash; erase this tablet, use the file</button>'
+    + '<button class="secondary" onclick="cancelImport()">Cancel</button>'
+    + '</div>';
+  setMsg("importMsg", "info", "Nothing has changed yet.");
+}
+
+function cancelImport() {
+  PENDING_IMPORT = null;
+  document.getElementById("importChoice").innerHTML = "";
+  document.getElementById("importFile").value = "";
+  setMsg("importMsg", "info", "Import cancelled. Nothing changed.");
+}
+
+// The one place that actually changes your data on an import.
+function runImport(mode) {
+  var parsed = PENDING_IMPORT;
+  if (!parsed) return;
+
+  if (mode === "replace") {
+    if (!window.confirm("Erase everything on this tablet and use the file instead?")) return;
+    DATA.tools = [];
+    DATA.entries = {};
+  }
+
+  // Note which tool-and-date combinations were already here BEFORE we start.
+  // In merge mode those are left exactly as they are: the tablet wins.
+  var alreadyHere = {};
+  var dates = Object.keys(DATA.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var toolIds = Object.keys(DATA.entries[dates[d]]);
+    for (var t = 0; t < toolIds.length; t++) alreadyHere[dates[d] + "|" + toolIds[t]] = true;
+  }
+
+  // Step 1: make sure every tool and reading in the file exists here.
+  for (var i = 0; i < parsed.tools.length; i++) ensureTool(parsed.tools[i]);
+
+  // Step 2: put the readings in.
+  var added = 0, skipped = 0;
+  for (var r = 0; r < parsed.rows.length; r++) {
+    var row = parsed.rows[r];
+    var tool = findToolByName(row.tool);
+    if (!tool) continue;
+    var point = findPointByName(tool, row.point);
+    if (!point) continue;
+
+    if (alreadyHere[row.date + "|" + tool.id]) { skipped++; continue; }
+
+    if (!DATA.entries[row.date]) DATA.entries[row.date] = {};
+    if (!DATA.entries[row.date][tool.id]) {
+      DATA.entries[row.date][tool.id] = { savedAt: row.savedAt || "", values: {} };
+    }
+    DATA.entries[row.date][tool.id].values[point.id] = row.value;
+    added++;
+  }
+
+  save();
+  PENDING_IMPORT = null;
+  showTab("data");
+
+  var note = "Imported " + added + " readings.";
+  if (skipped > 0) note += " Skipped " + skipped + " that this tablet already had for the same tool and day.";
+  setMsg("importMsg", "ok", note);
+}
+
+// Find a tool by name or create it, then do the same for each of its readings.
+// Limits from the file are only applied when a reading is brand new here, so
+// an import never quietly rewrites limits you have tuned on this tablet.
+function ensureTool(incoming) {
+  var tool = findToolByName(incoming.name);
+  if (!tool) {
+    tool = { id: newId(), name: String(incoming.name).trim(), points: [] };
+    DATA.tools.push(tool);
+  }
+  for (var i = 0; i < incoming.points.length; i++) {
+    var wanted = incoming.points[i];
+    if (findPointByName(tool, wanted.name)) continue;
+    tool.points.push({
+      id: newId(),
+      name: String(wanted.name).trim(),
+      unit: wanted.unit || "",
+      min: wanted.min === undefined ? null : wanted.min,
+      max: wanted.max === undefined ? null : wanted.max
+    });
+  }
+  return tool;
+}
+
+// Read a JSON backup into the common shape.
+function parseBackupJson(text) {
+  var obj = JSON.parse(text);
+  if (!obj || !obj.tools || !obj.entries) throw new Error("It is missing its tools or entries.");
+
+  var tools = [];
+  var byId = {};
+  for (var i = 0; i < obj.tools.length; i++) {
+    var t = obj.tools[i];
+    byId[t.id] = t;
+    var points = [];
+    for (var p = 0; p < t.points.length; p++) {
+      points.push({
+        name: t.points[p].name,
+        unit: t.points[p].unit || "",
+        min: t.points[p].min === undefined ? null : t.points[p].min,
+        max: t.points[p].max === undefined ? null : t.points[p].max
+      });
+    }
+    tools.push({ name: t.name, points: points });
+  }
+
+  // Flatten the saved entries into one row per reading.
+  var rows = [];
+  var dates = Object.keys(obj.entries);
+  for (var d = 0; d < dates.length; d++) {
+    var day = obj.entries[dates[d]];
+    var toolIds = Object.keys(day);
+    for (var k = 0; k < toolIds.length; k++) {
+      var tool = byId[toolIds[k]];
+      if (!tool) continue;                       // an entry for a deleted tool
+      var entry = day[toolIds[k]];
+      for (var q = 0; q < tool.points.length; q++) {
+        var point = tool.points[q];
+        var value = entry.values[point.id];
+        if (value === undefined || String(value).trim() === "") continue;
+        rows.push({
+          date: dates[d], tool: tool.name, point: point.name,
+          unit: point.unit || "", min: point.min, max: point.max,
+          value: String(value), savedAt: entry.savedAt || ""
+        });
+      }
+    }
+  }
+  return { tools: tools, rows: rows };
+}
+
+// Read an exported CSV into the common shape. The CSV carries the limits as
+// well as the values, so it can rebuild your whole setup on its own. The one
+// thing it cannot carry is a tool or reading you set up but never logged,
+// because those have no rows. That is what the JSON backup is for.
+function parseReadingsCsv(text) {
+  var table = parseCsv(text);
+  if (table.length < 2) throw new Error("It has no rows in it.");
+
+  // Match the header names to column numbers, so column order can change.
+  var header = table[0];
+  var col = {};
+  for (var h = 0; h < header.length; h++) {
+    col[String(header[h]).trim().toLowerCase()] = h;
+  }
+  var needed = ["date", "tool", "data point", "value"];
+  for (var n = 0; n < needed.length; n++) {
+    if (col[needed[n]] === undefined) throw new Error("It has no \"" + needed[n] + "\" column.");
+  }
+
+  var toolsByName = {};
+  var tools = [];
+  var rows = [];
+
+  for (var r = 1; r < table.length; r++) {
+    var line = table[r];
+    if (line.length === 1 && String(line[0]).trim() === "") continue;   // blank line
+
+    var date = cell(line, col["date"]);
+    var toolName = cell(line, col["tool"]);
+    var pointName = cell(line, col["data point"]);
+    var value = cell(line, col["value"]);
+    if (date === "" || toolName === "" || pointName === "") continue;
+
+    var unit = cell(line, col["unit"]);
+    var min = numberOrNull(cell(line, col["min"]));
+    var max = numberOrNull(cell(line, col["max"]));
+    var savedAt = cell(line, col["saved at"]);
+
+    // Collect the tool and reading definitions as we go.
+    // The "n:" in front of each key keeps a tool or reading named something
+    // like "constructor" from colliding with a built-in property name.
+    var key = "n:" + toolName.toLowerCase();
+    if (toolsByName[key] === undefined) {
+      toolsByName[key] = { name: toolName, points: [], seen: {} };
+      tools.push(toolsByName[key]);
+    }
+    var holder = toolsByName[key];
+    var pkey = "n:" + pointName.toLowerCase();
+    if (holder.seen[pkey] === undefined) {
+      holder.seen[pkey] = true;
+      holder.points.push({ name: pointName, unit: unit, min: min, max: max });
+    }
+
+    if (value !== "") {
+      rows.push({ date: date, tool: toolName, point: pointName, unit: unit,
+                  min: min, max: max, value: value, savedAt: savedAt });
+    }
+  }
+  // "seen" was only a working note while parsing. Leave it behind.
+  for (var i = 0; i < tools.length; i++) delete tools[i].seen;
+
+  return { tools: tools, rows: rows };
+}
+
+// Read one cell out of a CSV line, safely if the column is missing.
+function cell(line, index) {
+  if (index === undefined || index >= line.length) return "";
+  return String(line[index]).trim();
+}
+
+function numberOrNull(text) {
+  if (text === "" || isNaN(Number(text))) return null;
+  return Number(text);
+}
+
+// Split CSV text into rows of cells. Handles quoted fields, doubled quotes
+// inside them, and commas or line breaks inside quotes.
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, "");     // drop the byte order mark if present
+
+  var rows = [];
+  var row = [];
+  var field = "";
+  var inQuotes = false;
+
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+
+    if (inQuotes) {
+      if (c === '"') {
+        if (text.charAt(i + 1) === '"') { field += '"'; i++; }   // "" means one "
+        else inQuotes = false;
+      } else {
+        field += c;
+      }
+      continue;
+    }
+
+    if (c === '"') { inQuotes = true; }
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c === "\r") { /* ignore, Windows line endings use \r\n */ }
+    else { field += c; }
+  }
+  if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// ERASE
+// ---------------------------------------------------------------------------
+function eraseAll() {
+  var readings = countAllReadings();
+  if (!window.confirm("Erase every tool and all " + readings + " readings from this tablet?")) return;
+  if (!window.confirm("This cannot be undone. Have you exported? Press OK only if you are sure.")) return;
+
+  DATA = blankData();
+  save();
+  showTab("data");
+  setMsg("importMsg", "ok", "Everything erased. You can import a file above to bring it back.");
+}
+
+// ---------------------------------------------------------------------------
+// SMALL HELPERS
+// ---------------------------------------------------------------------------
+
+// Make text safe to drop into the page. Without this, a tool named with a
+// "<" in it would break the layout.
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c];
+  });
+}
+
+// Put a coloured message under a set of buttons.
+function setMsg(id, kind, text) {
+  var box = document.getElementById(id);
+  if (!box) return;
+  box.className = "msg " + kind;
+  box.textContent = text;
+}
+
+// ---------------------------------------------------------------------------
+// START UP
+// ---------------------------------------------------------------------------
+load();
+render();
+
+</script>
+</body>
+</html>
