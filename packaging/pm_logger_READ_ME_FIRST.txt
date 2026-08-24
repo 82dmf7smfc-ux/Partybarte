@@ -98,6 +98,36 @@ about. A type that is still in use cannot be deleted; the page says which tool
 is in the way.
 
 
+When one chamber runs to a different spec
+-----------------------------------------
+Sometimes two chambers do the same process but are held to different numbers -
+a tighter kit life on one, a looser leak rate on another. A chamber can set
+its own min and max for any reading, without affecting the others.
+
+  1. Tools tab, find the chamber, press "Limits".
+  2. Each reading shows its type default, and boxes for this chamber's own
+     min and max.
+  3. Change a number and that reading turns amber and is marked "custom".
+     The button then reads "Limits (1 custom)" so you can see it at a glance.
+  4. "Use the type default again" puts a reading back on the type.
+
+Only the min and max can differ. The reading's name and unit always come from
+the type, so the chambers stay comparable in Excel. Type the type's own numbers
+back in and the custom setting simply disappears - there is no difference
+between "uses the type" and "happens to agree with the type".
+
+While a reading is on the type default, changing the type still moves it. Once
+a chamber has its own number, that chamber stops following the type for that
+one reading only.
+
+On the entry screen a custom limit says so: "Expected 60 or below (set for
+this chamber)". Nobody should have to wonder why the identical chamber next
+door flags at a different number.
+
+The export always shows the limit a chamber was ACTUALLY checked against, so
+the Min and Max columns always agree with the Status beside them.
+
+
 About the limits
 ----------------
 A reading outside its min or max turns red and says why. The value still

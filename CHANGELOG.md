@@ -25,6 +25,23 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+- PM Round Logger 1.5.0: per-chamber limit overrides. A chamber can set its
+  own min and max for any reading while still taking the reading list, name and
+  unit from its type, so two chambers running the same process to different
+  specs stay comparable in Excel. A reading left on the type default still
+  follows the type when the type changes; only the overridden reading stops.
+  Entry hints say when a limit belongs to that chamber alone, and typing the
+  type's own numbers back in clears the override rather than storing a copy.
+- PM Round Logger 1.5.0: exports record the limit each chamber was actually
+  checked against, so the Min and Max columns always agree with the Status
+  beside them. A JSON backup restores the type-and-override split exactly; a
+  CSV restores the effective limits, rebuilding the split from whichever
+  chamber it meets first, which preserves what every chamber is checked
+  against even where the bookkeeping differs.
+- PM Round Logger 1.5.0: stored data layout moves to version 3. Nothing needs
+  converting, but the number still moves so that an older build refuses the
+  data rather than applying a type's limits to a chamber that has its own and
+  reporting an out-of-spec reading as good.
 - PM Round Logger 1.4.0: chambers. A tool may have chambers, and each chamber
   has a TYPE that carries its reading list, so chambers of the same kind log
   the same things and a type written once is shared by every chamber using it,

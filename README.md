@@ -40,6 +40,12 @@ Tapping a chambered tool lists its chambers with their own done marks; a tool
 with no chambers goes straight to its readings as before. The export gains
 `Chamber` and `Chamber type` columns, empty for tool-level rows.
 
+A chamber can also **override** its type's min and max for any reading, for
+when two chambers run the same process to different specs. Only the limits
+differ; name and unit still come from the type, so the chambers stay
+comparable. The export records the limit each chamber was actually checked
+against, so `Min`/`Max` always agree with `Status`.
+
 A reading outside its limits turns red and says why, but **always saves**. On a
 round you record what the screen says, good or bad. A tool that refuses a bad
 number is a tool that gets fed made-up ones.

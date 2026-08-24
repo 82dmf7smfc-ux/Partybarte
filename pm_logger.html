@@ -309,9 +309,9 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // of the stored data, and only goes up if that layout changes in a way that
 // old data needs converting for. See migrateData().
 // ---------------------------------------------------------------------------
-var APP_VERSION = "1.4.0";
+var APP_VERSION = "1.5.0";
 var BUILD_DATE = "2026-08-24";
-var DATA_SHAPE = 2;
+var DATA_SHAPE = 3;
 
 // A second, separate storage slot for diagnostics: the error log, the usage
 // counters and the upgrade history.
@@ -432,6 +432,16 @@ function migrateData() {
     }
     MIGRATION_CHANGED = true;
   }
+
+  // Layout 2 -> 3 added per-chamber limit overrides. Nothing needs converting:
+  // a chamber with no overrides simply has none, and the code reads a missing
+  // list as "use the type's limits".
+  //
+  // The version still moves, on purpose. An older build would not know about
+  // overrides and would quietly apply the TYPE's limits to a chamber that has
+  // its own, which could show a reading as in range when it is not. A wrong
+  // answer given confidently is worse than a refusal, so older builds are made
+  // to refuse.
 
   if (DATA.version !== DATA_SHAPE) { DATA.version = DATA_SHAPE; MIGRATION_CHANGED = true; }
 
@@ -676,11 +686,72 @@ function findChamberByName(tool, name) {
   return null;
 }
 
-// What a chamber logs: its type's readings. A chamber whose type has been
-// deleted logs nothing rather than crashing.
+// ---------------------------------------------------------------------------
+// A chamber logs whatever its type says. Usually it also uses the type's
+// limits - but not always. Two chambers can run the same process to different
+// specs, so a chamber may override the min and max for any of its readings.
+//
+// An override is stored on the chamber, against the reading's id:
+//
+//     chamber.limits = { "i14": { min: 0, max: 600 } }
+//
+// A reading with no entry there uses the type's limits. Nothing else in the
+// page needs to know about any of this: chamberPoints() hands back readings
+// with the limits already resolved, so the entry form, the status chips and
+// the export all just work.
+// ---------------------------------------------------------------------------
+function effectivePoint(chamber, point) {
+  var overrides = chamber.limits || {};
+  var own = overrides[point.id];
+  if (!own) return point;
+
+  // A copy, so overriding one chamber never edits the type everyone shares.
+  return {
+    id: point.id,
+    name: point.name,
+    unit: point.unit,
+    min: own.min === undefined ? null : own.min,
+    max: own.max === undefined ? null : own.max,
+    overridden: true
+  };
+}
+
+// What a chamber logs, with its own limits applied. A chamber whose type has
+// been deleted logs nothing rather than crashing.
 function chamberPoints(chamber) {
   var type = findChamberType(chamber.typeId);
-  return type ? type.points : [];
+  if (!type) return [];
+  var out = [];
+  for (var i = 0; i < type.points.length; i++) {
+    out.push(effectivePoint(chamber, type.points[i]));
+  }
+  return out;
+}
+
+// How many readings on this chamber are set differently from its type.
+function countOverrides(chamber) {
+  var type = findChamberType(chamber.typeId);
+  if (!type) return 0;
+  var overrides = chamber.limits || {};
+  var n = 0;
+  for (var i = 0; i < type.points.length; i++) {
+    if (overrides[type.points[i].id]) n++;
+  }
+  return n;
+}
+
+// Set or clear one chamber's limits for one reading.
+//
+// If the numbers typed match the type exactly, the override is removed rather
+// than kept as a copy. That keeps "uses the type" and "happens to agree with
+// the type" from looking different when they are not.
+function setChamberLimit(chamber, point, min, max) {
+  if (!chamber.limits) chamber.limits = {};
+  if (min === point.min && max === point.max) {
+    delete chamber.limits[point.id];
+    return;
+  }
+  chamber.limits[point.id] = { min: min, max: max };
 }
 
 function chamberTypeName(chamber) {
@@ -851,10 +922,15 @@ function statusText(status, point) {
 
 // Describes a point's limits in plain words, for the hint under an input.
 function limitHint(point) {
-  if (point.min !== null && point.max !== null) return "Expected " + point.min + " to " + point.max;
-  if (point.min !== null) return "Expected " + point.min + " or above";
-  if (point.max !== null) return "Expected " + point.max + " or below";
-  return "No limits set";
+  // Say when a limit belongs to this chamber alone, so nobody has to wonder
+  // why the identical chamber next door flags at a different number.
+  var whose = point.overridden ? " (set for this chamber)" : "";
+  if (point.min !== null && point.max !== null) {
+    return "Expected " + point.min + " to " + point.max + whose;
+  }
+  if (point.min !== null) return "Expected " + point.min + " or above" + whose;
+  if (point.max !== null) return "Expected " + point.max + " or below" + whose;
+  return point.overridden ? "No limits, set for this chamber" : "No limits set";
 }
 
 // ---------------------------------------------------------------------------
@@ -979,6 +1055,7 @@ function showTab(name) {
   VIEW = name;
   CURRENT_TOOL = null;
   CURRENT_UNIT = null;
+  if (name !== "tools") OPEN_LIMITS = {};
   render();
 }
 
@@ -1817,6 +1894,7 @@ function deleteTypePoint(typeId, pointId) {
   }
   type.points = kept;
   forgetPointEverywhere(pointId);
+  forgetOverrideEverywhere(pointId);
   save();
   render();
 }
@@ -1851,6 +1929,16 @@ function movePointInList(list, pointId, step) {
     list[i] = list[to];
     list[to] = moved;
     return;
+  }
+}
+
+// Drop any chamber's own limits for a reading that no longer exists.
+function forgetOverrideEverywhere(pointId) {
+  for (var t = 0; t < DATA.tools.length; t++) {
+    var chambers = DATA.tools[t].chambers || [];
+    for (var c = 0; c < chambers.length; c++) {
+      if (chambers[c].limits) delete chambers[c].limits[pointId];
+    }
   }
 }
 
@@ -1970,9 +2058,13 @@ function chamberEditorHtml(tool) {
       + chamber.id + '\',-1)"' + (i === 0 ? ' disabled' : '') + '>&#9650;</button>'
       + '<button class="secondary small" onclick="moveChamber(\'' + tool.id + '\',\''
       + chamber.id + '\',1)"' + (i === chambers.length - 1 ? ' disabled' : '') + '>&#9660;</button>'
+      + '<button class="secondary small" onclick="toggleChamberLimits(\'' + chamber.id + '\')">'
+      + limitsButtonLabel(chamber) + '</button>'
       + '<button class="danger small" onclick="deleteChamber(\'' + tool.id + '\',\''
       + chamber.id + '\')">Delete chamber</button>'
-      + '</div></div>';
+      + '</div>'
+      + chamberLimitsHtml(tool, chamber)
+      + '</div>';
   }
 
   html += '<div class="row" style="margin-top:10px">'
@@ -1982,6 +2074,157 @@ function chamberEditorHtml(tool) {
     + '</div>';
 
   return html;
+}
+
+// Which chambers have their limits panel open. Reset on every visit to the
+// tab, so the setup screen is never a wall of open panels.
+var OPEN_LIMITS = {};
+
+function toggleChamberLimits(chamberId) {
+  OPEN_LIMITS[chamberId] = !OPEN_LIMITS[chamberId];
+  render();
+}
+
+function limitsButtonLabel(chamber) {
+  var n = countOverrides(chamber);
+  var tail = n === 0 ? "" : " (" + n + " custom)";
+  // The count stays on the label while the panel is open, so you can see what
+  // you have changed without closing it again.
+  return (OPEN_LIMITS[chamber.id] ? "Hide limits" : "Limits") + tail;
+}
+
+// ---------------------------------------------------------------------------
+// One chamber's limits.
+//
+// Normally a chamber uses its type's limits and there is nothing to do here.
+// This is for the case where two chambers run the same process to different
+// specs - a tighter kit life on one chamber, a looser leak rate on another.
+//
+// Only the min and max can differ. The reading's name and unit always come
+// from the type, so the chambers stay comparable in Excel.
+// ---------------------------------------------------------------------------
+function chamberLimitsHtml(tool, chamber) {
+  if (!OPEN_LIMITS[chamber.id]) return "";
+
+  var type = findChamberType(chamber.typeId);
+  if (!type) return '<p class="hint">This chamber has no type, so there is nothing to set.</p>';
+  if (type.points.length === 0) {
+    return '<p class="hint">The "' + esc(type.name) + '" type has no readings yet.</p>';
+  }
+
+  var overrides = chamber.limits || {};
+  var html = '<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">'
+    + '<p class="hint">Limits for ' + esc(chamber.name) + ' only. Blank boxes mean no limit. '
+    + 'Leave a reading alone and it uses the ' + esc(type.name) + ' type\'s limits.</p>';
+
+  for (var i = 0; i < type.points.length; i++) {
+    var point = type.points[i];
+    var own = overrides[point.id];
+    var effective = own ? own : point;
+    var isCustom = !!own;
+    var rowId = chamber.id + "_" + point.id;
+
+    // The "custom" chip and the reset button are always in the page, shown or
+    // hidden as needed. Building them up front means typing a limit can update
+    // this block in place instead of redrawing it and taking the cursor away.
+    html += '<div class="pointedit" id="clirow_' + rowId + '"' + (isCustom ? customRowStyle() : '') + '>'
+      + '<div class="spread">'
+      + '<strong style="font-size:15px">' + esc(point.name)
+      + (point.unit ? ' (' + esc(point.unit) + ')' : '') + '</strong>'
+      + '<span class="chip bad" id="clichip_' + rowId + '"'
+      + (isCustom ? '' : ' style="display:none"') + '>custom</span></div>'
+      + '<p class="hint" style="margin:4px 0 8px">Type default: '
+      + esc(plainLimits(point)) + '</p>'
+      + '<div class="grid">'
+      + '<div><label>Min</label><input type="number" step="any" value="'
+      + (effective.min === null || effective.min === undefined ? "" : esc(effective.min))
+      + '" placeholder="no min" oninput="updateChamberLimit(\'' + tool.id + '\',\''
+      + chamber.id + '\',\'' + point.id + '\')" id="climin_' + rowId + '"></div>'
+      + '<div><label>Max</label><input type="number" step="any" value="'
+      + (effective.max === null || effective.max === undefined ? "" : esc(effective.max))
+      + '" placeholder="no max" oninput="updateChamberLimit(\'' + tool.id + '\',\''
+      + chamber.id + '\',\'' + point.id + '\')" id="climax_' + rowId + '"></div>'
+      + '</div>'
+      + '<div class="row" style="margin-top:8px">'
+      + '<button class="secondary small" id="clireset_' + rowId + '"'
+      + (isCustom ? '' : ' disabled')
+      + ' onclick="clearChamberLimit(\'' + tool.id + '\',\'' + chamber.id + '\',\''
+      + point.id + '\')">Use the type default again</button></div>'
+      + '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// The amber highlight that marks a reading set differently from its type.
+function customRowStyle() {
+  return ' style="background:var(--warn-bg);border-color:#f0cf9a"';
+}
+
+// Show or hide one row's "custom" marks, without redrawing anything.
+function refreshLimitRow(chamberId, pointId, isCustom) {
+  var rowId = chamberId + "_" + pointId;
+  var row = document.getElementById("clirow_" + rowId);
+  var chip = document.getElementById("clichip_" + rowId);
+  var reset = document.getElementById("clireset_" + rowId);
+  if (!row || !chip || !reset) return;
+
+  row.style.background = isCustom ? "var(--warn-bg)" : "";
+  row.style.borderColor = isCustom ? "#f0cf9a" : "";
+  chip.style.display = isCustom ? "" : "none";
+  reset.disabled = !isCustom;
+}
+
+// The type's limits in plain words, for the "what you are deviating from" line.
+function plainLimits(point) {
+  if (point.min !== null && point.max !== null) return point.min + " to " + point.max;
+  if (point.min !== null) return point.min + " or above";
+  if (point.max !== null) return point.max + " or below";
+  return "no limits";
+}
+
+// Read both boxes and store the result. Both are taken together, because a
+// limit is a pair: setting only a max still means "and no min".
+function updateChamberLimit(toolId, chamberId, pointId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var chamber = findChamber(tool, chamberId);
+  if (!chamber) return;
+  var type = findChamberType(chamber.typeId);
+  if (!type) return;
+
+  var point = null;
+  for (var i = 0; i < type.points.length; i++) {
+    if (type.points[i].id === pointId) point = type.points[i];
+  }
+  if (!point) return;
+
+  var minBox = document.getElementById("climin_" + chamberId + "_" + pointId);
+  var maxBox = document.getElementById("climax_" + chamberId + "_" + pointId);
+  setChamberLimit(chamber, point, numberOrNull(minBox.value.trim()), numberOrNull(maxBox.value.trim()));
+  save();
+
+  // Update the marks in place rather than redrawing, which would throw away
+  // the box being typed in along with the cursor sitting in it.
+  refreshLimitRow(chamber.id, point.id, !!(chamber.limits && chamber.limits[point.id]));
+  refreshLimitsButton(chamber);
+}
+
+function clearChamberLimit(toolId, chamberId, pointId) {
+  var tool = findTool(toolId);
+  if (!tool) return;
+  var chamber = findChamber(tool, chamberId);
+  if (!chamber || !chamber.limits) return;
+  delete chamber.limits[pointId];
+  save();
+  render();
+}
+
+// Update just the "Limits (n custom)" label, without a full redraw.
+function refreshLimitsButton(chamber) {
+  var buttons = document.querySelectorAll('button[onclick="toggleChamberLimits(\'' + chamber.id + '\')"]');
+  for (var i = 0; i < buttons.length; i++) buttons[i].textContent = limitsButtonLabel(chamber);
 }
 
 function addChamber(toolId) {
@@ -2002,7 +2245,7 @@ function addChamber(toolId) {
   if (!tool.chambers) tool.chambers = [];
   // Default to the first type. Almost always right for a tool whose chambers
   // are all the same, and one tap to change when they are not.
-  tool.chambers.push({ id: newId(), name: name, typeId: DATA.chamberTypes[0].id });
+  tool.chambers.push({ id: newId(), name: name, typeId: DATA.chamberTypes[0].id, limits: {} });
   save();
   render();
   setMsg("toolsMsg", "ok", "Added " + name + " to " + tool.name
@@ -2263,6 +2506,17 @@ function copyPoints(toolId) {
 }
 
 // A small made-up setup so you can try the whole flow before typing your own.
+// Build the example's one custom limit, by finding the reading by name.
+function kitLifeOverride(type, max) {
+  var limits = {};
+  for (var i = 0; i < type.points.length; i++) {
+    if (type.points[i].name === "Kit life used") {
+      limits[type.points[i].id] = { min: null, max: max };
+    }
+  }
+  return limits;
+}
+
 function loadExample() {
   if (DATA.tools.length > 0 && !window.confirm("This adds two example tools to your list. Continue?")) return;
 
@@ -2289,9 +2543,12 @@ function loadExample() {
       { id: newId(), name: "N2 pressure", unit: "psi", min: 40, max: 60 }
     ],
     chambers: [
-      { id: newId(), name: "PM1", typeId: etchType.id },
-      { id: newId(), name: "PM2", typeId: etchType.id },
-      { id: newId(), name: "PM3", typeId: stripType.id }
+      { id: newId(), name: "PM1", typeId: etchType.id, limits: {} },
+      // PM2 runs the same process but its kit is held to a tighter limit, to
+      // show how one chamber can differ without affecting the others.
+      { id: newId(), name: "PM2", typeId: etchType.id,
+        limits: kitLifeOverride(etchType, 60) },
+      { id: newId(), name: "PM3", typeId: stripType.id, limits: {} }
     ]
   });
 
@@ -2880,11 +3137,24 @@ function ensureTool(incoming) {
     if (findChamberByName(tool, incomingChambers[c].name)) continue;
     var type = findChamberTypeByName(incomingChambers[c].typeName);
     if (!type) continue;
-    tool.chambers.push({
+    var made = {
       id: newId(),
       name: String(incomingChambers[c].name).trim(),
-      typeId: type.id
-    });
+      typeId: type.id,
+      limits: {}
+    };
+    // Apply this chamber's own limits, matching readings by name.
+    var wantedLimits = incomingChambers[c].limits || [];
+    for (var L = 0; L < wantedLimits.length; L++) {
+      for (var q2 = 0; q2 < type.points.length; q2++) {
+        if (type.points[q2].name.trim().toLowerCase()
+            !== String(wantedLimits[L].point).trim().toLowerCase()) continue;
+        setChamberLimit(made, type.points[q2],
+          wantedLimits[L].min === undefined ? null : wantedLimits[L].min,
+          wantedLimits[L].max === undefined ? null : wantedLimits[L].max);
+      }
+    }
+    tool.chambers.push(made);
   }
   return tool;
 }
@@ -2946,8 +3216,22 @@ function parseBackupJson(text) {
     var sourceChambers = t.chambers || [];
     for (var c = 0; c < sourceChambers.length; c++) {
       var type = typesById[sourceChambers[c].typeId];
+      // Overrides are carried by reading NAME, not by id, because ids are
+      // private to the tablet that wrote the file.
+      var limits = [];
+      var own = sourceChambers[c].limits || {};
+      if (type) {
+        for (var z = 0; z < type.points.length; z++) {
+          var setting = own[type.points[z].id];
+          if (!setting) continue;
+          limits.push({ point: type.points[z].name,
+                        min: setting.min === undefined ? null : setting.min,
+                        max: setting.max === undefined ? null : setting.max });
+        }
+      }
       chambers.push({ name: sourceChambers[c].name,
-                      typeName: type ? type.name : "Imported" });
+                      typeName: type ? type.name : "Imported",
+                      limits: limits });
     }
     tools.push({ name: t.name, points: copyPoints(t.points), chambers: chambers });
   }
@@ -2980,8 +3264,14 @@ function parseBackupJson(text) {
         if (!chamber) continue;                  // a reading for a deleted chamber
         var chamberType = typesById[chamber.typeId];
         if (!chamberType) continue;
+        // Use the limits this chamber actually ran to, so an exported row
+        // always agrees with the pass or fail recorded beside it.
+        var effectivePoints = [];
+        for (var z2 = 0; z2 < chamberType.points.length; z2++) {
+          effectivePoints.push(effectivePoint(chamber, chamberType.points[z2]));
+        }
         addRows(rows, dates[d], tool.name, chamber.name, chamberType.name,
-          chamberType.points, storedChambers[chamberIds[q]].values,
+          effectivePoints, storedChambers[chamberIds[q]].values,
           storedChambers[chamberIds[q]].savedAt);
       }
     }
@@ -3087,8 +3377,17 @@ function parseReadingsCsv(text) {
       var ckey = "n:cham:" + chamberName.toLowerCase();
       if (holder.seen[ckey] === undefined) {
         holder.seen[ckey] = true;
-        holder.chambers.push({ name: chamberName, typeName: typeName });
+        holder.chambers.push({ name: chamberName, typeName: typeName, limits: [] });
       }
+      // Remember the limits this chamber actually used, so a chamber running
+      // to its own spec keeps that spec on the way back in.
+      var chamberRef = null;
+      for (var cf = 0; cf < holder.chambers.length; cf++) {
+        if (holder.chambers[cf].name.toLowerCase() === chamberName.toLowerCase()) {
+          chamberRef = holder.chambers[cf];
+        }
+      }
+      if (chamberRef) chamberRef.limits.push({ point: pointName, min: min, max: max });
       var tkey = "n:type:" + typeName.toLowerCase();
       if (typesByName[tkey] === undefined) {
         typesByName[tkey] = { name: typeName, points: [], seen: {} };
@@ -3108,6 +3407,36 @@ function parseReadingsCsv(text) {
                   value: value, savedAt: savedAt });
     }
   }
+  // A CSV has no idea which limits were "the type" and which were one
+  // chamber's own - every row just carries the numbers that were applied. So
+  // the first chamber seen defines the type, and any chamber that used
+  // different numbers becomes an override. The split may not match the tablet
+  // the file came from, but every chamber ends up checked against exactly the
+  // limits it was checked against before, which is what actually matters.
+  for (var i2 = 0; i2 < tools.length; i2++) {
+    var toolRef = tools[i2];
+    for (var c2 = 0; c2 < toolRef.chambers.length; c2++) {
+      var chamberRef2 = toolRef.chambers[c2];
+      var typeRef = typesByName["n:type:" + chamberRef2.typeName.toLowerCase()];
+      var keptLimits = [];
+      for (var L2 = 0; L2 < chamberRef2.limits.length; L2++) {
+        var wanted2 = chamberRef2.limits[L2];
+        var typePoint = null;
+        if (typeRef) {
+          for (var q3 = 0; q3 < typeRef.points.length; q3++) {
+            if (typeRef.points[q3].name.toLowerCase() === wanted2.point.toLowerCase()) {
+              typePoint = typeRef.points[q3];
+            }
+          }
+        }
+        if (!typePoint) continue;
+        if (wanted2.min === typePoint.min && wanted2.max === typePoint.max) continue;
+        keptLimits.push(wanted2);
+      }
+      chamberRef2.limits = keptLimits;
+    }
+  }
+
   // "seen" was only a working note while parsing. Leave it behind.
   for (var i = 0; i < tools.length; i++) delete tools[i].seen;
   for (var y = 0; y < chamberTypes.length; y++) delete chamberTypes[y].seen;
@@ -3250,7 +3579,8 @@ function buildReport() {
   head("DATA");
   row("Tools", String(DATA.tools.length));
   row("Chambers", String(stats.chamberCount) + " across " + stats.typeCount
-    + (stats.typeCount === 1 ? " type" : " types"));
+    + (stats.typeCount === 1 ? " type" : " types")
+    + (stats.overrideCount > 0 ? ", " + stats.overrideCount + " custom limits" : ""));
   row("Readings defined", String(stats.pointCount));
   row("Days logged", String(stats.dayCount));
   row("Date range", stats.dayCount === 0 ? "nothing logged yet" : stats.first + " to " + stats.last);
@@ -3274,7 +3604,8 @@ function buildReport() {
           lines.push("        " + padRight(point.name, 26)
             + padRight(point.unit || "-", 12)
             + "min " + (point.min === null ? "-" : point.min)
-            + "  max " + (point.max === null ? "-" : point.max));
+            + "  max " + (point.max === null ? "-" : point.max)
+            + (point.overridden ? "   (custom for this chamber)" : ""));
         }
       }
     }
@@ -3334,11 +3665,15 @@ function kb(chars) {
 // Counts across the whole data set. No values, only tallies.
 function dataStats() {
   var out = { pointCount: 0, dayCount: 0, readingCount: 0, outOfRange: 0,
-              blankCount: 0, first: "", last: "",
+              blankCount: 0, first: "", last: "", overrideCount: 0,
               chamberCount: 0, typeCount: DATA.chamberTypes.length };
 
   for (var t = 0; t < DATA.tools.length; t++) {
-    out.chamberCount += (DATA.tools[t].chambers || []).length;
+    var toolChambers = DATA.tools[t].chambers || [];
+    out.chamberCount += toolChambers.length;
+    for (var oc = 0; oc < toolChambers.length; oc++) {
+      out.overrideCount += countOverrides(toolChambers[oc]);
+    }
     var units = toolUnits(DATA.tools[t]);
     for (var u = 0; u < units.length; u++) out.pointCount += units[u].points.length;
   }
@@ -3433,14 +3768,15 @@ function runSelfTest() {
         ],
         chambers: [
           { id: "ch1", name: "PM1", typeId: "ct1" },
-          { id: "ch2", name: "PM2", typeId: "ct1" }
+          // PM2 runs the same process to a tighter kit-life spec.
+          { id: "ch2", name: "PM2", typeId: "ct1", limits: { c2: { min: null, max: 40 } } }
         ] }],
       entries: { "2026-01-31": { t1: {
         savedAt: "2026-01-31 09:00",
         values: { p1: "9.4", p2: "1875.5" },
         chambers: {
           ch1: { savedAt: "2026-01-31 09:05", values: { c1: "120", c2: "44" } },
-          ch2: { savedAt: "2026-01-31 09:08", values: { c1: "610", c2: "12" } }
+          ch2: { savedAt: "2026-01-31 09:08", values: { c1: "610", c2: "60" } }
         }
       } } }
     };
@@ -3502,6 +3838,26 @@ function runSelfTest() {
     check("a tool knows how many things it has to log",
       toolUnits(DATA.tools[0]).length === 3,
       String(toolUnits(DATA.tools[0]).length) + " of 3");
+
+    // Overrides: PM2 is held to a tighter kit-life limit than its type, so the
+    // same number passes on PM1 and fails on PM2.
+    var pm1Kit = byName["n:PM1|Kit life"];
+    var pm2Kit = byName["n:PM2|Kit life"];
+    check("the type limit applies where nothing was overridden",
+      pm1Kit && pm1Kit.max === 80, pm1Kit ? String(pm1Kit.max) : "missing");
+    check("a chamber's own limit is exported instead of the type's",
+      pm2Kit && pm2Kit.max === 40, pm2Kit ? String(pm2Kit.max) : "missing");
+    check("44 passes on the type limit but fails the tighter one",
+      rangeStatus("44", { min: null, max: 80 }) === "OK"
+        && rangeStatus("44", { min: null, max: 40 }) === "HIGH");
+    check("60 would pass the type limit of 80",
+      rangeStatus("60", { min: null, max: 80 }) === "OK");
+    check("but the exported row marks it HIGH against this chamber's 40",
+      pm2Kit && pm2Kit.value === "60" && rangeStatus(pm2Kit.value, pm2Kit) === "HIGH",
+      pm2Kit ? pm2Kit.value + " vs max " + pm2Kit.max : "missing");
+    check("overriding one chamber leaves its twin alone",
+      countOverrides(DATA.tools[0].chambers[0]) === 0
+        && countOverrides(DATA.tools[0].chambers[1]) === 1);
   } catch (e) {
     check("the self-test ran without crashing", false, e.name + ": " + e.message);
   } finally {
