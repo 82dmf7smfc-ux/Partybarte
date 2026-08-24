@@ -59,6 +59,11 @@ Once daily files are piling up in one folder, Excel's
 Data > Get Data > From Folder reads the whole folder as one table and
 refreshes as new days appear.
 
+**Extract the zip properly** before use. Opening the HTML from inside the zip
+makes Windows unpack it to a temporary folder that it later deletes; the page
+detects this and warns. Readings survive either way, since storage is keyed to
+the `file://` address rather than the folder.
+
 **Updating:** replace `pm_logger.html` with the new file. Readings are untouched,
 because the browser stores them separately from the file itself. The version
 number sits next to `Diagnostics` at the bottom of the Data tab. Delete old

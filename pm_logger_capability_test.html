@@ -21,6 +21,19 @@
   This file stores nothing except a folder handle, and only if you pick
   one. It does not touch anything belonging to pm_logger.html, and it
   makes no network calls. Keep it for the next tablet.
+
+  ALREADY ANSWERED, on Windows + Edge, 2026-08-24:
+      Test 1  Save As dialog ........ WORKS
+      Test 2  Pick a backup folder .. WORKS
+      Test 3  After a full restart .. PARTLY (prompt -> granted)
+
+  PARTLY means the folder was remembered but the permission was not, so
+  writing into it silently would cost a permission tap every morning. That
+  is worse than pointing Edge's download folder at OneDrive, which costs
+  nothing, so the logger does not do it. Test 1 passing is why the logger
+  has an "Export this round to a folder you pick" button.
+
+  Re-run this only on a new tablet or after a browser change.
 -->
 <style>
   body { font-family: Segoe UI, Tahoma, Arial, sans-serif; font-size: 16px;
@@ -71,9 +84,16 @@
 
 <div class="card">
   <h2>Test 3 &mdash; <b class="q">the one that matters</b></h2>
-  <p class="hint">After test 2, <b>close this page completely, reopen it, and
-     press this button without running test 2 again.</b> This tells us whether
-     the tablet remembers your folder tomorrow, or asks again every day.</p>
+  <p class="hint">After test 2, <b>close EVERY Edge window</b> - not just this
+     tab, and not a refresh - then reopen Edge, open this file again, and press
+     this button <b>without running test 2 again</b>.</p>
+  <p class="hint">The permission granted in test 2 lasts as long as the
+     browsing session does. Close only the tab and Edge may keep it alive, and
+     you would get a green result that is simply wrong. A false pass is worse
+     than a failure: it leads to building something that then asks permission
+     every single morning. To be certain, check Task Manager for leftover
+     msedge.exe processes before reopening. Re-running test 2 re-grants the
+     permission and destroys the thing being measured, so do not.</p>
   <button onclick="testWriteAgain()">Run test 3</button>
   <div class="out" id="out3">not run yet</div>
 </div>
@@ -142,7 +162,8 @@ async function testPickFolder() {
     await w.close();
     await putHandle(dir);
     show("out2", "WORKS. Wrote pm_test.csv into \"" + dir.name + "\" and remembered the folder.\n"
-      + "Now CLOSE this page, reopen it, and run test 3.", "good");
+      + "Now close EVERY Edge window, reopen Edge, open this file again, and run test 3.\n"
+      + "Closing only this tab is not enough and would give a false pass.", "good");
     document.getElementById("out2").style.whiteSpace = "pre-wrap";
   } catch (e) {
     if (e.name === "AbortError") show("out2", "You cancelled the dialog. Run it again and pick a folder.");

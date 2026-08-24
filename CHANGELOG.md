@@ -25,6 +25,19 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+- PM Round Logger 1.3.0: an "Export this round to a folder you pick" button,
+  opening a real Save As dialog, shown only where the browser supports it. A
+  failure falls back to an ordinary download rather than losing the export, and
+  says so. Added after testing on the tablet showed the Save As API works while
+  a remembered backup folder re-prompts for permission every session, which
+  would have cost a tap every morning and was therefore not built.
+- PM Round Logger 1.3.0: warns when the page is running from a Windows
+  temporary folder, which is what happens when the HTML is opened from inside
+  the zip rather than extracted. Windows deletes that folder eventually.
+- `pm_logger_capability_test.html`: step 3 now says to close every browser
+  window rather than "this page", since closing only the tab can leave the
+  permission alive and produce a false pass. The measured result is recorded in
+  the file so it need not be repeated except on a new tablet.
 - `tools/build_zips.py` now also builds `dist/pm_logger.zip`, holding the
   logger, its read me, the tablet capability test and a screenshot. The release
   workflow attaches it alongside the two existing packages.

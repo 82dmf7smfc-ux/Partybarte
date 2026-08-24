@@ -64,6 +64,22 @@ gets fed made-up numbers.
 Leave min and max blank for a reading you just want logged, not checked.
 
 
+EXTRACT THE ZIP PROPERLY FIRST
+------------------------------
+Do not double-click pm_logger.html from inside the zip. Windows quietly unpacks
+it to a temporary folder to do that, and it works - until Windows clears that
+folder and the tool is gone.
+
+Right-click the zip, choose Extract All, and put the pm_logger folder somewhere
+permanent. Next to your OneDrive PM folder is ideal. Make your shortcut point
+at the extracted file.
+
+If you get this wrong the tool notices and says so in amber at the top of the
+page. Your readings are safe either way - the browser stores them against the
+address, not the folder - but hunting for a vanished tool mid-round is a bad
+morning.
+
+
 SET THIS UP ONCE: where the files land
 --------------------------------------
 Do this before anything else. It takes a minute and saves you a step every
@@ -93,13 +109,23 @@ allowed, or point the download folder at a USB stick or a mapped drive
 instead.
 
 
-The three export buttons
-------------------------
+The export buttons
+------------------
 On the Data tab:
 
-  Export this round (CSV)          pm_round_2026-08-24.csv
-  Export everything for Excel      pm_readings_through_2026-08-24.csv
-  Export full backup (JSON)        pm_backup_through_2026-08-24.json
+  Export this round (CSV)            pm_round_2026-08-24.csv
+  Export this round to a folder      the same file, but you choose where
+  Export everything for Excel        pm_readings_through_2026-08-24.csv
+  Export full backup (JSON)          pm_backup_through_2026-08-24.json
+
+The second one opens a normal Windows "Save as" box, so you can put one file on
+a USB stick or in a different folder without changing your Edge settings. It is
+for exceptions. For the daily round the first button plus the download-folder
+setting above is fewer taps, so use that.
+
+That button only appears if your browser supports it. If saving where you
+picked fails for any reason, the file goes to the download folder instead
+rather than being lost, and the page tells you that is what happened.
 
 USE THE FIRST ONE EVERY DAY. It holds that one day's round, and it is named
 for the day the readings were TAKEN, not the day you pressed the button. So
@@ -272,12 +298,18 @@ not need it to log a round. It answers one question that can only be answered
 on the real tablet: can this browser write straight into a folder you choose,
 and does it REMEMBER that folder tomorrow?
 
-That matters because if the answer is yes, exports could go directly into your
-OneDrive folder with no taps at all. If it only remembers until you close the
-browser, it is not worth building, and the Edge download-folder setting above
-stays the better answer.
+ALREADY ANSWERED on Windows + Edge, 24 August 2026:
 
-Run it when you first set up a tablet, or if IT changes the browser:
+  Test 1  Save As dialog ........ WORKS
+  Test 2  Pick a backup folder .. WORKS
+  Test 3  After a full restart .. PARTLY
+
+PARTLY means the tablet remembered the folder but not the permission. Writing
+into it silently would have cost a permission tap every morning, which is worse
+than the download-folder setting that costs nothing. So the logger does not do
+it. Test 1 passing is why the "Export this round to a folder" button exists.
+
+You only need to run this again on a NEW tablet, or if IT changes the browser:
 
   1. Double-click pm_logger_capability_test.html.
   2. Run test 1, then test 2.

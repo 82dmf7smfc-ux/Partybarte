@@ -308,7 +308,7 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // of the stored data, and only goes up if that layout changes in a way that
 // old data needs converting for. See migrateData().
 // ---------------------------------------------------------------------------
-var APP_VERSION = "1.2.0";
+var APP_VERSION = "1.3.0";
 var BUILD_DATE = "2026-08-24";
 var DATA_SHAPE = 1;
 
@@ -359,6 +359,22 @@ var VERSION_PROBLEM = "";
 
 // Set by migrateData() when it changed something that needs writing back.
 var MIGRATION_CHANGED = false;
+
+// ---------------------------------------------------------------------------
+// Are we running out of a temporary folder?
+//
+// Double-clicking an HTML file from INSIDE a zip makes Windows quietly unpack
+// it to AppData\Local\Temp and open it from there. It works, so nothing looks
+// wrong - until Windows clears Temp and the tool is simply gone.
+//
+// Your readings would survive that, because the browser stores them against
+// the file:// address rather than the folder. But hunting for a vanished tool
+// mid-round is a bad morning, so say something now.
+// ---------------------------------------------------------------------------
+function runningFromTempFolder() {
+  var path = String(location.pathname || "").toLowerCase();
+  return path.indexOf("appdata/local/temp") !== -1 || path.indexOf("appdata\\local\\temp") !== -1;
+}
 
 // ---------------------------------------------------------------------------
 // Bring stored data up to date with the version of the page now running.
@@ -811,6 +827,17 @@ function renderBanner() {
         : "This browser is blocking local storage, so nothing will be remembered after you close "
           + "this page. Export before you close it.")
       + "</span><button class=\"small\" onclick=\"exportAllCsv()\">Export everything</button>";
+    return;
+  }
+
+  // Opened straight out of a zip. Worth interrupting for once, because the fix
+  // takes ten seconds and the alternative is the tool disappearing.
+  if (runningFromTempFolder()) {
+    banner.className = "banner show warn";
+    banner.innerHTML = "<span>This page is running from a temporary Windows folder, "
+      + "probably opened from inside the zip. Windows deletes that folder eventually. "
+      + "Extract the zip properly and open it from there instead. Your readings are safe "
+      + "either way.</span>";
     return;
   }
 
@@ -1511,6 +1538,12 @@ function renderData() {
     + 'before anything risky, like swapping tablets.</p>'
     + '<div class="big-actions">'
     + '<button onclick="exportRoundCsv()">Export this round &mdash; ' + esc(CURRENT_DATE) + ' (CSV)</button>'
+    // Only offered when the browser can actually do it. A button that always
+    // fails is worse than no button.
+    + (canSaveAs()
+        ? '<button class="secondary" onclick="exportRoundToChosenFolder()">'
+          + 'Export this round to a folder you pick</button>'
+        : '')
     + '<button class="secondary" onclick="exportAllCsv()">Export everything for Excel (CSV)</button>'
     + '<button class="secondary" onclick="exportJson()">Export full backup (JSON)</button>'
     + '</div><div class="msg" id="exportMsg"></div></div>';
@@ -1713,6 +1746,65 @@ function countReadingsOnDate(date) {
 function lastLoggedDate() {
   var dates = Object.keys(DATA.entries).sort();
   return dates.length > 0 ? dates[dates.length - 1] : todayStr();
+}
+
+// ---------------------------------------------------------------------------
+// SAVING SOMEWHERE YOU CHOOSE
+//
+// Normally an export lands wherever Edge is set to put downloads, which is the
+// right answer for the daily round: point that setting at your OneDrive folder
+// once and every export files itself with no taps at all.
+//
+// This is for the exceptions - a copy onto a USB stick, or one file that needs
+// to go somewhere else - without touching your Edge settings.
+//
+// We tested the other approach on the real tablet and rejected it: letting the
+// page remember a folder and write into it silently is possible, but the
+// browser asks permission again every session, so it would have cost a tap
+// every single morning. A Save As box costs one dialog only when you ask for
+// it. That is why this is a separate button and not the default.
+// ---------------------------------------------------------------------------
+function canSaveAs() {
+  return typeof window.showSaveFilePicker === "function";
+}
+
+// Written with async/await rather than the plain functions used elsewhere in
+// this file, because the browser's save dialog hands back promises and this
+// reads far better than chaining .then() calls.
+async function exportRoundToChosenFolder() {
+  var date = CURRENT_DATE;
+  if (countReadingsOnDate(date) === 0) {
+    setMsg("exportMsg", "err", "Nothing is logged for " + date + " yet, so there is nothing to export.");
+    return;
+  }
+
+  var name = "pm_round_" + date + ".csv";
+  var text = buildCsv(date);
+
+  try {
+    var handle = await window.showSaveFilePicker({
+      suggestedName: name,
+      types: [{ description: "CSV for Excel", accept: { "text/csv": [".csv"] } }]
+    });
+    var writer = await handle.createWritable();
+    await writer.write(text);
+    await writer.close();
+    bump("exportsRoundToChosenFolder");
+    markExported(handle.name, "exportMsg");
+  } catch (e) {
+    if (e.name === "AbortError") {
+      setMsg("exportMsg", "info", "Cancelled. Nothing was saved.");
+      return;
+    }
+    // Anything else - a locked folder, a full disk, a browser that changed its
+    // mind - falls back to a normal download. Never lose the export just
+    // because the fancy route failed.
+    downloadFile(text, name, "text/csv");
+    bump("exportsRound");
+    markExported(name, "exportMsg");
+    setMsg("exportMsg", "info", "Could not save where you picked (" + e.name
+      + "), so " + name + " went to the download folder instead.");
+  }
 }
 
 // Remember that we exported today, so the reminder banner goes quiet.
