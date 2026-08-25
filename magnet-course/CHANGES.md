@@ -185,3 +185,22 @@ bought.
 **Done:** kept as `free_alternative_note`. Two further fields were added:
 `host`, and `year_basis`, which records where a derived year came from so that a
 guess cannot pass as a fact.
+
+---
+
+## 12. Tags cannot be pushed from this session
+
+The build plan leans on tags as milestones: `session-0-complete`,
+`exemplar-approved`, `unit-N-complete`, `lit-review-N`.
+
+Pushing a tag from this session is refused with HTTP 403 by the GitHub side of
+the git proxy. A branch push to `claude/kickoff-md-aowok2` succeeded between
+two refused tag pushes, so it is not credentials and not a transient failure.
+The push scope covers the designated branch, not `refs/tags/*`.
+
+**Done:** the `session-0-complete` tag exists locally on commit `6483c63` and
+is described in `PROGRESS.md` with the command to recreate it.
+
+**Proposed:** either push the tags yourself from a checkout that can, or drop
+tags from the plan and use `PROGRESS.md` as the milestone record. It already
+carries the date and state of every class, which is what the tags were for.

@@ -142,6 +142,24 @@ items refer to `CHANGES.md`.
 3. Whether `magcamieee` should stay in the syllabus at all. Item 5.
 4. Commit and branch policy for classes. Item 7.
 
+## The session-0-complete tag is local only
+
+`KICKOFF.md` phase 5 says to tag this commit `session-0-complete`. The tag
+exists locally on `6483c63`, but it could not be pushed. `git push origin
+session-0-complete` is refused with HTTP 403 by the GitHub side of this
+session's git proxy, twice, while a branch push to
+`claude/kickoff-md-aowok2` succeeded in between. That rules out credentials
+and rules out a transient failure. This session's push scope covers the
+designated branch and not `refs/tags/*`.
+
+Recreate the tag from a session that can push tags:
+
+    git tag -a session-0-complete 6483c63 -m "Session zero: scaffold and source index."
+    git push origin session-0-complete
+
+The same applies to every later tag the build plan asks for:
+`exemplar-approved`, `unit-N-complete`, `lit-review-N`.
+
 ## Next session
 
 Open network egress for the 30 hosts in `library/sources.json`, plus PyPI, then
