@@ -26,12 +26,33 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
 ### Fixed
+- PM Round Logger: a chamber whose type had no readings was counted on the
+  round despite having nothing to log and no way to save, so a tool made only
+  of such chambers could never be completed, the round could never reach
+  complete, and the export prompt never appeared. Those chambers are now
+  skipped in the count while still being listed, under "Not set up yet", on the
+  tool screen. Introduced in 1.4.0 with chambers.
 - PM Round Logger: "Copy its tool readings here" did nothing. Two functions
   were both named `copyPoints`, so the later one silently replaced the button's
   handler from 1.4.0 onward, with no error anywhere. The file-format helper is
   now `copyPointList`, and a test covers the button.
 
 ### Added
+- PM Round Logger 1.7.0: chamber types and tools collapse to one-line summary
+  rows saying what is inside them, expanding only where you are working. On a
+  real six-type, three-tool, twelve-chamber setup this took the Tools tab from
+  7,436px to 1,452px, or 9.3 screens of scrolling to 1.8, and it no longer
+  grows without limit as tools are added.
+- PM Round Logger 1.7.0: a "Setup not finished" panel at the top of the Tools
+  tab, naming chamber types with no readings, how many chambers they leave
+  unable to log, tools that are not on the round, and chambers whose type has
+  been deleted. It disappears once setup is complete.
+- PM Round Logger 1.7.0: Enter submits every add box - tool, chamber type,
+  reading and chamber.
+- PM Round Logger 1.7.0: a reading is edited on one row rather than five
+  stacked ones, stacking again on narrow screens. Chamber type drop-downs spell
+  out "no readings yet" instead of showing a bare "(0)", and a type says which
+  tools and chambers use it rather than only how many.
 - PM Round Logger 1.6.0: reading suggestions. Every reading defined on any
   chamber type or tool is offered as type-ahead in each "add a reading" box,
   showing its unit, limits and where it came from, and filling those in when

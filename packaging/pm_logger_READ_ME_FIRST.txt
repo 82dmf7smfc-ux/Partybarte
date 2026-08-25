@@ -54,6 +54,29 @@ How to use it
    it in.
 
 
+Finding your way around the Tools tab
+-------------------------------------
+Chamber types and tools show as one-line summary rows. Tap one to open it,
+tap again to close. Only the one you are editing is open, so the whole setup
+fits on a screen or two however many tools you add.
+
+Each row says what is inside it - "PVD, 4 chambers, 3 readings" - and turns
+amber if something still needs doing.
+
+At the top, a "Setup not finished" panel lists anything incomplete: chamber
+types with no readings, and tools that are not on the round because nothing on
+them can be logged yet. It disappears once everything is set up.
+
+A chamber whose type has no readings has nothing to log, so it is SKIPPED on
+the round rather than counted. Before, such a chamber made its tool impossible
+to finish. It still shows on the tool screen under "Not set up yet" so you
+remember to finish it.
+
+Pressing Enter in any "add" box does the same as tapping the button beside it.
+Adding six readings is type-Enter-type-Enter rather than six trips across the
+screen.
+
+
 Tools with chambers
 -------------------
 A cluster tool's chambers wear differently. PM1 and PM3 do not share a process

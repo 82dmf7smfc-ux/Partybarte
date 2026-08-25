@@ -215,6 +215,39 @@
 
   .count { font-size: 15px; color: var(--muted); }
 
+  /* A collapsed section: one tappable row showing what is inside. Setup is a
+     job done rarely, so the default should be an overview, not every field. */
+  .section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 16px;
+    min-height: 56px;
+    margin-bottom: 8px;
+    font-size: 16px;
+  }
+  .section.open { background: #eef1f5; border-color: var(--bar2); }
+  .section .name { font-weight: 600; }
+  .section .sub { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+  .section .caret { font-size: 13px; color: var(--muted); }
+  .section.warn { background: var(--warn-bg); border-color: #f0cf9a; }
+
+  /* One reading on one row where there is width for it, stacking on narrow
+     screens. Five stacked rows per reading turns a setup screen into a
+     scrolling exercise. */
+  .readingrow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; }
+  .readingrow .lab { font-weight: 600; font-size: 13px; margin-bottom: 3px; display: block; }
+  @media (max-width: 720px) {
+    .readingrow { grid-template-columns: 1fr 1fr; }
+  }
+
   /* The diagnostics footnote. Deliberately quiet: small, grey, and right at
      the bottom. There if you look for it, invisible if you are not. */
   .footnote {
@@ -309,7 +342,7 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // of the stored data, and only goes up if that layout changes in a way that
 // old data needs converting for. See migrateData().
 // ---------------------------------------------------------------------------
-var APP_VERSION = "1.6.0";
+var APP_VERSION = "1.7.0";
 var BUILD_DATE = "2026-08-24";
 var DATA_SHAPE = 3;
 
@@ -783,6 +816,23 @@ function toolUnits(tool) {
   return units;
 }
 
+// The units you can actually fill in. A chamber whose type has no readings yet
+// has nothing to type and no way to save, so it is not part of the round.
+//
+// This distinction matters more than it looks. Counting a chamber that cannot
+// be completed leaves a tool stuck at "0 of 3" for ever, which also means the
+// round never reaches complete and the export prompt never appears. The
+// unusable chambers are still SHOWN on the tool screen, marked "Not set up",
+// because hiding them would be a good way never to finish setting them up.
+function loggableUnits(tool) {
+  var units = toolUnits(tool);
+  var out = [];
+  for (var i = 0; i < units.length; i++) {
+    if (units[i].points.length > 0) out.push(units[i]);
+  }
+  return out;
+}
+
 // The saved readings for one unit on one date, or null if it has not been
 // saved yet. Tool readings live directly on the entry, which is how they were
 // stored before chambers existed - that is why old data still reads correctly.
@@ -957,7 +1007,7 @@ function unitStatus(tool, unit, date) {
 // once every one of its units is in, so a four-chamber etcher with three
 // chambers done still shows as outstanding on the round.
 function toolStatus(tool, date) {
-  var units = toolUnits(tool);
+  var units = loggableUnits(tool);
   var done = 0;
   var outOfRange = 0;
   var savedAt = "";
@@ -1004,7 +1054,7 @@ function countTotal(date) {
 
 // The next unit within one tool that still needs doing.
 function nextUnitInTool(tool, date, afterUnitId) {
-  var units = toolUnits(tool);
+  var units = loggableUnits(tool);
   var seen = false;
   var i;
   for (i = 0; i < units.length; i++) {
@@ -1055,7 +1105,7 @@ function showTab(name) {
   VIEW = name;
   CURRENT_TOOL = null;
   CURRENT_UNIT = null;
-  if (name !== "tools") OPEN_LIMITS = {};
+  if (name !== "tools") { OPEN_LIMITS = {}; OPEN_SECTIONS = {}; }
   render();
 }
 
@@ -1325,8 +1375,13 @@ function openTool(toolId) {
   if (!tool) return;
   CURRENT_TOOL = toolId;
 
-  var units = toolUnits(tool);
-  if (units.length === 1) { openUnit(toolId, units[0].id); return; }
+  // Straight into the readings when there is only one thing to fill in, and
+  // nothing else to look at.
+  var usable = loggableUnits(tool);
+  if (usable.length === 1 && toolUnits(tool).length === 1) {
+    openUnit(toolId, usable[0].id);
+    return;
+  }
 
   VIEW = "tool";
   CURRENT_UNIT = null;
@@ -1363,19 +1418,41 @@ function renderToolScreen() {
   if (!tool) { showTab("today"); return; }
 
   var st = toolStatus(tool, CURRENT_DATE);
-  var units = toolUnits(tool);
+  var usable = loggableUnits(tool);
+
+  // Anything with nothing to log goes to the bottom, out of the way of the
+  // round, but still visible so it gets finished off.
+  var notSetUp = [];
+  var all = toolUnits(tool);
+  for (var n = 0; n < all.length; n++) {
+    if (all[n].points.length === 0) notSetUp.push(all[n]);
+  }
 
   var html = '<div class="card">'
     + '<div class="spread"><h2 style="margin:0">' + esc(tool.name) + '</h2>'
     + '<span class="count">' + esc(CURRENT_DATE) + '</span></div>'
-    + '<p class="hint" style="margin-top:8px">' + st.done + ' of ' + st.total + ' done. '
-    + 'Tap one to enter its readings.</p></div>';
+    + '<p class="hint" style="margin-top:8px">'
+    + (st.total === 0
+        ? 'Nothing is set up to log on this tool yet.'
+        : st.done + ' of ' + st.total + ' done. Tap one to enter its readings.')
+    + '</p></div>';
 
-  html += '<div class="card">';
-  for (var i = 0; i < units.length; i++) {
-    html += unitRowHtml(tool, units[i]);
+  if (usable.length > 0) {
+    html += '<div class="card">';
+    for (var i = 0; i < usable.length; i++) html += unitRowHtml(tool, usable[i]);
+    html += '</div>';
   }
-  html += '</div>';
+
+  if (notSetUp.length > 0) {
+    html += '<div class="card">'
+      + '<h2>Not set up yet</h2>'
+      + '<p class="hint">' + notSetUp.length
+      + (notSetUp.length === 1 ? ' chamber has' : ' chambers have')
+      + ' no readings to log, so they are not counted on the round. '
+      + 'Give their chamber type some readings on the Tools tab.</p>';
+    for (var m = 0; m < notSetUp.length; m++) html += unitRowHtml(tool, notSetUp[m]);
+    html += '</div>';
+  }
 
   html += '<div class="card"><div class="big-actions">';
   if (st.logged) {
@@ -1608,15 +1685,88 @@ function saveEntry(mode) {
 // Every box on this screen saves the moment you leave it. There is no save
 // button, on purpose: fewer taps, and nothing to forget.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// WHAT IS NOT FINISHED
+//
+// The one place that says what still needs doing. Without it the only way to
+// discover a chamber type with no readings is to scroll the whole tab, or to
+// walk the round and find a chamber you cannot log.
+//
+// It disappears completely once everything is set up, so it costs nothing
+// after the first week.
+// ---------------------------------------------------------------------------
+function setupIssuesHtml() {
+  var lines = [];
+
+  // Chamber types with no readings, and how many chambers they leave stranded.
+  var emptyTypes = [];
+  var strandedChambers = 0;
+  for (var y = 0; y < DATA.chamberTypes.length; y++) {
+    var type = DATA.chamberTypes[y];
+    if (type.points.length > 0) continue;
+    var used = countChambersOfType(type.id);
+    strandedChambers += used;
+    emptyTypes.push(esc(type.name) + (used > 0 ? " (" + used
+      + (used === 1 ? " chamber" : " chambers") + ")" : " (unused)"));
+  }
+  if (emptyTypes.length > 0) {
+    lines.push('<strong>' + emptyTypes.length
+      + (emptyTypes.length === 1 ? ' chamber type has' : ' chamber types have')
+      + ' no readings' + (strandedChambers > 0
+        ? ', so ' + strandedChambers + ' chambers will log nothing' : '')
+      + ':</strong><br>' + emptyTypes.join(" &middot; "));
+  }
+
+  // Tools that are not on the round at all.
+  var idleTools = [];
+  for (var t = 0; t < DATA.tools.length; t++) {
+    if (!toolStatus(DATA.tools[t], CURRENT_DATE).ready) idleTools.push(esc(DATA.tools[t].name));
+  }
+  if (idleTools.length > 0) {
+    lines.push('<strong>' + idleTools.length
+      + (idleTools.length === 1 ? ' tool is' : ' tools are')
+      + ' not on the round</strong>, because nothing on '
+      + (idleTools.length === 1 ? 'it' : 'them') + ' can be logged yet:<br>'
+      + idleTools.join(" &middot; "));
+  }
+
+  // Chambers whose type has been deleted out from under them.
+  var orphans = [];
+  for (var t2 = 0; t2 < DATA.tools.length; t2++) {
+    var chambers = DATA.tools[t2].chambers || [];
+    for (var c = 0; c < chambers.length; c++) {
+      if (!findChamberType(chambers[c].typeId)) {
+        orphans.push(esc(DATA.tools[t2].name) + " / " + esc(chambers[c].name));
+      }
+    }
+  }
+  if (orphans.length > 0) {
+    lines.push('<strong>' + orphans.length + ' chambers have no chamber type:</strong><br>'
+      + orphans.join(" &middot; "));
+  }
+
+  if (lines.length === 0) return '<div id="setupIssues"></div>';
+
+  return '<div id="setupIssues"><div class="card" '
+    + 'style="background:var(--warn-bg);border-color:#f0cf9a">'
+    + '<h2>Setup not finished</h2>'
+    + '<p class="hint">' + lines.join('</p><p class="hint">') + '</p>'
+    + '<p class="hint">None of this loses data. It just means those chambers are '
+    + 'skipped on the round until they have something to log.</p>'
+    + '</div></div>';
+}
+
 function renderTools() {
   var host = document.getElementById("viewTools");
 
   var html = '<div id="dupWarn"></div>'
+    + setupIssuesHtml()
     + '<div class="card">'
     + '<h2>Add a tool</h2>'
     + '<p class="hint">The name you type here is what shows on your round and in the export.</p>'
     + '<div class="row">'
-    + '<div class="grow"><input type="text" id="newToolName" placeholder="For example: Etcher 3"></div>'
+    + '<div class="grow"><input type="text" id="newToolName" placeholder="For example: Etcher 3" '
+    + 'onkeydown="onEnter(event, addTool)"></div>'
     + '<button onclick="addTool()">Add tool</button>'
     + '</div><div class="msg" id="toolsMsg"></div>';
 
@@ -1836,21 +1986,35 @@ function chamberTypesHtml() {
     + 'readings taken at any chamber of that kind, for example "Etch" or "Strip". '
     + 'Set it up once here, then give each chamber its type on the tool below.</p>'
     + '<div class="row">'
-    + '<div class="grow"><input type="text" id="newTypeName" placeholder="For example: Etch"></div>'
+    + '<div class="grow"><input type="text" id="newTypeName" placeholder="For example: Etch" '
+    + 'onkeydown="onEnter(event, addChamberType)"></div>'
     + '<button onclick="addChamberType()">Add type</button>'
     + '</div><div class="msg" id="typesMsg"></div>';
 
   for (var i = 0; i < DATA.chamberTypes.length; i++) {
     var type = DATA.chamberTypes[i];
-    html += '<div class="pointedit" style="margin-top:10px">'
+    var used = countChambersOfType(type.id);
+
+    // The collapsed summary. A type with no readings is flagged here, because
+    // every chamber using it logs nothing until that is fixed.
+    var summary = (used === 0 ? "not used yet" : used + (used === 1 ? " chamber" : " chambers"))
+      + " \u00b7 " + (type.points.length === 0
+          ? "NO READINGS YET"
+          : type.points.length + (type.points.length === 1 ? " reading" : " readings"));
+    html += sectionRowHtml(type.id, type.name, summary,
+      type.points.length === 0 ? "warn" : "");
+
+    if (!OPEN_SECTIONS[type.id]) continue;
+
+    html += '<div class="pointedit" style="margin:0 0 14px">'
       + '<div class="row">'
       + '<div class="grow"><label>Type name</label>'
       + '<input type="text" value="' + esc(type.name) + '" '
       + 'oninput="renameChamberType(\'' + type.id + '\', this.value)"></div>'
       + '<button class="danger small" onclick="deleteChamberType(\'' + type.id + '\')">Delete</button>'
       + '</div>'
-      + '<p class="hint" style="margin:8px 0 4px">Used by ' + countChambersOfType(type.id)
-      + ' chamber(s). Readings taken at every chamber of this type:</p>';
+      + '<p class="hint" style="margin:8px 0 4px">' + esc(chamberUsageText(type.id))
+      + ' Readings taken at every chamber of this type:</p>';
 
     for (var q = 0; q < type.points.length; q++) {
       html += pointEditorHtml(type.points[q], q, type.points.length,
@@ -1864,7 +2028,8 @@ function chamberTypesHtml() {
 
     html += '<div class="row" style="margin-top:10px">'
       + '<div class="grow"><input type="text" id="newTypePoint_' + type.id + '" '
-      + 'list="readingSuggestions" placeholder="For example: RF hours"></div>'
+      + 'list="readingSuggestions" placeholder="For example: RF hours" '
+      + 'onkeydown="onEnter(event, function () { addTypePoint(\'' + type.id + '\'); })"></div>'
       + '<button onclick="addTypePoint(\'' + type.id + '\')">Add reading</button>'
       + '</div>'
       + suggestionsHintHtml();
@@ -1897,35 +2062,66 @@ function chamberTypesHtml() {
   return html;
 }
 
+// A tool's one-line summary while it is collapsed.
+function toolSummary(tool) {
+  var chambers = (tool.chambers || []).length;
+  var st = toolStatus(tool, CURRENT_DATE);
+  var bits = [];
+  if (chambers > 0) bits.push(chambers + (chambers === 1 ? " chamber" : " chambers"));
+  if (tool.points.length > 0) {
+    bits.push(tool.points.length + (tool.points.length === 1 ? " tool reading" : " tool readings"));
+  }
+  if (bits.length === 0) return "nothing set up yet";
+  if (!st.ready) return bits.join(" \u00b7 ") + " \u00b7 NOT ON THE ROUND";
+  return bits.join(" \u00b7 ") + " \u00b7 " + st.total
+    + (st.total === 1 ? " thing" : " things") + " to log";
+}
+
 // The editor block for one reading. Shared by chamber types and by a tool's
 // own readings, so both look and behave the same. The three handler strings
 // are the calls to make when this particular reading is edited, moved or
 // deleted - they differ only in which list the reading lives in.
 function pointEditorHtml(point, index, total, updateCall, moveCall, deleteCall) {
   return '<div class="pointedit">'
-    + '<div class="row">'
-    + '<div class="grow"><label>Reading name</label>'
+    + '<div class="readingrow">'
+    + '<div><span class="lab">Reading name</span>'
     + '<input type="text" value="' + esc(point.name) + '" '
     + 'oninput="' + updateCall + ',\'name\',this.value)"></div>'
+    + '<div><span class="lab">Unit</span>'
+    + '<input type="text" value="' + esc(point.unit) + '" placeholder="mTorr" '
+    + 'oninput="' + updateCall + ',\'unit\',this.value)"></div>'
+    + '<div><span class="lab">Min</span>'
+    + '<input type="number" step="any" placeholder="no min" value="'
+    + (point.min === null ? "" : esc(point.min)) + '" '
+    + 'oninput="' + updateCall + ',\'min\',this.value)"></div>'
+    + '<div><span class="lab">Max</span>'
+    + '<input type="number" step="any" placeholder="no max" value="'
+    + (point.max === null ? "" : esc(point.max)) + '" '
+    + 'oninput="' + updateCall + ',\'max\',this.value)"></div>'
     + '</div>'
-    + '<div class="grid" style="margin-top:8px">'
-    + '<div><label>Unit</label><input type="text" value="' + esc(point.unit) + '" '
-    + 'placeholder="mTorr" oninput="' + updateCall + ',\'unit\',this.value)"></div>'
-    + '<div><label>&nbsp;</label><div class="row">'
+    + '<div class="row" style="margin-top:8px">'
     + '<button class="secondary small" onclick="' + moveCall + ',-1)"'
     + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
     + '<button class="secondary small" onclick="' + moveCall + ',1)"'
     + (index === total - 1 ? ' disabled' : '') + '>&#9660;</button>'
     + '<button class="danger small" onclick="' + deleteCall + '">Delete</button>'
-    + '</div></div></div>'
-    + '<div class="grid" style="margin-top:8px">'
-    + '<div><label>Min (optional)</label><input type="number" step="any" value="'
-    + (point.min === null ? "" : esc(point.min)) + '" placeholder="no min" '
-    + 'oninput="' + updateCall + ',\'min\',this.value)"></div>'
-    + '<div><label>Max (optional)</label><input type="number" step="any" value="'
-    + (point.max === null ? "" : esc(point.max)) + '" placeholder="no max" '
-    + 'oninput="' + updateCall + ',\'max\',this.value)"></div>'
     + '</div></div>';
+}
+
+// Which tools use a type, and which chambers on them. "Used by 4 chambers"
+// does not tell you what a limit change is about to affect.
+function chamberUsageText(typeId) {
+  var parts = [];
+  for (var t = 0; t < DATA.tools.length; t++) {
+    var chambers = DATA.tools[t].chambers || [];
+    var names = [];
+    for (var c = 0; c < chambers.length; c++) {
+      if (chambers[c].typeId === typeId) names.push(chambers[c].name);
+    }
+    if (names.length > 0) parts.push(DATA.tools[t].name + " (" + names.join(", ") + ")");
+  }
+  if (parts.length === 0) return "Not used by any chamber yet.";
+  return "Used by " + parts.join(", ") + ".";
 }
 
 function countChambersOfType(typeId) {
@@ -2153,7 +2349,11 @@ function forgetPointEverywhere(pointId) {
 }
 
 function toolEditorHtml(tool, index) {
-  var html = '<div class="card">';
+  var st = toolStatus(tool, CURRENT_DATE);
+  var html = sectionRowHtml(tool.id, tool.name, toolSummary(tool), st.ready ? "" : "warn");
+  if (!OPEN_SECTIONS[tool.id]) return html;
+
+  html += '<div class="card">';
 
   // Tool name, plus move up / move down / delete.
   html += '<label>Tool name</label>'
@@ -2188,7 +2388,8 @@ function toolEditorHtml(tool, index) {
   // Add a new tool-level reading.
   html += '<div class="row" style="margin-top:10px">'
     + '<div class="grow"><input type="text" id="newPoint_' + tool.id + '" '
-    + 'list="readingSuggestions" placeholder="For example: N2 pressure"></div>'
+    + 'list="readingSuggestions" placeholder="For example: N2 pressure" '
+    + 'onkeydown="onEnter(event, function () { addPoint(\'' + tool.id + '\'); })"></div>'
     + '<button onclick="addPoint(\'' + tool.id + '\')">Add tool reading</button>'
     + '</div>'
     + suggestionsHintHtml();
@@ -2244,7 +2445,10 @@ function chamberEditorHtml(tool) {
       var type = DATA.chamberTypes[q];
       html += '<option value="' + type.id + '"'
         + (type.id === chamber.typeId ? ' selected' : '') + '>' + esc(type.name)
-        + ' (' + type.points.length + ')</option>';
+        + (type.points.length === 0
+            ? ' \u2014 no readings yet'
+            : ' \u2014 ' + type.points.length + (type.points.length === 1 ? ' reading' : ' readings'))
+        + '</option>';
     }
     html += '</select></div></div>'
       + '<div class="row" style="margin-top:8px">'
@@ -2263,7 +2467,8 @@ function chamberEditorHtml(tool) {
 
   html += '<div class="row" style="margin-top:10px">'
     + '<div class="grow"><input type="text" id="newChamber_' + tool.id + '" '
-    + 'placeholder="For example: PM1"></div>'
+    + 'placeholder="For example: PM1" '
+    + 'onkeydown="onEnter(event, function () { addChamber(\'' + tool.id + '\'); })"></div>'
     + '<button onclick="addChamber(\'' + tool.id + '\')">Add chamber</button>'
     + '</div>';
 
@@ -2273,6 +2478,36 @@ function chamberEditorHtml(tool) {
 // Which chambers have their limits panel open. Reset on every visit to the
 // tab, so the setup screen is never a wall of open panels.
 var OPEN_LIMITS = {};
+
+// Which chamber types and tools are expanded. Reset whenever you leave the
+// tab, so setup always opens as an overview rather than as it was left.
+var OPEN_SECTIONS = {};
+
+function toggleSection(id) {
+  OPEN_SECTIONS[id] = !OPEN_SECTIONS[id];
+  render();
+}
+
+// The one-line summary row a collapsed section shows.
+//
+// tone: "" normal, "warn" for something that still needs attention.
+function sectionRowHtml(id, name, summary, tone) {
+  var open = !!OPEN_SECTIONS[id];
+  return '<button class="section' + (open ? ' open' : '') + (tone ? ' ' + tone : '') + '" '
+    + 'onclick="toggleSection(\'' + id + '\')">'
+    + '<span><span class="name">' + esc(name) + '</span>'
+    + '<span class="sub">' + summary + '</span></span>'
+    + '<span class="caret">' + (open ? 'Hide &#9650;' : 'Edit &#9660;') + '</span></button>';
+}
+
+// Pressing Enter in an "add" box should do what the button next to it does.
+// On a tablet the keyboard's Enter is under your thumb and the button is
+// across the screen, so this is most of the typing saved during setup.
+function onEnter(event, action) {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  action();
+}
 
 function toggleChamberLimits(chamberId) {
   OPEN_LIMITS[chamberId] = !OPEN_LIMITS[chamberId];

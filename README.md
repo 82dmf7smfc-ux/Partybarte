@@ -40,6 +40,11 @@ Tapping a chambered tool lists its chambers with their own done marks; a tool
 with no chambers goes straight to its readings as before. The export gains
 `Chamber` and `Chamber type` columns, empty for tool-level rows.
 
+**Setup screen.** Chamber types and tools collapse to one-line summary rows,
+so a full setup stays about a screen tall instead of growing without limit. A
+"Setup not finished" panel at the top names anything incomplete. Enter submits
+every add box.
+
 **Reading suggestions.** Every reading defined anywhere is offered as
 type-ahead in each "add a reading" box, filling in unit and limits when picked,
 and the existing spelling wins so one reading cannot become two Excel columns.
