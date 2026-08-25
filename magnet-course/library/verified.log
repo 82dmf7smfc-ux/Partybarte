@@ -1,0 +1,458 @@
+# Verification log
+
+Append only. One block per fetch attempt, per source. Never edit a past block.
+Links rot, and the point of this file is to know when.
+
+Format:
+
+    key      the sources.json key
+    url      what was requested
+    date     when it was attempted, ISO 8601
+    result   ok, redirected, dead, paywalled, egress_denied
+    status   the HTTP status, or the transport error
+    cached   the file under library/pdf/, or none
+    contents one line on what the document actually holds, which is often not
+             what its title suggests. Written by a person or a model that has
+             read it. A fetch alone never fills this in.
+
+================================================================================
+SESSION ZERO, 2026-08-25. NOTHING WAS FETCHED.
+================================================================================
+
+All 40 attempts below failed for the same reason, and it is not link rot. The
+environment this session ran in denies outbound network egress. Every host was
+refused at the proxy before any request was sent.
+
+Evidence, 2026-08-25:
+
+  curl, WebFetch and pip were each tried. All returned the same class of
+  failure. The agent proxy status endpoint reported, for every host:
+
+      kind:   connect_rejected
+      detail: gateway answered 403 to CONNECT (policy denial or upstream
+              failure)
+
+  Hosts confirmed refused by direct test:
+
+      arxiv.org                        cds.cern.ch
+      www.bnl.gov                      www.astm.org
+      www.femm.info                    magpylib.readthedocs.io
+      www.arnoldmagnetics.com          eprintspublications.npl.co.uk
+      github.com                       pypi.org
+
+  The syllabus cites 40 sources across 30 distinct hosts. None is reachable.
+  PyPI being refused also means magpylib cannot be installed, so no worked.py
+  can run here either.
+
+What this means for the entries below. Every one records result egress_denied,
+not dead. Do not treat any of them as a broken link. The URLs have not been
+tested. When the network is open, run:
+
+    python3 magnet-course/library/fetch_sources.py
+
+It appends a fresh dated block for every source with the real HTTP status, and
+updates the verification object in sources.json. Read what lands, then write
+the contents line for each. Until then, no source in this course has been
+verified and nothing may be cited.
+
+================================================================================
+ATTEMPTS, 2026-08-25
+================================================================================
+
+key:      hall
+url:      https://arxiv.org/abs/1103.1271
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      coils
+url:      https://arxiv.org/pdf/1104.0803
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      bahrdt
+url:      https://arxiv.org/abs/1103.1573
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      sgobba
+url:      https://arxiv.org/abs/1103.1069
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      cas
+url:      https://cds.cern.ch/record/1158462/files/cern-2010-004.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      casprog
+url:      https://cas.web.cern.ch/schools/bruges-2009
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      jainov
+url:      https://www.bnl.gov/magnets/magnet_files/publications/overview.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      jainus
+url:      https://wpw.bnl.gov/rgupta/uspas-2006-by-animesh-jain/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      jainharm
+url:      https://wpw.bnl.gov/rgupta/wp-content/uploads/sites/9/2023/02/1_harmonicseries.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      jainaxis
+url:      https://wpw.bnl.gov/rgupta/wp-content/uploads/sites/9/2023/02/8_alignment.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      immw20
+url:      https://www.diamond.ac.uk/dam/jcr:e8ca5fa8-9630-401d-958f-eef13d832123/A%20Jain.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      immw12
+url:      https://www.esrf.fr/files/live/sites/www/files/events/conferences/2001/IMMW12/present/JainI.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      femmman
+url:      https://www.femm.info/Archives/doc/manual.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      femmtut
+url:      https://sourceforge.net/p/femm/wiki/Magnetics%20Tutorial/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      femmfaq
+url:      https://www.femm.info/doku/doku.php?id=FAQ
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      femmcas
+url:      https://indico.cern.ch/event/1227234/contributions/5601012/attachments/2754519/4795801/CAS_magnets_2023_FEMM_intro.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      feexer
+url:      https://arxiv.org/pdf/2006.10463
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      magpy
+url:      https://magpylib.readthedocs.io/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      magpygh
+url:      https://github.com/magpylib/magpylib
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      magpypaper
+url:      https://www.sciencedirect.com/science/article/pii/S2352711020300170
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      arnoldmeas
+url:      https://www.arnoldmagnetics.com/wp-content/uploads/2021/11/White-Paper-Measurement-07.23.2021MS2a4.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      arnoldunder
+url:      https://www.allegromicro.com/-/media/files/technical-documents/arnold/understanding-permanent-magnets.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      pmg88
+url:      https://www.automate.org/userAssets/a3/a3Uploads/pdf/permanent-magnet-guideline.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      mmpa
+url:      https://www.duramag.com/products-and-services/magnetic-standards-and-guidelines/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      npl
+url:      https://eprintspublications.npl.co.uk/5352/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      amamag
+url:      https://www.ama-science.org/proceedings/details/543
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      radia
+url:      https://pypi.org/project/radia/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      ema
+url:      https://magnetism.eu/43-software.htm
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      tn1297
+url:      https://www.nist.gov/pml/nist-technical-note-1297
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      tn1297pdf
+url:      https://nvlpubs.nist.gov/nistpubs/legacy/tn/nbstechnicalnote1297.pdf
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      nistunc
+url:      https://www.nist.gov/itl/sed/topic-areas/measurement-uncertainty
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      nistbib
+url:      https://physics.nist.gov/cuu/Uncertainty/bibliography.html
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      a977
+url:      https://www.astm.org/Standards/A977.htm
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      a773
+url:      https://www.astm.org/Standards/A773.htm
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      iec
+url:      https://webstore.ansi.org/standards/iec/iec60404ed2015
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      magcam
+url:      https://www.magcam.com/blog/how-inspect-magnetic-field-distributions-permanent-magnets-different-sizes-shapes-and-types
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      magcamieee
+url:      https://ieeexplore.ieee.org/document/6085537/
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      bcam
+url:      https://arxiv.org/pdf/1904.05620
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      visc
+url:      https://doi.org/10.3390/met16030322
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
+
+--------------------------------------------------------------------------------
+
+key:      uspas
+url:      https://uspas.fnal.gov/programs/2001/Rice/courses/Super-Magnets.shtml
+date:     2026-08-25
+result:   egress_denied
+status:   403 on CONNECT, refused by the network egress policy
+cached:   none
+contents: unknown. Not fetched, so not read.
