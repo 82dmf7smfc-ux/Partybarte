@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Permanent Magnet Lifecycle: Research Checklist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0D13;
+  --panel:#121822;
+  --panel-2:#171F2B;
+  --rule:#243040;
+  --text:#DDE4EE;
+  --muted:#7B8899;
+  --south:#3B82C4;
+  --north:#D2452C;
+  --active:#DFA22B;
+  --focus:#8FD0FF;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --display:"Space Grotesk","IBM Plex Sans",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  background-image:
+    linear-gradient(rgba(59,130,196,.055) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(59,130,196,.055) 1px,transparent 1px);
+  background-size:34px 34px;
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:960px;margin:0 auto;padding:28px 20px 90px}
+
+/* ---------- header readout ---------- */
+.masthead{border:1px solid var(--rule);background:linear-gradient(180deg,var(--panel-2),var(--panel));padding:22px 22px 18px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(24px,4.4vw,36px);line-height:1.08;letter-spacing:-.02em;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14px;margin:0;max-width:56ch}
+
+.readout{display:flex;align-items:flex-end;gap:16px;margin-top:20px;flex-wrap:wrap}
+.bignum{font-family:var(--mono);font-weight:600;font-size:clamp(38px,8vw,58px);line-height:.9;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.bigunit{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;padding-bottom:6px}
+.counts{font-family:var(--mono);font-size:12px;color:var(--muted);padding-bottom:6px;margin-left:auto}
+.counts b{color:var(--text);font-weight:500}
+
+.gauge{margin-top:14px;height:10px;background:#0A0F16;border:1px solid var(--rule);position:relative;overflow:hidden}
+.gauge span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--south),#8E63A0 48%,var(--north));transition:width .45s cubic-bezier(.2,.7,.2,1)}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;margin-top:6px}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:18px 0 22px}
+button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:transparent;border:1px solid var(--rule);padding:7px 11px;cursor:pointer;transition:.15s}
+button:hover{color:var(--text);border-color:#3B4A5E}
+button:focus-visible,.marker:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button[aria-pressed="true"]{color:var(--bg);background:var(--text);border-color:var(--text)}
+.spacer{flex:1 1 auto}
+
+/* ---------- sections ---------- */
+.section{border:1px solid var(--rule);background:var(--panel);margin-bottom:14px}
+.shead{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--rule);cursor:pointer;user-select:none}
+.shead:hover{background:var(--panel-2)}
+.caret{font-family:var(--mono);color:var(--muted);font-size:11px;transition:transform .2s}
+.section.collapsed .caret{transform:rotate(-90deg)}
+.section.collapsed .slist{display:none}
+.stitle{font-family:var(--display);font-weight:500;font-size:15px;letter-spacing:-.01em;margin:0}
+.sdesc{display:block;font-family:var(--sans);font-weight:400;font-size:12.5px;color:var(--muted);letter-spacing:0}
+.sprog{margin-left:auto;display:flex;align-items:center;gap:9px;flex-shrink:0}
+.sbar{width:64px;height:4px;background:#0A0F16;border:1px solid var(--rule)}
+.sbar span{display:block;height:100%;background:var(--south);transition:width .35s,background .35s}
+.scount{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ---------- items ---------- */
+.slist{list-style:none;margin:0;padding:0}
+.item{border-bottom:1px solid rgba(36,48,64,.6);padding:11px 16px 11px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start}
+.item:last-child{border-bottom:none}
+.marker{width:15px;height:15px;margin-top:3px;border:1.5px solid #3D4C60;background:transparent;padding:0;cursor:pointer;border-radius:50%;transition:.18s;flex-shrink:0}
+.marker:hover{border-color:var(--muted)}
+.item[data-status="active"] .marker{border-color:var(--active);background:radial-gradient(circle,var(--active) 0 38%,transparent 42%)}
+.item[data-status="done"] .marker{border-color:var(--north);background:var(--north)}
+.item[data-status="done"] .ititle{color:var(--muted);text-decoration:line-through;text-decoration-color:#4A5B70}
+.ititle{font-size:14.5px;font-weight:500;margin:0;letter-spacing:-.005em}
+.ihint{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.ihint a{color:var(--south);text-decoration:none;border-bottom:1px solid rgba(59,130,196,.35)}
+.ihint a:hover{color:var(--focus)}
+.notebtn{font-size:10px;padding:4px 7px;letter-spacing:.08em;align-self:start;margin-top:1px}
+.notebtn.has{color:var(--active);border-color:rgba(223,162,43,.45)}
+.note{grid-column:2 / 4;margin-top:9px}
+.note textarea{width:100%;min-height:74px;background:#0A0F16;color:var(--text);border:1px solid var(--rule);font-family:var(--mono);font-size:12.5px;line-height:1.5;padding:9px 10px;resize:vertical}
+.note[hidden]{display:none}
+.addrow{padding:10px 16px 12px;display:flex;gap:8px}
+.addrow input{flex:1;background:#0A0F16;border:1px solid var(--rule);color:var(--text);font-family:var(--sans);font-size:13px;padding:7px 9px}
+.addrow input::placeholder{color:#5A6878}
+
+footer{margin-top:26px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.7}
+.status{font-family:var(--mono);font-size:11px;color:var(--active);min-height:16px;margin-top:10px}
+
+@media (max-width:560px){
+  .wrap{padding:16px 12px 70px}
+  .masthead{padding:16px}
+  .item{padding:10px 12px}
+  .sprog .sbar{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{
+  body{background:#fff;color:#000}
+  .toolbar,.marker,.notebtn,.addrow,.gauge,footer{display:none}
+  .section,.masthead{border-color:#999;background:#fff}
+  .note[hidden]{display:block}
+  .note textarea{border:1px solid #ccc;color:#000;background:#fff;min-height:0}
+  .item{page-break-inside:avoid}
+  .ititle,.stitle,h1,.bignum{color:#000}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Bench program / rev 1</p>
+  <h1>Permanent Magnet Lifecycle</h1>
+  <p class="sub">Field measurement, contour mapping, and long term tracking. Work through it, mark what is done, keep the notes with the item.</p>
+
+  <div class="readout">
+    <div class="bignum" id="pct">0</div>
+    <div class="bigunit">% saturation</div>
+    <div class="counts"><b id="cDone">0</b> done &nbsp;/&nbsp; <b id="cActive">0</b> active &nbsp;/&nbsp; <b id="cOpen">0</b> open</div>
+  </div>
+  <div class="gauge"><span id="gauge"></span></div>
+  <div class="ticks"><span>Unmagnetized</span><span>Fully researched</span></div>
+</header>
+
+<div class="toolbar">
+  <button id="fAll" aria-pressed="true">All</button>
+  <button id="fOpen" aria-pressed="false">Open only</button>
+  <button id="fActive" aria-pressed="false">Active only</button>
+  <span class="spacer"></span>
+  <button id="expand">Expand all</button>
+  <button id="collapse">Collapse all</button>
+  <button id="export">Export</button>
+  <button id="import">Import</button>
+  <button id="print">Print</button>
+  <button id="reset">Reset</button>
+</div>
+
+<main id="board"></main>
+<div class="status" id="status"></div>
+
+<footer>
+  Click a circle to cycle: open, active, done. Notes save as you type.<br>
+  Storage is local to this browser. Use Export to keep a copy or move it to another machine.
+</footer>
+</div>
+
+<input type="file" id="fileIn" accept="application/json" hidden>
+
+<script>
+const DATA=[
+ {id:"s1",title:"Field measurement methods",desc:"What each instrument actually measures, and when it applies.",items:[
+  {id:"a1",t:"Hall probe gaussmeter or teslameter",h:"The workhorse. Single point, one or three axes. Understand lift-off sensitivity and temperature drift before trusting any number."},
+  {id:"a2",t:"Fluxgate magnetometer",h:"Far more sensitive than Hall, but low range. Use for stray field and shielding checks, not for magnet faces."},
+  {id:"a3",t:"Search coil with integrating fluxmeter",h:"Measures flux change, not field. Learn the drift behavior of the integrator."},
+  {id:"a4",t:"Helmholtz coil plus fluxmeter",h:"Total magnetic moment of a whole part with no applied field, so no risk of demagnetizing the sample. This is the core method for measuring the same magnet again and again over years.",u:"https://magnetism.eu/43-software.htm"},
+  {id:"a5",t:"Hysteresigraph or permeameter",h:"Closed circuit B-H loop. Gives Br, HcB, HcJ, BHmax, knee field, recoil permeability. Needs a specific specimen shape, so it is a sample test rather than a part test."},
+  {id:"a6",t:"VSM and SQUID magnetometry",h:"Small research samples. Worth knowing the sample size limits and typical cost per run."},
+  {id:"a7",t:"NMR teslameter",h:"Highest accuracy in uniform fields. Mainly relevant as a calibration reference for your Hall probes."},
+  {id:"a8",t:"Magnetoresistive sensors: AMR, GMR, TMR",h:"Cheap, small, easy to array. Check linearity and hysteresis before using them for absolute values."},
+  {id:"a9",t:"Pull force testers and production QC gates",h:"What industry actually uses on the line. Fast, coarse, and blind to pole geometry."},
+  {id:"a10",t:"Pick your primary instrument and your reference instrument",h:"Decision item. The reference never leaves the drawer and only measures the reference magnet."}
+ ]},
+ {id:"s2",title:"Mapping and imaging",desc:"Getting from single points to a contour map.",items:[
+  {id:"b1",t:"Scanned Hall probe on an XY stage",h:"Slow, flexible, cheap to build. Step size, settling time, and backlash are the whole game."},
+  {id:"b2",t:"Hall sensor array chips, sold as magnetic field cameras",h:"Chips carry a 2D array of over 16000 microscopic Hall sensors and capture a full map in about a second.",u:"https://www.magcam.com/blog/how-inspect-magnetic-field-distributions-permanent-magnets-different-sizes-shapes-and-types"},
+  {id:"b3",t:"Magneto-optical viewing film",h:"Cheap and qualitative. Good for pole layout and gross defects. Useless for numbers."},
+  {id:"b4",t:"NV diamond magnetometry",h:"Microscale imaging, research level. Read enough to know why it is out of scope for a bench program."},
+  {id:"b5",t:"Rotor and curved surface scanning",h:"Radial and diametric magnetization needs a rotary stage. Angular resolution replaces one of your linear axes."},
+  {id:"b6",t:"Field continuation between planes",h:"Fourier based projection lets you take a map at one lift-off and predict another. Understand where it breaks down."},
+  {id:"b7",t:"Inverse methods: magnetization from a surface map",h:"Reconstructing the source from the field. Ill posed, but useful for locating internal defects."},
+  {id:"b8",t:"Rendering choices: contour, heatmap, quiver",h:"Decide the fixed color scale and the fixed contour interval now, so maps from different years stay comparable."}
+ ]},
+ {id:"s3",title:"Repeatability",desc:"The part that decides whether the study works at all.",items:[
+  {id:"c1",t:"Lift-off control and fixture design",h:"A fraction of a millimeter of lift-off error can outweigh a year of real aging."},
+  {id:"c2",t:"Part orientation and indexing",h:"Kinematic mount or a hard index feature. The magnet must return to the same pose every time."},
+  {id:"c3",t:"Temperature logging at the magnet",h:"Not the room. Not the chamber setpoint. The magnet body."},
+  {id:"c4",t:"Reference magnet measured every session",h:"A stable sample that never changes duty. It separates instrument drift from sample aging."},
+  {id:"c5",t:"Probe calibration and error sources",h:"Planar Hall effect, active area averaging, angular alignment, temperature coefficient of the sensor."},
+  {id:"c6",t:"Build an uncertainty budget for the full chain",h:"Sensor, position, temperature, fixture, integrator. Total it before you claim any trend."},
+  {id:"c7",t:"Map registration and differencing",h:"How to align two contour maps taken months apart, then subtract them. Alignment error looks exactly like a real change."},
+  {id:"c8",t:"Scalar metrics per scan for trending",h:"Pick a handful of numbers to extract from every map, then run them as a control chart."}
+ ]},
+ {id:"s4",title:"Aging physics",desc:"What actually changes, and why.",items:[
+  {id:"d1",t:"Reversible, irreversible, and structural loss",h:"Define all three cleanly before designing any test. They need different experiments."},
+  {id:"d2",t:"Permeance coefficient and working point",h:"Aging depends on the magnetic circuit, not just the material. The same magnet ages differently in a different assembly."},
+  {id:"d3",t:"Knee of the demagnetization curve",h:"Where it sits, and how it moves with temperature. Cross the knee and the loss does not come back."},
+  {id:"d4",t:"Thermal aging and stabilization procedures",h:"Typical protocol: soak at elevated temperature, cool, remeasure, repeat. Find the standard soak times used in industry."},
+  {id:"d5",t:"Magnetic viscosity and long term after-effect",h:"Slow time dependent polarization decrease. Recent work models it and validates against long term open circuit Helmholtz measurements.",u:"https://doi.org/10.3390/met16030322"},
+  {id:"d6",t:"Corrosion and coating failure in NdFeB",h:"Often the real lifecycle limit, not demagnetization. Look at NiCuNi, epoxy, and parylene performance."},
+  {id:"d7",t:"Mechanical shock, vibration, and radiation",h:"Secondary paths to loss. Worth scoping even if you do not test them."},
+  {id:"d8",t:"Material comparison and temperature coefficients",h:"NdFeB, SmCo, ferrite, AlNiCo. Build one table of Br and Hcj temperature coefficients and max service temperature."}
+ ]},
+ {id:"s5",title:"Standards to obtain",desc:"Paywalled, but they set the vocabulary everyone else uses.",items:[
+  {id:"e1",t:"IEC 60404-5",h:"Defines measurement of flux density, polarization, and field strength, and how to determine the demagnetization curve and recoil line."},
+  {id:"e2",t:"IEC 60404-14",h:"Methods of measurement of the magnetic dipole moment of a ferromagnetic material."},
+  {id:"e3",t:"ASTM A977 / A977M",h:"Hysteresigraph method for high coercivity permanent magnets. Covers initial magnetization, demagnetization, and recoil curves.",u:"https://www.astm.org/Standards/A977.htm"},
+  {id:"e4",t:"ASTM A773 / A773M",h:"DC properties of low coercivity materials. Useful context for the soft parts of your magnetic circuit.",u:"https://www.astm.org/Standards/A773.htm"},
+  {id:"e5",t:"ASTM A341 / A341M",h:"The older method. Read why it is considered unsuitable for rare earth magnets."}
+ ]},
+ {id:"s6",title:"Sources and communities",desc:"There is no single public knowledge base. This is where the material actually lives.",items:[
+  {id:"f1",t:"International Magnetic Measurement Workshop proceedings",h:"The accelerator magnet community publishes scanner design, probe calibration, and error budgets openly. The most useful free source on field mapping practice."},
+  {id:"f2",t:"Magnet Technology conference papers",h:"Broader magnet engineering, including measurement sessions."},
+  {id:"f3",t:"IEEE Transactions on Magnetics",h:"Primary journal. Also check Sensors and Metals for measurement and aging papers."},
+  {id:"f4",t:"Instrument vendor application notes",h:"Lake Shore, Metrolab, Senis, Magcam. Often more practical than the papers."},
+  {id:"f5",t:"Magnet supplier handbooks",h:"Arnold, Vacuumschmelze, Dexter and similar. Free, and they contain the working point and temperature curves you need."},
+  {id:"f6",t:"European Magnetism Association software list",h:"A maintained index of open magnetics software.",u:"https://magnetism.eu/43-software.htm"},
+  {id:"f7",t:"National lab technical notes",h:"CERN and ESRF publish detailed magnetic measurement system documentation."}
+ ]},
+ {id:"s7",title:"Modeling tools",desc:"Predict the map, then subtract it. The residual is where the information is.",items:[
+  {id:"g1",t:"Magpylib",h:"Open source Python package for static fields of magnets and currents, using analytical expressions. Fast and easy to script against your scan data.",u:"https://magpylib.readthedocs.io/"},
+  {id:"g2",t:"Radia",h:"Built for open space magnetics: large air gaps, moving permanent magnets, Halbach arrays. Solves open boundary problems without meshing the air.",u:"https://pypi.org/project/radia/"},
+  {id:"g3",t:"FEMM",h:"2D finite element magnetics. Free, and good enough for most axisymmetric fixture questions."},
+  {id:"g4",t:"Predicted minus measured workflow",h:"Script it once: model the ideal magnet, sample the model on your scan grid, difference the two, plot the residual."}
+ ]},
+ {id:"s8",title:"Bench build",desc:"What to specify, price, and propose.",items:[
+  {id:"h1",t:"Helmholtz coil plus fluxmeter: build or buy",h:"Your trustworthy scalar. Decide whether to wind your own coil and calculate the coil constant, or buy a calibrated set."},
+  {id:"h2",t:"Stepper driven Hall probe scanner",h:"Your spatial detail. Two axes, a probe holder with a hard lift-off stop, and a simple serial data logger."},
+  {id:"h3",t:"Temperature soak fixture or chamber",h:"Needed for any accelerated aging work. Include the magnet mounted at its real working point, not loose."},
+  {id:"h4",t:"Data format and archive scheme",h:"Fix the file format, the header fields, and the naming now. Future you will be comparing against these files."},
+  {id:"h5",t:"Purchase proposal for the chosen kit",h:"Problem, fix, cost, safety. BOM with Digi-Key and Mouser sourcing, totals, and a signature block."}
+ ]}
+];
+
+const KEY="magnet-research-v1";
+const CYCLE={open:"active",active:"done",done:"open"};
+let state={};let custom=[];let filter="all";
+const $=s=>document.querySelector(s);
+const board=$("#board");
+const statusLine=$("#status");
+let memFallback={};
+
+/* ---------- storage: window.storage, then localStorage, then memory ---------- */
+async function load(){
+  if(window.storage){
+    try{const r=await window.storage.get(KEY);if(r&&r.value)return JSON.parse(r.value);}catch(e){}
+  }
+  try{const v=localStorage.getItem(KEY);if(v)return JSON.parse(v);}catch(e){}
+  return memFallback[KEY]?JSON.parse(memFallback[KEY]):null;
+}
+async function save(){
+  const payload=JSON.stringify({state,custom,saved:new Date().toISOString()});
+  memFallback[KEY]=payload;
+  if(window.storage){
+    try{await window.storage.set(KEY,payload);return;}catch(e){}
+  }
+  try{localStorage.setItem(KEY,payload);}catch(e){
+    flash("Could not save to this browser. Use Export to keep your work.");
+  }
+}
+function flash(msg){statusLine.textContent=msg;clearTimeout(flash.t);flash.t=setTimeout(()=>statusLine.textContent="",3500);}
+
+/* ---------- model ---------- */
+function sections(){
+  return DATA.map(s=>({...s,items:s.items.concat(custom.filter(c=>c.s===s.id).map(c=>({id:c.id,t:c.t,h:"Added by you."})))}));
+}
+function get(id){return state[id]||{status:"open",note:""};}
+
+/* ---------- render ---------- */
+function render(){
+  board.innerHTML="";
+  sections().forEach(sec=>{
+    const el=document.createElement("section");
+    el.className="section";el.dataset.sec=sec.id;
+    const done=sec.items.filter(i=>get(i.id).status==="done").length;
+    const pct=Math.round(done/sec.items.length*100);
+    const head=document.createElement("div");
+    head.className="shead";head.tabIndex=0;head.setAttribute("role","button");
+    head.innerHTML=`<span class="caret">&#9660;</span>
+      <h2 class="stitle">${sec.title}<span class="sdesc">${sec.desc}</span></h2>
+      <div class="sprog"><div class="sbar"><span style="width:${pct}%;background:${pct===100?"var(--north)":"var(--south)"}"></span></div>
+      <span class="scount">${done}/${sec.items.length}</span></div>`;
+    head.addEventListener("click",()=>el.classList.toggle("collapsed"));
+    head.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();el.classList.toggle("collapsed");}});
+    el.appendChild(head);
+
+    const ul=document.createElement("ul");ul.className="slist";
+    sec.items.forEach(it=>{
+      const st=get(it.id);
+      if(filter==="open"&&st.status!=="open")return;
+      if(filter==="active"&&st.status!=="active")return;
+      const li=document.createElement("li");
+      li.className="item";li.dataset.status=st.status;
+      const link=it.u?` <a href="${it.u}" target="_blank" rel="noopener">source</a>`:"";
+      li.innerHTML=`<button class="marker" aria-label="Change status of ${it.t}"></button>
+        <div><p class="ititle">${it.t}</p><p class="ihint">${it.h}${link}</p></div>
+        <button class="notebtn${st.note?" has":""}">${st.note?"Note *":"Note"}</button>
+        <div class="note" hidden><textarea placeholder="Findings, references, part numbers, decisions.">${st.note.replace(/</g,"&lt;")}</textarea></div>`;
+      li.querySelector(".marker").addEventListener("click",()=>{
+        state[it.id]={...get(it.id),status:CYCLE[get(it.id).status]};save();render();
+      });
+      const nb=li.querySelector(".notebtn"),nd=li.querySelector(".note"),ta=li.querySelector("textarea");
+      nb.addEventListener("click",()=>{nd.hidden=!nd.hidden;if(!nd.hidden)ta.focus();});
+      ta.addEventListener("input",()=>{
+        state[it.id]={...get(it.id),note:ta.value};
+        nb.classList.toggle("has",!!ta.value);nb.textContent=ta.value?"Note *":"Note";
+        clearTimeout(ta.timer);ta.timer=setTimeout(save,400);
+      });
+      ul.appendChild(li);
+    });
+    el.appendChild(ul);
+
+    const add=document.createElement("div");
+    add.className="addrow";
+    add.innerHTML=`<input placeholder="Add an item to ${sec.title.toLowerCase()}"><button>Add</button>`;
+    const inp=add.querySelector("input"),btn=add.querySelector("button");
+    const commit=()=>{const v=inp.value.trim();if(!v)return;
+      custom.push({id:"x"+Date.now().toString(36),s:sec.id,t:v});inp.value="";save();render();};
+    btn.addEventListener("click",commit);
+    inp.addEventListener("keydown",e=>{if(e.key==="Enter")commit();});
+    el.appendChild(add);
+    board.appendChild(el);
+  });
+  updateGauge();
+}
+function updateGauge(){
+  const all=sections().flatMap(s=>s.items);
+  const d=all.filter(i=>get(i.id).status==="done").length;
+  const a=all.filter(i=>get(i.id).status==="active").length;
+  const pct=Math.round(d/all.length*100);
+  $("#pct").textContent=pct;$("#gauge").style.width=pct+"%";
+  $("#cDone").textContent=d;$("#cActive").textContent=a;$("#cOpen").textContent=all.length-d-a;
+}
+
+/* ---------- toolbar ---------- */
+function setFilter(f){
+  filter=f;
+  [["all","#fAll"],["open","#fOpen"],["active","#fActive"]].forEach(([k,s])=>$(s).setAttribute("aria-pressed",String(k===f)));
+  render();
+}
+$("#fAll").onclick=()=>setFilter("all");
+$("#fOpen").onclick=()=>setFilter("open");
+$("#fActive").onclick=()=>setFilter("active");
+$("#expand").onclick=()=>document.querySelectorAll(".section").forEach(s=>s.classList.remove("collapsed"));
+$("#collapse").onclick=()=>document.querySelectorAll(".section").forEach(s=>s.classList.add("collapsed"));
+$("#print").onclick=()=>window.print();
+$("#export").onclick=()=>{
+  const blob=new Blob([JSON.stringify({state,custom,saved:new Date().toISOString()},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="magnet-research-progress.json";a.click();URL.revokeObjectURL(a.href);
+  flash("Exported.");
+};
+$("#import").onclick=()=>$("#fileIn").click();
+$("#fileIn").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);state=d.state||{};custom=d.custom||[];save();render();flash("Imported.");}
+  catch(err){flash("That file is not a valid export.");}};
+  r.readAsText(f);e.target.value="";
+};
+$("#reset").onclick=()=>{
+  if(!confirm("Clear all statuses, notes, and added items? Export first if you want a copy."))return;
+  state={};custom=[];save();render();flash("Cleared.");
+};
+
+/* ---------- boot ---------- */
+(async()=>{
+  const d=await load();
+  if(d){state=d.state||{};custom=d.custom||[];}
+  render();
+})();
+</script>
+</body>
+</html>

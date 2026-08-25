@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magnet Field Mapping Bench: Course Syllabus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0D13;--panel:#121822;--panel-2:#171F2B;--rule:#243040;
+  --text:#DDE4EE;--muted:#7B8899;--dim:#5A6878;
+  --south:#3B82C4;--north:#D2452C;--active:#DFA22B;--focus:#8FD0FF;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --display:"Space Grotesk","IBM Plex Sans",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);
+  background-image:linear-gradient(rgba(59,130,196,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,196,.05) 1px,transparent 1px);
+  background-size:34px 34px;color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 90px}
+a{color:var(--south);text-decoration:none;border-bottom:1px solid rgba(59,130,196,.35)}
+a:hover{color:var(--focus)}
+
+/* header */
+.masthead{border:1px solid var(--rule);background:linear-gradient(180deg,var(--panel-2),var(--panel));padding:22px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(24px,4.6vw,38px);line-height:1.06;letter-spacing:-.02em;margin:0 0 8px}
+.sub{color:var(--muted);font-size:14.5px;margin:0;max-width:62ch}
+.readout{display:flex;align-items:flex-end;gap:14px;margin-top:20px;flex-wrap:wrap}
+.bignum{font-family:var(--mono);font-weight:600;font-size:clamp(34px,7vw,52px);line-height:.9;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.bigunit{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;padding-bottom:5px}
+.counts{font-family:var(--mono);font-size:12px;color:var(--muted);padding-bottom:5px;margin-left:auto;text-align:right}
+.counts b{color:var(--text);font-weight:500}
+.gauge{margin-top:14px;height:9px;background:#080C12;border:1px solid var(--rule);overflow:hidden}
+.gauge span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--south),#8E63A0 48%,var(--north));transition:width .45s}
+
+/* meta strip */
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:16px}
+.meta div{background:var(--panel);padding:11px 13px}
+.meta dt{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:0 0 3px}
+.meta dd{margin:0;font-size:13.5px}
+
+/* toolbar */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:18px 0 20px}
+button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:transparent;border:1px solid var(--rule);padding:7px 11px;cursor:pointer;transition:.15s}
+button:hover{color:var(--text);border-color:#3B4A5E}
+button[aria-pressed="true"]{color:var(--bg);background:var(--text);border-color:var(--text)}
+button:focus-visible,.marker:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.spacer{flex:1 1 auto}
+
+/* preamble */
+.note-block{border:1px solid var(--rule);border-left:2px solid var(--south);background:var(--panel);padding:15px 18px;margin-bottom:22px}
+.note-block h2{font-family:var(--display);font-size:15px;margin:0 0 8px;font-weight:500}
+.note-block p{margin:0 0 8px;font-size:14px;color:#C3CDDA}
+.note-block p:last-child{margin-bottom:0}
+
+/* units */
+.unit{margin-bottom:26px}
+.uhead{display:flex;align-items:baseline;gap:12px;padding:0 0 10px;border-bottom:1px solid var(--rule);margin-bottom:0;flex-wrap:wrap}
+.unum{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--south);text-transform:uppercase}
+.utitle{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.015em;margin:0}
+.uaim{flex-basis:100%;color:var(--muted);font-size:13.5px;margin:6px 0 0}
+.uprog{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+/* class cards */
+.cls{border:1px solid var(--rule);border-top:none;background:var(--panel)}
+.unit .cls:first-of-type{border-top:1px solid var(--rule);border-top-color:transparent}
+.chead{display:grid;grid-template-columns:auto auto 1fr auto;gap:11px;align-items:center;padding:11px 14px;cursor:pointer;list-style:none}
+.chead::-webkit-details-marker{display:none}
+.cls:hover .chead{background:var(--panel-2)}
+.marker{width:15px;height:15px;border:1.5px solid #3D4C60;background:transparent;padding:0;cursor:pointer;border-radius:50%;flex-shrink:0}
+.marker:hover{border-color:var(--muted)}
+.cls[data-done="1"] .marker{border-color:var(--north);background:var(--north)}
+.cls[data-done="1"] .ctitle{color:var(--muted)}
+.cno{font-family:var(--mono);font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.ctitle{font-size:14.5px;font-weight:500;letter-spacing:-.005em}
+.clen{font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+.cbody{padding:2px 14px 16px 40px;border-top:1px solid rgba(36,48,64,.55)}
+.lbl{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:14px 0 6px}
+.obj{font-size:14px;color:#C3CDDA;margin:12px 0 0}
+.beats{list-style:none;margin:0;padding:0}
+.beats li{display:grid;grid-template-columns:62px 1fr;gap:10px;font-size:13.5px;padding:3px 0;border-bottom:1px solid rgba(36,48,64,.4)}
+.beats li:last-child{border-bottom:none}
+.beats b{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--active);padding-top:2px}
+.srcs{list-style:none;margin:0;padding:0;font-size:13.5px}
+.srcs li{padding:4px 0 4px 14px;position:relative}
+.srcs li::before{content:"";position:absolute;left:0;top:12px;width:6px;height:1px;background:var(--dim)}
+.srcs em{font-style:normal;color:var(--muted);font-size:12.5px;display:block}
+.tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--rule);padding:1px 5px;margin-left:6px;color:var(--dim);white-space:nowrap}
+.tag.free{color:#6FA96F;border-color:rgba(111,169,111,.4)}
+.tag.paid{color:var(--active);border-color:rgba(223,162,43,.4)}
+.artifact{font-size:13.5px;color:#C3CDDA;font-family:var(--mono);background:#080C12;border:1px solid var(--rule);padding:8px 10px}
+
+/* checkpoint */
+.gate{border:1px solid rgba(223,162,43,.35);border-left:3px solid var(--active);background:rgba(223,162,43,.05);padding:12px 15px;margin-top:0}
+.gate .glbl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--active);display:block;margin-bottom:5px}
+.gate p{margin:0;font-size:13.5px;color:#D8CDBB}
+.gate .risk{margin-top:7px;font-size:13px;color:var(--muted)}
+.gate .risk b{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:400;margin-right:6px}
+
+/* appendix */
+.lib{border:1px solid var(--rule);background:var(--panel);padding:18px}
+.lib h2{font-family:var(--display);font-size:19px;margin:0 0 4px}
+.lib h3{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--south);margin:22px 0 8px;font-weight:500}
+.lib ul{list-style:none;margin:0;padding:0}
+.lib li{padding:6px 0;border-bottom:1px solid rgba(36,48,64,.5);font-size:13.5px}
+.lib li:last-child{border-bottom:none}
+.lib em{font-style:normal;display:block;color:var(--muted);font-size:12.5px;margin-top:1px}
+footer{margin-top:26px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.7}
+.status{font-family:var(--mono);font-size:11px;color:var(--active);min-height:16px;margin-top:10px}
+
+@media (max-width:600px){
+  .wrap{padding:16px 12px 70px}
+  .masthead{padding:16px}
+  .cbody{padding-left:16px}
+  .chead{grid-template-columns:auto auto 1fr;gap:9px}
+  .clen{display:none}
+  .beats li{grid-template-columns:54px 1fr;gap:8px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media print{
+  body{background:#fff;color:#000}
+  .toolbar,.marker,.gauge,footer,.status{display:none}
+  .masthead,.cls,.lib,.note-block,.meta div{background:#fff;border-color:#bbb;color:#000}
+  .cbody{display:block!important}
+  .cls,.unit{page-break-inside:avoid}
+  h1,.utitle,.ctitle,.bignum{color:#000}
+  a{color:#000;border:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Self-directed course / plan only, no material written yet</p>
+  <h1>Magnet Field Mapping Bench</h1>
+  <p class="sub">A build-along course on permanent magnet metrology. Take the units in any order that suits the work in front of you. The final deliverable is a working bench that maps and images magnet characteristics and tracks them over time.</p>
+
+  <div class="readout">
+    <div class="bignum" id="pct">0</div>
+    <div class="bigunit">% complete</div>
+    <div class="counts"><b id="cDone">0</b> of <b id="cAll">0</b> classes &nbsp;/&nbsp; <b id="cHrs">0</b> h logged</div>
+  </div>
+  <div class="gauge"><span id="gauge"></span></div>
+
+  <dl class="meta">
+    <div><dt>Units</dt><dd>8, plus orientation</dd></div>
+    <div><dt>Classes</dt><dd id="mClasses">35</dd></div>
+    <div><dt>Contact time</dt><dd id="mHours">approx 55 h</dd></div>
+    <div><dt>Suggested pace</dt><dd>2 classes per week, 18 weeks</dd></div>
+    <div><dt>Checkpoints</dt><dd>8, advisory only</dd></div>
+    <div><dt>Cost of sources</dt><dd>Every topic has a free route</dd></div>
+  </dl>
+</header>
+
+<div class="toolbar">
+  <button id="fAll" aria-pressed="true">All classes</button>
+  <button id="fOpen" aria-pressed="false">Not done</button>
+  <span class="spacer"></span>
+  <button id="expand">Open all</button>
+  <button id="collapse">Close all</button>
+  <button id="export">Export</button>
+  <button id="import">Import</button>
+  <button id="print">Print</button>
+  <button id="reset">Reset</button>
+</div>
+
+<div class="note-block">
+  <h2>How this course is built</h2>
+  <p>Each class is 90 minutes by default and follows the same shape: a short framing, a source read with a specific question to answer, a worked calculation or hands-on step, then a written artifact. The artifact is the point. If a class does not leave a file, a sketch, or a number behind, it did not happen.</p>
+  <p>The order is a suggestion, not a rule. Theory is placed just before the class that needs it, so reading straight through means nothing arrives cold. Jump ahead whenever a real problem pulls you there. The checkpoint at the end of each unit tells you what should be working by then and what tends to go wrong if it is not. Treat it as a warning label, not a lock.</p>
+  <p>The source list is dominated by the accelerator magnet community and by vendor technical staff. That is deliberate. Both publish measurement practice openly, in far more detail than the standards bodies do, and the physics is identical to yours. Paid standards appear only where they are genuinely the authority, and each one is paired with a free document that covers the same ground.</p>
+</div>
+
+<main id="board"></main>
+
+<section class="lib" id="library"></section>
+<div class="status" id="status"></div>
+
+<footer>
+  Click a circle to mark a class done. Click a class title to open its plan.<br>
+  Progress is stored in this browser. Export to keep a copy.
+</footer>
+</div>
+<input type="file" id="fileIn" accept="application/json" hidden>
+
+<script>
+const S={
+ hall:{t:"Sanfilippo, Hall probes: physics and application to magnetometry",u:"https://arxiv.org/abs/1103.1271",f:1},
+ coils:{t:"Fabrication and calibration of search coils (CAS 2009)",u:"https://arxiv.org/pdf/1104.0803",f:1},
+ bahrdt:{t:"Bahrdt, Permanent magnets including undulators and wigglers",u:"https://arxiv.org/abs/1103.1573",f:1},
+ sgobba:{t:"Sgobba, Physics and measurements of magnetic materials",u:"https://arxiv.org/abs/1103.1069",f:1},
+ cas:{t:"CAS Magnets, Bruges 2009, full proceedings (CERN-2010-004)",u:"https://cds.cern.ch/record/1158462/files/cern-2010-004.pdf",f:1},
+ casprog:{t:"CAS Bruges 2009 programme with lecture slides",u:"https://cas.web.cern.ch/schools/bruges-2009",f:1},
+ jainov:{t:"Jain, Overview of Magnetic Measurement Techniques",u:"https://www.bnl.gov/magnets/magnet_files/publications/overview.pdf",f:1},
+ jainus:{t:"Jain, USPAS Superconducting Magnet lecture set",u:"https://wpw.bnl.gov/rgupta/uspas-2006-by-animesh-jain/",f:1},
+ jainharm:{t:"Jain, Harmonic Description of 2D Fields",u:"https://wpw.bnl.gov/rgupta/wp-content/uploads/sites/9/2023/02/1_harmonicseries.pdf",f:1},
+ jainaxis:{t:"Jain, Determination of Magnetic Axis",u:"https://wpw.bnl.gov/rgupta/wp-content/uploads/sites/9/2023/02/8_alignment.pdf",f:1},
+ immw20:{t:"Jain, Overview of magnetic measurements for APS-U (IMMW20)",u:"https://www.diamond.ac.uk/dam/jcr:e8ca5fa8-9630-401d-958f-eef13d832123/A%20Jain.pdf",f:1},
+ immw12:{t:"Jain et al., IMMW-XII presentation (ESRF archive)",u:"https://www.esrf.fr/files/live/sites/www/files/events/conferences/2001/IMMW12/present/JainI.pdf",f:1},
+ femmman:{t:"FEMM 4.2 user manual",u:"https://www.femm.info/Archives/doc/manual.pdf",f:1},
+ femmtut:{t:"FEMM magnetics tutorial",u:"https://sourceforge.net/p/femm/wiki/Magnetics%20Tutorial/",f:1},
+ femmfaq:{t:"FEMM FAQ, permanent magnet modeling",u:"https://www.femm.info/doku/doku.php?id=FAQ",f:1},
+ femmcas:{t:"Milanese, Introduction to the use of FEMM (CAS 2023)",u:"https://indico.cern.ch/event/1227234/contributions/5601012/attachments/2754519/4795801/CAS_magnets_2023_FEMM_intro.pdf",f:1},
+ feexer:{t:"Finite element simulation of an accelerator magnet: an exercise",u:"https://arxiv.org/pdf/2006.10463",f:1},
+ magpy:{t:"Magpylib documentation",u:"https://magpylib.readthedocs.io/",f:1},
+ magpygh:{t:"Magpylib source and examples",u:"https://github.com/magpylib/magpylib",f:1},
+ magpypaper:{t:"Magpylib: a free Python package for magnetic field computation (SoftwareX, open access)",u:"https://www.sciencedirect.com/science/article/pii/S2352711020300170",f:1},
+ arnoldmeas:{t:"Arnold, Magnetic Properties of Permanent Magnets and Measuring Techniques",u:"https://www.arnoldmagnetics.com/wp-content/uploads/2021/11/White-Paper-Measurement-07.23.2021MS2a4.pdf",f:1},
+ arnoldunder:{t:"Arnold, Understanding Permanent Magnets",u:"https://www.allegromicro.com/-/media/files/technical-documents/arnold/understanding-permanent-magnets.pdf",f:1},
+ pmg88:{t:"MMPA PMG-88, Permanent Magnet Guidelines",u:"https://www.automate.org/userAssets/a3/a3Uploads/pdf/permanent-magnet-guideline.pdf",f:1},
+ mmpa:{t:"MMPA 0100-00 and PMG-88, free PDF downloads",u:"https://www.duramag.com/products-and-services/magnetic-standards-and-guidelines/",f:1},
+ npl:{t:"NPL Report MAT 54, permanent magnet measurement comparison under IEC 60404-5",u:"https://eprintspublications.npl.co.uk/5352/",f:1},
+ amamag:{t:"MagCam field mapping and analysis (AMA Science open proceedings)",u:"https://www.ama-science.org/proceedings/details/543",f:1},
+ radia:{t:"Radia, open space magnetics solver",u:"https://pypi.org/project/radia/",f:1},
+ ema:{t:"European Magnetism Association software index",u:"https://magnetism.eu/43-software.htm",f:1},
+ tn1297:{t:"NIST Technical Note 1297, uncertainty guidelines",u:"https://www.nist.gov/pml/nist-technical-note-1297",f:1},
+ tn1297pdf:{t:"NIST TN 1297 full PDF",u:"https://nvlpubs.nist.gov/nistpubs/legacy/tn/nbstechnicalnote1297.pdf",f:1},
+ nistunc:{t:"NIST measurement uncertainty topic page and GUM links",u:"https://www.nist.gov/itl/sed/topic-areas/measurement-uncertainty",f:1},
+ nistbib:{t:"NIST uncertainty bibliography",u:"https://physics.nist.gov/cuu/Uncertainty/bibliography.html",f:1},
+ a977:{t:"ASTM A977 / A977M, hysteresigraph method",u:"https://www.astm.org/Standards/A977.htm",f:0,sub:"Covered free by the Arnold measurement white paper and MMPA PMG-88. Buy only if a customer cites the standard."},
+ a773:{t:"ASTM A773 / A773M, low coercivity DC properties",u:"https://www.astm.org/Standards/A773.htm",f:0,sub:"Covered free by Sgobba on soft magnetic materials. Rarely needed for this program."},
+ iec:{t:"IEC 60404-5, permanent magnet measurement methods",u:"https://webstore.ansi.org/standards/iec/iec60404ed2015",f:0,sub:"MMPA 0100-00 carries the IEC TC 68 material free, and NPL Report MAT 54 shows the method in use."},
+ magcam:{t:"Magcam, inspecting field distributions of permanent magnets",u:"https://www.magcam.com/blog/how-inspect-magnetic-field-distributions-permanent-magnets-different-sizes-shapes-and-types",f:1},
+ magcamieee:{t:"Inline magnet inspection using MagCam field mapping (IEEE)",u:"https://ieeexplore.ieee.org/document/6085537/",f:0,sub:"Same authors and content in the open AMA Science proceedings. Skip the IEEE version."},
+ bcam:{t:"A magnetic field camera for real-time subsurface imaging",u:"https://arxiv.org/pdf/1904.05620",f:1},
+ visc:{t:"Evaluation of time-dependent magnetic losses of permanent magnets",u:"https://doi.org/10.3390/met16030322",f:1},
+ uspas:{t:"USPAS course archive, superconducting accelerator magnets",u:"https://uspas.fnal.gov/programs/2001/Rice/courses/Super-Magnets.shtml",f:1}
+};
+
+const UNITS=[
+{n:"Unit 0",title:"Orientation",aim:"Decide what the bench must do before deciding anything else.",
+ check:"By here you want a one page bench spec with numbers in it: field range, scan area, spatial step, target repeatability, and the three questions the bench must answer.",risk:"Without a written target you will buy parts that are individually fine and collectively wrong. It is the cheapest hour in the whole course.",
+ classes:[
+  {id:"c01",t:"What the bench must do, and what good means",len:90,
+   obj:"Write the bench specification that every later decision is measured against.",
+   beats:["10 min|Framing. Name the three questions you want the bench to answer about a magnet.",
+          "25 min|Survey what commercial mapping systems do, at what resolution and speed.",
+          "30 min|Draft numeric targets: field range, scan area, step size, repeatability, throughput.",
+          "20 min|Sanity check the targets against what a hobby budget can reach.",
+          "5 min|Write the open questions you will resolve in later units."],
+   src:[{k:"magcam",n:"Read for capability and vocabulary, not for purchase intent."},
+        {k:"jainov",n:"Skim the whole deck. It is the best single map of the field."},
+        {k:"bahrdt",n:"Read the sections on measurement of macroscopic properties."}],
+   art:"bench-spec-v1.md, one page, numeric targets"}
+ ]},
+
+{n:"Unit 1",title:"Physical foundations",aim:"The minimum theory needed to interpret a number off a probe.",
+ check:"By here you should be able to predict flux density at the pole face of your reference magnet within about ten percent, on paper, before measuring it.",risk:"Skip this and your first surprising reading has no baseline to argue with. You will not know whether the magnet is odd or the probe is lying.",
+ classes:[
+  {id:"c02",t:"Units and quantities: B, H, M, J, and the CGS trap",len:90,
+   obj:"Convert between any two magnetic quantity systems without hesitation.",
+   beats:["15 min|Define B, H, M, J and the two conventions for writing them.",
+          "25 min|Work through gauss to tesla, oersted to A/m, emu to A m squared.",
+          "30 min|Take three real datasheets and normalize every value to SI.",
+          "20 min|Build the conversion card you will tape to the bench."],
+   src:[{k:"sgobba",n:"Opening sections. Careful, precise definitions."},
+        {k:"bahrdt",n:"Basic definitions related to permanent magnets."}],
+   art:"conversion-card.pdf, one page, printed"},
+  {id:"c03",t:"The demagnetization curve and the intrinsic curve",len:90,
+   obj:"Read a second quadrant plot and explain what each named quantity means physically.",
+   beats:["20 min|Walk the full hysteresis loop, then isolate the second quadrant.",
+          "20 min|Separate the normal curve from the intrinsic curve. Understand why both are drawn.",
+          "25 min|Locate Br, HcB, HcJ, BHmax, and the knee on a real supplier curve.",
+          "25 min|Annotate the curve for the exact grade you plan to test."],
+   src:[{k:"bahrdt",n:"Magnetic properties of common materials."},
+        {k:"arnoldmeas",n:"Sections on the demagnetization curve and what each named quantity means."},
+        {k:"pmg88",n:"Chapter on basic physics of permanent magnet materials."},
+        {k:"a977",n:"Optional. Scope and terminology only, and only if a customer cites it."}],
+   art:"annotated demag curve for your test grade"},
+  {id:"c04",t:"Working point, permeance coefficient, and load lines",len:90,
+   obj:"Compute where on the curve your magnet actually sits inside its fixture.",
+   beats:["20 min|Why the circuit, not the material, sets the operating point.",
+          "25 min|Derive the load line and the permeance coefficient for simple geometries.",
+          "30 min|Compute the working point of your sample two ways and compare.",
+          "15 min|Note how far the point sits from the knee."],
+   src:[{k:"bahrdt",n:"Applications section, where load lines appear in practice."},
+        {k:"arnoldunder",n:"Load lines and permeance coefficient, worked in plain language."},
+        {k:"pmg88",n:"Design relationships, figures of merit, and optimizing techniques."},
+        {k:"femmfaq",n:"How a solver treats a permanent magnet. Useful for intuition."}],
+   art:"load line calculation, both methods, in one sheet"},
+  {id:"c05",t:"Materials map: NdFeB, SmCo, ferrite, AlNiCo",len:90,
+   obj:"Choose test materials on purpose, knowing how each one fails with age.",
+   beats:["25 min|Production routes and how they set microstructure.",
+          "25 min|Temperature coefficients of Br and HcJ, and maximum service temperature.",
+          "25 min|Corrosion behavior and coating practice.",
+          "15 min|Pick your reference material and your study materials."],
+   src:[{k:"sgobba",n:"Hard and soft material properties, with real numbers."},
+        {k:"bahrdt",n:"Material review and production processes."},
+        {k:"mmpa",n:"MMPA 0100-00 gives nominal properties per grade, free, and carries the IEC TC 68 material."}],
+   art:"materials comparison table, four families, six columns"}
+ ]},
+
+{n:"Unit 2",title:"Sensors and instruments",aim:"Understand each sensing principle well enough to reject the wrong ones.",
+ check:"By here you want an instrument shortlist with a written reason for every rejection, traceable to the spec.",risk:"Buying before this is the most expensive mistake available. A probe with the wrong active area or range cannot be fixed in software.",
+ classes:[
+  {id:"c06",t:"Hall sensors: physics, planar effect, active area, offset",len:120,
+   obj:"Name every error term in a Hall measurement and estimate its size.",
+   beats:["25 min|Hall physics and what the sensor actually integrates over.",
+          "30 min|Planar Hall effect, angular sensitivity, and why probe orientation matters.",
+          "30 min|Offset, drift, nonlinearity, temperature coefficient.",
+          "25 min|Active area averaging in a steep gradient. This one will bite you.",
+          "10 min|Write the error list for your candidate probe."],
+   src:[{k:"hall",n:"Read it end to end. This is the single most useful free document in the course."}],
+   art:"hall-error-list.md with an estimated magnitude per term"},
+  {id:"c07",t:"Search coils and fluxmeters",len:120,
+   obj:"Design a pickup coil and know its coil constant before winding it.",
+   beats:["25 min|Why a coil measures flux change, never field.",
+          "30 min|Coil geometry, turns, area, and the calibration problem.",
+          "35 min|Integrator hardware, drift, and digital integration.",
+          "30 min|Size a coil for your intended sample and compute its constant."],
+   src:[{k:"coils",n:"Fabrication and calibration, written for exactly this task."},
+        {k:"jainov",n:"Flux measurement hardware slides."}],
+   art:"coil design sheet with computed coil constant"},
+  {id:"c08",t:"Helmholtz coil magnetometry",len:90,
+   obj:"Specify the Helmholtz setup that will carry your longitudinal measurements.",
+   beats:["20 min|Why the sample sees no applied field, and why that matters for repeat tests.",
+          "30 min|Coil constant derivation and the correction for non-ideal sample shapes.",
+          "25 min|The extraction procedure and its error sources.",
+          "15 min|Sketch your geometry and predicted sensitivity."],
+   src:[{k:"jainov",n:"Coil methods overview."},
+        {k:"arnoldmeas",n:"Helmholtz coil and fluxmeter method, written for practitioners."},
+        {k:"npl",n:"A national lab comparison of methods compliant with IEC 60404-5. Free stand-in for the standard itself."},
+        {k:"iec",n:"Optional purchase. Part 14 covers dipole moment. Read the free sources first."}],
+   art:"helmholtz spec: geometry, turns, expected volt-seconds"},
+  {id:"c09",t:"Fluxgate, NMR, and magnetoresistive sensors",len:90,
+   obj:"Know which principle wins in each field range and why.",
+   beats:["25 min|Fluxgate operation and its practical ceiling.",
+          "25 min|NMR resonance measurement and its accuracy, and its uniformity requirement.",
+          "25 min|AMR, GMR, TMR: linearity, hysteresis, and array potential.",
+          "15 min|Score all principles against your spec."],
+   src:[{k:"jainov",n:"Comparative overview of techniques."},
+        {k:"hall",n:"Comparison sections against other magnetometers."},
+        {k:"cas",n:"Broader measurement chapters if you want depth."}],
+   art:"instrument selection matrix, scored"},
+  {id:"c10",t:"Reading a probe datasheet like a metrologist",len:90,
+   obj:"Extract the numbers that matter and spot what the vendor left out.",
+   beats:["20 min|Accuracy, resolution, repeatability, linearity. Four different claims.",
+          "30 min|Pull specs from two candidate probes into a common table.",
+          "25 min|Identify every unstated condition behind each claim.",
+          "15 min|Decide and write the rejection reasons."],
+   src:[{k:"tn1297",n:"Appendix D on terminology. Accuracy and precision are not synonyms."},
+        {k:"hall",n:"Calibration sections for context on vendor claims."}],
+   art:"probe comparison table plus a short decision memo"}
+ ]},
+
+{n:"Unit 3",title:"Metrology discipline",aim:"Build the habits that make a multi-year dataset trustworthy.",
+ check:"By here, measure one point on the reference magnet ten times across three days and check the spread against your target repeatability.",risk:"This is the unit most worth not skipping. Aging signals are small. If repeatability is unknown, every later trend is unreadable and months of scans become unusable.",
+ classes:[
+  {id:"c11",t:"Calibration and traceability",len:90,
+   obj:"Write a calibration plan you can actually follow on a home bench.",
+   beats:["20 min|What traceability means and what it costs.",
+          "30 min|Practical calibration options: reference magnet, NMR service, vendor recalibration.",
+          "25 min|Setting the interval, and what triggers an early recalibration.",
+          "15 min|Draft the plan."],
+   src:[{k:"tn1297",n:"Framing for what a calibration claim entails."},
+        {k:"hall",n:"Probe calibration practice."}],
+   art:"calibration-plan.md with interval and triggers"},
+  {id:"c12",t:"Uncertainty budgets, type A and type B",len:120,
+   obj:"Produce a defensible uncertainty statement for a single field reading.",
+   beats:["25 min|Type A versus type B evaluation.",
+          "30 min|Law of propagation of uncertainty, applied to your measurement equation.",
+          "35 min|Build the budget spreadsheet: sensor, position, angle, temperature, integrator.",
+          "30 min|Combined and expanded uncertainty, and how to report it."],
+   src:[{k:"tn1297pdf",n:"Sections 3 to 7 plus Appendix A. This is the core read."},
+        {k:"nistunc",n:"For the GUM itself and the Monte Carlo supplement."},
+        {k:"nistbib",n:"If you want worked examples."}],
+   art:"uncertainty-budget.xlsx for one point measurement"},
+  {id:"c13",t:"Fixturing, lift-off, and kinematic location",len:120,
+   obj:"Design a holder that returns the magnet to the same pose every time.",
+   beats:["25 min|Why lift-off error dominates everything else in a near field map.",
+          "30 min|Kinematic mounting principles and how to build one cheaply.",
+          "35 min|Tolerance stack from magnet face to sensor active area.",
+          "30 min|Sketch the fixture and mark the critical dimensions."],
+   src:[{k:"cas",n:"Chapters on minimising errors in mechanical measurement equipment."},
+        {k:"immw20",n:"See how a real lab handles positioning."}],
+   art:"fixture drawing with tolerance stack and predicted lift-off error"},
+  {id:"c14",t:"The reference magnet and session control",len:90,
+   obj:"Define the routine that separates instrument drift from real change.",
+   beats:["20 min|Why a reference sample is non negotiable for multi-year work.",
+          "25 min|Selecting and storing a stable reference.",
+          "30 min|Session opening and closing checks, and what to log every time.",
+          "15 min|Write the checklist."],
+   src:[{k:"jainus",n:"Measurements as a tool to monitor magnet production."},
+        {k:"immw12",n:"Example of long running measurement discipline."}],
+   art:"session-checklist.pdf, one page, laminated"}
+ ]},
+
+{n:"Unit 4",title:"Mapping and imaging",aim:"Turn a point sensor into a field map you can defend.",
+ check:"By here you want a full map of the reference magnet, saved as raw data, and regenerated as a plot from that raw data by script with no manual steps.",risk:"Manual plotting steps do not survive a year. If the plot cannot be rebuilt from raw data, the archive is decoration.",
+ classes:[
+  {id:"c15",t:"From points to maps: grids, sampling, aliasing",len:90,
+   obj:"Choose a scan grid from the physics, not from convenience.",
+   beats:["25 min|Spatial frequency content of a magnet field at a given lift-off.",
+          "25 min|Sampling theory applied to a scan grid. What aliasing looks like in a map.",
+          "25 min|Step size versus scan time. The real tradeoff.",
+          "15 min|Fix the grid plan for the reference magnet."],
+   src:[{k:"magcam",n:"Typical resolutions used commercially."},
+        {k:"bcam",n:"Array approach and its sampling limits."}],
+   art:"grid plan with a written justification for step size"},
+  {id:"c16",t:"Scanner kinematics and motion control",len:120,
+   obj:"Specify the two axis stage, including error terms you will have to live with.",
+   beats:["30 min|Stage architectures: lead screw, belt, linear rail.",
+          "30 min|Backlash, straightness, orthogonality, and repeatability.",
+          "35 min|Control approach, homing, and position readback.",
+          "25 min|Write the axis spec and predicted position uncertainty."],
+   src:[{k:"jainov",n:"XY stage measurement setups."},
+        {k:"immw20",n:"Practical scanner descriptions."}],
+   art:"axis-spec.md feeding directly into the BOM"},
+  {id:"c17",t:"Rotating coils and harmonic analysis",len:120,
+   obj:"Decide whether harmonic measurement belongs on your bench, with evidence.",
+   beats:["30 min|Harmonic description of a two dimensional field.",
+          "35 min|Rotating coil hardware, bucking, and what it buys you.",
+          "30 min|Where the 2D expansion stops being valid for short magnets.",
+          "25 min|Write the decision memo: scanning versus rotating coil for your parts."],
+   src:[{k:"jainharm",n:"Harmonic description of 2D fields."},
+        {k:"jainaxis",n:"Determination of magnetic axis."},
+        {k:"jainus",n:"Full lecture set, harmonic coils section."}],
+   art:"decision memo, scanning versus harmonic, with the reason recorded"},
+  {id:"c18",t:"Field continuation and plane to plane projection",len:120,
+   obj:"Project a measured plane to another height and know when the projection lies.",
+   beats:["30 min|Why a measured plane contains more information than it looks like.",
+          "35 min|The Fourier method and the exponential factor that governs it.",
+          "35 min|Noise amplification when projecting toward the magnet.",
+          "20 min|Implement and test against a modeled magnet."],
+   src:[{k:"magcam",n:"Commercial framing of what continuation delivers."},
+        {k:"magpy",n:"Use a modeled field as the ground truth for your test."}],
+   art:"continuation script, validated against a model"},
+  {id:"c19",t:"Rendering: contour intervals and the fixed scale rule",len:90,
+   obj:"Build the plotting module that every future map will use unchanged.",
+   beats:["20 min|Contour, heatmap, quiver. What each hides.",
+          "25 min|Diverging color scales and why the zero point must be fixed.",
+          "30 min|Lock the scale, the interval, and the annotation block.",
+          "15 min|Version the module and stop touching it."],
+   src:[{k:"magpygh",n:"Visualization examples worth borrowing from."},
+        {k:"magcam",n:"Conventions used in commercial reports."}],
+   art:"plotting module, version 1, frozen"},
+  {id:"c20",t:"Imaging alternatives: film, arrays, NV centres",len:90,
+   obj:"Know what each imaging route adds, and what it costs, before you want it.",
+   beats:["25 min|Magneto-optical film: what it shows and what it cannot.",
+          "30 min|Hall array chips and cameras. Speed versus flexibility.",
+          "25 min|NV magnetometry and microscopic characterization.",
+          "10 min|One page on which of these you might add in year two."],
+   src:[{k:"amamag",n:"The array camera approach, open proceedings version."},
+        {k:"magcamieee",n:"Optional. Same authors, paywalled journal version."},
+        {k:"bcam",n:"A built-from-parts array camera."},
+        {k:"bahrdt",n:"Microscopic property measurement."}],
+   art:"one page upgrade path with rough costs"}
+ ]},
+
+{n:"Unit 5",title:"Modeling and residuals",aim:"Build the predicted map so the measured map has something to be compared against.",
+ check:"By here you want a residual map and a ranked list of what is driving it.",risk:"You can run the bench without modeling. You just lose the ability to tell a real defect from a fixture error, which is most of the value.",
+ classes:[
+  {id:"c21",t:"Analytic modeling with Magpylib",len:120,
+   obj:"Model your reference magnet and sample the model on your scan grid.",
+   beats:["25 min|Analytic solutions and where they are exact.",
+          "30 min|Build the magnet, position it, compute the field.",
+          "35 min|Sample on your exact grid and export in your data format.",
+          "30 min|Understand the stated limits: demagnetization factors are not included."],
+   src:[{k:"magpy",n:"Start with the physics and computation page, then the examples."},
+        {k:"magpypaper",n:"Background on the package design."},
+        {k:"ema",n:"For alternatives if Magpylib does not fit."}],
+   art:"model script producing a predicted map on your grid"},
+  {id:"c22",t:"FEA with FEMM, and 3D with Radia",len:120,
+   obj:"Model the magnet inside its fixture, where analytic solutions stop working.",
+   beats:["25 min|When you need FEA: soft iron nearby, saturation, complex geometry.",
+          "35 min|Build the axisymmetric model in FEMM. Follow the tutorial exactly once.",
+          "35 min|Permanent magnet definition and the coercivity convention.",
+          "25 min|When to reach for Radia instead: open boundaries and large air gaps."],
+   src:[{k:"femmtut",n:"Do the tutorial start to finish."},
+        {k:"femmman",n:"Appendix A.1 on permanent magnet modeling."},
+        {k:"femmfaq",n:"Read the PM questions before you get confused by H direction."},
+        {k:"femmcas",n:"A good compressed orientation to the tool."},
+        {k:"feexer",n:"Worked exercise if you want the theory underneath."},
+        {k:"radia",n:"For the 3D and open space cases."}],
+   art:"FEMM model of magnet plus fixture, with field along the scan plane"},
+  {id:"c23",t:"Predicted minus measured",len:90,
+   obj:"Automate the residual and learn to read it.",
+   beats:["20 min|Registration first. A misaligned subtraction is worthless.",
+          "30 min|Build the differencing script.",
+          "25 min|Interpret the first residual: tilt, offset, magnetization error, defect.",
+          "15 min|Rank the contributors."],
+   src:[{k:"magpy",n:"For the predicted side."},
+        {k:"immw20",n:"How labs present measured versus expected."}],
+   art:"residual script plus first annotated residual map"}
+ ]},
+
+{n:"Unit 6",title:"Aging and lifecycle",aim:"Design the actual experiment the bench exists to run.",
+ check:"By here you want a written test plan that separates instrument drift, temperature effects, and true aging, with a stated detection threshold.",risk:"Without the separation, any drift you see has three possible causes and no way to choose between them. The experiment answers nothing.",
+ classes:[
+  {id:"c24",t:"Loss taxonomy: reversible, irreversible, structural",len:90,
+   obj:"Classify any observed change into the right category.",
+   beats:["25 min|Define the three categories and the test that distinguishes them.",
+          "30 min|Recovery behavior: what returns on cooling, what needs remagnetizing, what never returns.",
+          "25 min|Map each category to a measurable signature.",
+          "10 min|Write the decision tree."],
+   src:[{k:"bahrdt",n:"Stability and loss behavior."},
+        {k:"visc",n:"Modern treatment of time dependent losses."}],
+   art:"loss classification decision tree, one page"},
+  {id:"c25",t:"Thermal aging and stabilization protocols",len:120,
+   obj:"Write a soak protocol that produces comparable results run to run.",
+   beats:["25 min|Why magnets are stabilized before service, and what that does to the curve.",
+          "35 min|Soak temperature, duration, ramp rate, and the working point during soak.",
+          "35 min|Measurement timing after soak. When does the reading settle.",
+          "25 min|Draft the protocol with tolerances on every parameter."],
+   src:[{k:"visc",n:"Experimental setup and controlled temperature conditions."},
+        {k:"arnoldmeas",n:"Measurement at elevated temperature and specimen handling."},
+        {k:"pmg88",n:"Stabilizing and handling chapter. This is the practical one."},
+        {k:"bahrdt",n:"Temperature behavior of the common families."}],
+   art:"soak-protocol.md with tolerances"},
+  {id:"c26",t:"Magnetic viscosity and long term drift",len:90,
+   obj:"Estimate the size of the signal you are hunting before hunting it.",
+   beats:["25 min|Thermal activation and the logarithmic time dependence.",
+          "30 min|What magnitude of change to expect over months at your working point.",
+          "25 min|Compare that magnitude to your measured repeatability.",
+          "10 min|Decide whether your bench can see it at all."],
+   src:[{k:"visc",n:"Read the modeling and the long term open circuit validation."}],
+   art:"expected drift estimate versus measured noise floor"},
+  {id:"c27",t:"Corrosion, coatings, and mechanical damage",len:90,
+   obj:"Add the non magnetic failure modes to the study.",
+   beats:["25 min|NdFeB corrosion mechanisms and coating systems.",
+          "25 min|How coating failure shows up in a field map, if at all.",
+          "25 min|Handling damage, chipping, and cracks.",
+          "15 min|Write the physical inspection checklist that runs alongside each scan."],
+   src:[{k:"sgobba",n:"Material behavior background."},
+        {k:"bahrdt",n:"Practical handling and protection."}],
+   art:"visual inspection checklist"}
+ ]},
+
+{n:"Unit 7",title:"Bench build",aim:"Build it, wire it, and prove it does what unit 0 said it would.",
+ check:"By here, run the bench against its own written acceptance test and record the results, pass or fail.",risk:"An untested bench silently redefines its own spec. Record the gaps even when you decide to live with them.",
+ classes:[
+  {id:"c28",t:"BOM and sourcing",len:120,
+   obj:"Produce a complete, priced, sourced bill of materials.",
+   beats:["30 min|Break the bench into subassemblies: motion, sensing, thermal, control, fixture.",
+          "40 min|Line by line sourcing, Digi-Key and Mouser first, mechanical suppliers second.",
+          "30 min|Alternates for every long lead item.",
+          "20 min|Totals, with a contingency line."],
+   src:[{k:"jainov",n:"For sanity checking what a real setup contains."}],
+   art:"BOM with part numbers, links, quantities, and totals"},
+  {id:"c29",t:"Mechanical build and alignment",len:120,
+   obj:"Assemble the stage and fixture, then prove the axes are square.",
+   beats:["30 min|Assembly order and what to leave adjustable.",
+          "40 min|Squaring the axes and measuring the error.",
+          "30 min|Setting and verifying lift-off.",
+          "20 min|Record as-built dimensions against the drawing."],
+   src:[{k:"cas",n:"Mechanical error minimisation chapters."}],
+   art:"as-built record with measured squareness and lift-off"},
+  {id:"c30",t:"Electronics, noise, grounding, and shielding",len:120,
+   obj:"Get a clean signal from the probe to the logger.",
+   beats:["30 min|Signal chain design and where the noise enters.",
+          "35 min|Grounding, shielding, and cable routing near stepper drivers.",
+          "35 min|Measure the noise floor with the magnet absent.",
+          "20 min|Record the noise floor. It is now a spec of the bench."],
+   src:[{k:"hall",n:"Signal conditioning practice for Hall probes."},
+        {k:"coils",n:"Integrator and cabling notes."}],
+   art:"measured noise floor, plotted and archived"},
+  {id:"c31",t:"Software: acquisition, file format, metadata",len:120,
+   obj:"Lock the data format before generating data you cannot interpret later.",
+   beats:["30 min|Acquisition loop, settling time, and averaging per point.",
+          "35 min|Header design: every field you will wish you had recorded.",
+          "35 min|Storage layout, naming, and version stamping.",
+          "20 min|Write a reader and prove a file round trips."],
+   src:[{k:"immw20",n:"Data handling practice in a production environment."}],
+   art:"format specification plus working reader and writer"},
+  {id:"c32",t:"Commissioning and acceptance test",len:120,
+   obj:"Prove the bench meets spec, in writing.",
+   beats:["25 min|Write the acceptance test from the unit 0 spec, one check per target.",
+          "45 min|Run every check and record raw results.",
+          "30 min|Compare a measured map to the modeled map for the reference magnet.",
+          "20 min|Sign it off or list the gaps."],
+   src:[{k:"tn1297",n:"For stating the results with their uncertainty."}],
+   art:"acceptance test report, signed and dated"}
+ ]},
+
+{n:"Unit 8",title:"Running the program",aim:"Turn a working bench into a dataset that answers the original questions.",
+ check:"By here you want the baseline campaign archived and a trend chart with control limits derived from real repeat data.",risk:"Control limits guessed rather than measured will either cry wolf constantly or hide the thing you built the bench to find.",
+ classes:[
+  {id:"c33",t:"Baseline campaign and archive",len:120,
+   obj:"Capture the zero point for every sample in the study.",
+   beats:["25 min|Sample inventory, labeling, and storage conditions.",
+          "45 min|Run the full baseline: map, Helmholtz moment, temperature, photos.",
+          "30 min|Archive with checksums and an index.",
+          "20 min|Verify you can reproduce a plot from the archive alone."],
+   src:[{k:"immw12",n:"Long term measurement record keeping."}],
+   art:"baseline dataset, indexed and checksummed"},
+  {id:"c34",t:"Trending and control charts",len:90,
+   obj:"Detect real change and resist reading noise as signal.",
+   beats:["25 min|Choose the scalar metrics extracted from every scan.",
+          "30 min|Set control limits from your repeatability data, not from guesses.",
+          "25 min|Rules for when a point counts as a signal.",
+          "10 min|Build the chart and set the review cadence."],
+   src:[{k:"jainus",n:"Measurement as a production monitoring tool."},
+        {k:"tn1297pdf",n:"For expressing the limits honestly."}],
+   art:"control chart with documented limits"},
+  {id:"c35",t:"Reporting and the purchase proposal",len:90,
+   obj:"Write the two documents this program produces: the finding, and the ask.",
+   beats:["20 min|Report structure: what changed, by how much, and how sure you are.",
+          "25 min|Plain language rules. Assume the reader is not a magnetics person.",
+          "30 min|Proposal structure: problem, fix, cost, safety, with the BOM attached.",
+          "15 min|Export both to PDF and set the review date."],
+   src:[{k:"tn1297",n:"Section 7 on reporting uncertainty."}],
+   art:"report template and proposal template, both PDF"}
+ ]}
+];
+
+const LIB=[
+ {h:"Free core reading, start here",k:["hall","coils","bahrdt","sgobba","jainov","cas"]},
+ {h:"Free practitioner handbooks, the industry side",k:["arnoldmeas","arnoldunder","pmg88","mmpa","npl"]},
+ {h:"Lecture archives worth mining",k:["jainus","jainharm","jainaxis","casprog","uspas","immw20","immw12"]},
+ {h:"Metrology and uncertainty",k:["tn1297","tn1297pdf","nistunc","nistbib"]},
+ {h:"Software",k:["magpy","magpygh","magpypaper","radia","femmman","femmtut","femmfaq","femmcas","feexer","ema"]},
+ {h:"Mapping and imaging",k:["magcam","amamag","bcam","magcamieee"]},
+ {h:"Aging",k:["visc"]},
+ {h:"Paid, and what covers the same ground for free",k:["a977","a773","iec"]}
+];
+
+/* ---------- state ---------- */
+const KEY="magnet-syllabus-v1";
+let done={};let filter="all";let mem={};
+const $=s=>document.querySelector(s);
+const board=$("#board");
+
+async function load(){
+  if(window.storage){try{const r=await window.storage.get(KEY);if(r&&r.value)return JSON.parse(r.value);}catch(e){}}
+  try{const v=localStorage.getItem(KEY);if(v)return JSON.parse(v);}catch(e){}
+  return mem[KEY]?JSON.parse(mem[KEY]):null;
+}
+async function save(){
+  const p=JSON.stringify({done,saved:new Date().toISOString()});
+  mem[KEY]=p;
+  if(window.storage){try{await window.storage.set(KEY,p);return;}catch(e){}}
+  try{localStorage.setItem(KEY,p);}catch(e){flash("Could not save here. Use Export to keep your progress.");}
+}
+function flash(m){const s=$("#status");s.textContent=m;clearTimeout(flash.t);flash.t=setTimeout(()=>s.textContent="",3500);}
+
+/* ---------- render ---------- */
+function srcLine(o){
+  const s=S[o.k];if(!s)return "";
+  const tag=s.f?'<span class="tag free">Free</span>':'<span class="tag paid">Paid</span>';
+  const name=s.u?`<a href="${s.u}" target="_blank" rel="noopener">${s.t}</a>`:s.t;
+  const sub=s.sub?`<em style="color:var(--dim)">Free instead: ${s.sub}</em>`:"";
+  return `<li>${name}${tag}<em>${o.n}</em>${sub}</li>`;
+}
+function render(){
+  board.innerHTML="";
+  let n=0;
+  UNITS.forEach(u=>{
+    const sec=document.createElement("section");sec.className="unit";
+    const total=u.classes.length;
+    const d=u.classes.filter(c=>done[c.id]).length;
+    let html=`<div class="uhead"><span class="unum">${u.n}</span><h2 class="utitle">${u.title}</h2>
+      <span class="uprog">${d}/${total}</span><p class="uaim">${u.aim}</p></div>`;
+    u.classes.forEach(c=>{
+      n++;
+      if(filter==="open"&&done[c.id])return;
+      const beats=c.beats.map(b=>{const [a,t]=b.split("|");return `<li><b>${a}</b><span>${t}</span></li>`}).join("");
+      const srcs=c.src.map(srcLine).join("");
+      html+=`<details class="cls" data-id="${c.id}" data-done="${done[c.id]?1:0}">
+        <summary class="chead">
+          <button class="marker" aria-label="Mark class ${n} done"></button>
+          <span class="cno">${String(n).padStart(2,"0")}</span>
+          <span class="ctitle">${c.t}</span>
+          <span class="clen">${c.len} min</span>
+        </summary>
+        <div class="cbody">
+          <p class="obj">${c.obj}</p>
+          <p class="lbl">Class structure</p>
+          <ul class="beats">${beats}</ul>
+          <p class="lbl">Sources</p>
+          <ul class="srcs">${srcs}</ul>
+          <p class="lbl">Artifact</p>
+          <div class="artifact">${c.art}</div>
+        </div>
+      </details>`;
+    });
+    html+=`<div class="gate"><span class="glbl">Checkpoint, not a stop</span><p>${u.check}</p>
+      <p class="risk"><b>If you skip it</b>${u.risk}</p></div>`;
+    sec.innerHTML=html;
+    sec.querySelectorAll(".marker").forEach(m=>{
+      m.addEventListener("click",e=>{
+        e.preventDefault();e.stopPropagation();
+        const id=m.closest(".cls").dataset.id;
+        done[id]=!done[id];if(!done[id])delete done[id];
+        save();render();
+      });
+    });
+    board.appendChild(sec);
+  });
+  updateHead();
+  renderLib();
+}
+function renderLib(){
+  let h=`<h2>Source library</h2><p style="color:var(--muted);font-size:13.5px;margin:0">Everything referenced above, grouped. Free means openly downloadable with no account or payment. Nothing in this course requires a purchase.</p>`;
+  LIB.forEach(g=>{
+    h+=`<h3>${g.h}</h3><ul>`;
+    g.k.forEach(k=>{const s=S[k];if(!s)return;
+      const tag=s.f?'<span class="tag free">Free</span>':'<span class="tag paid">Paid</span>';
+      h+=`<li><a href="${s.u}" target="_blank" rel="noopener">${s.t}</a>${tag}${s.sub?`<em>${s.sub}</em>`:""}</li>`;});
+    h+=`</ul>`;
+  });
+  $("#library").innerHTML=h;
+}
+function updateHead(){
+  const all=UNITS.flatMap(u=>u.classes);
+  const d=all.filter(c=>done[c.id]).length;
+  const hrs=all.filter(c=>done[c.id]).reduce((a,c)=>a+c.len,0)/60;
+  const totalHrs=all.reduce((a,c)=>a+c.len,0)/60;
+  $("#pct").textContent=Math.round(d/all.length*100);
+  $("#gauge").style.width=(d/all.length*100)+"%";
+  $("#cDone").textContent=d;$("#cAll").textContent=all.length;
+  $("#cHrs").textContent=hrs.toFixed(1);
+  $("#mClasses").textContent=all.length;
+  $("#mHours").textContent="approx "+Math.round(totalHrs)+" h";
+}
+
+/* ---------- toolbar ---------- */
+function setFilter(f){filter=f;$("#fAll").setAttribute("aria-pressed",String(f==="all"));$("#fOpen").setAttribute("aria-pressed",String(f==="open"));render();}
+$("#fAll").onclick=()=>setFilter("all");
+$("#fOpen").onclick=()=>setFilter("open");
+$("#expand").onclick=()=>document.querySelectorAll(".cls").forEach(d=>d.open=true);
+$("#collapse").onclick=()=>document.querySelectorAll(".cls").forEach(d=>d.open=false);
+$("#print").onclick=()=>{document.querySelectorAll(".cls").forEach(d=>d.open=true);window.print();};
+$("#export").onclick=()=>{
+  const b=new Blob([JSON.stringify({done,saved:new Date().toISOString()},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="magnet-syllabus-progress.json";a.click();URL.revokeObjectURL(a.href);flash("Exported.");
+};
+$("#import").onclick=()=>$("#fileIn").click();
+$("#fileIn").onchange=e=>{const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);done=d.done||{};save();render();flash("Imported.");}catch(err){flash("That file is not a valid export.");}};
+  r.readAsText(f);e.target.value="";};
+$("#reset").onclick=()=>{if(!confirm("Clear all class progress? Export first if you want a copy."))return;done={};save();render();flash("Cleared.");};
+
+(async()=>{const d=await load();if(d)done=d.done||{};render();})();
+</script>
+</body>
+</html>

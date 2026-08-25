@@ -13,3 +13,21 @@ dist/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# ---------------------------------------------------------------------------
+# magnet-course/
+#
+# Cached source PDFs in magnet-course/library/pdf/ are tracked in git on
+# purpose. They are not ignored. The whole point of the cache is that the
+# course survives link rot, and a cache that lives on one machine does not do
+# that job. The verification log records when each link last resolved, which
+# only means something if the file it resolved to is still here.
+#
+# If library/pdf/ ever passes 100 MB, move it to Git LFS. Do not switch it to
+# ignored: that loses the cache silently, which is the failure this decision
+# exists to prevent.
+#
+# Only scratch output is ignored here.
+magnet-course/**/output/
+magnet-course/**/__pycache__/
+magnet-course/**/.ipynb_checkpoints/

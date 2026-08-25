@@ -1,0 +1,16 @@
+# Dependencies for the worked examples in classes/*/worked.py.
+#
+# This file is separate from the requirements.txt at the repository root. That
+# one belongs to the Alarm Log Pareto tool and must not be touched.
+#
+# Versions are not pinned yet. Pinning a version you have never resolved is a
+# guess, and CLAUDE.md forbids guesses. PyPI was unreachable when this file was
+# written, so nothing here has been installed or run. Pin exact versions on the
+# first session that can install them, then keep the pins.
+#
+#   pip install -r magnet-course/requirements.txt
+#
+magpylib
+numpy
+scipy
+matplotlib
