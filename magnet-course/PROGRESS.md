@@ -162,6 +162,11 @@ The same applies to every later tag the build plan asks for:
 
 ## Next session
 
+The one thing standing in front of everything else is network egress.
+`library/egress-allowlist.md` is generated from `sources.json` and lists the 36
+hosts to allow, with a paste block and the commands to run once it is live.
+
+
 Open network egress for the 30 hosts in `library/sources.json`, plus PyPI, then
 run `library/fetch_sources.py`. Read what lands, write the `contents` line for
 each source, seed the queue from the bibliographies, generate `export.bib`, and
