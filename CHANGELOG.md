@@ -25,6 +25,26 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - PM Round Logger: a storage-fullness readout on the Data tab, and a warning
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
+### Fixed
+- PM Round Logger: "Copy its tool readings here" did nothing. Two functions
+  were both named `copyPoints`, so the later one silently replaced the button's
+  handler from 1.4.0 onward, with no error anywhere. The file-format helper is
+  now `copyPointList`, and a test covers the button.
+
+### Added
+- PM Round Logger 1.6.0: reading suggestions. Every reading defined on any
+  chamber type or tool is offered as type-ahead in each "add a reading" box,
+  showing its unit, limits and where it came from, and filling those in when
+  picked. Suggestions copy rather than link, so a limit changed on one type
+  never moves another. The spelling already in use wins, so one reading cannot
+  quietly become two columns in a PivotTable. The list is derived from what
+  already exists rather than stored, so it needs no migration, cannot fall out
+  of step, and updates the moment a reading is added or removed.
+- PM Round Logger 1.6.0: "Copy its readings here" on a chamber type, mirroring
+  the tools' button, for setting up a type much like one that already exists.
+- PM Round Logger 1.6.0: the setup screen warns when one reading name is
+  logged in two different units across types, which Excel would silently
+  combine into a single column.
 - PM Round Logger 1.5.0: per-chamber limit overrides. A chamber can set its
   own min and max for any reading while still taking the reading list, name and
   unit from its type, so two chambers running the same process to different

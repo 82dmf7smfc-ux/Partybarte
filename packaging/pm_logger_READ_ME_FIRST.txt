@@ -98,6 +98,33 @@ about. A type that is still in use cannot be deleted; the page says which tool
 is in the way.
 
 
+Typing each reading only once
+-----------------------------
+Every reading you set up anywhere becomes a suggestion everywhere else. Start
+typing a name in any "add a reading" box and the ones you have already used
+drop down, showing their unit, limits and which type they came from. Pick one
+and the unit and limits are filled in for you.
+
+It is a SUGGESTION, not a link. Once added, that type owns its copy, so
+changing a limit on Etch Standard never touches CVD Teos. An etch chamber and
+a sputter chamber can measure the same thing to different specs.
+
+One thing it does enforce: the spelling already in use wins. Type "rf time on"
+and you get "RF Time On". Two spellings of one reading become two separate
+columns in Excel, which is the kind of mistake you only notice months later
+when a chart looks wrong.
+
+Setting up a type much like one you already have? Use "Copy its readings here"
+at the bottom of the type. Pick the similar type, tap once, and adjust
+whatever differs. For two CVD types or two etch types this is usually faster
+than adding readings one at a time.
+
+The setup screen also warns if the same reading name is logged in two
+different units - say "RF Time On" in hours on one type and minutes on
+another. Nothing breaks on the tablet, but Excel would treat them as one
+column and add hours to minutes.
+
+
 When one chamber runs to a different spec
 -----------------------------------------
 Sometimes two chambers do the same process but are held to different numbers -

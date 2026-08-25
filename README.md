@@ -40,6 +40,14 @@ Tapping a chambered tool lists its chambers with their own done marks; a tool
 with no chambers goes straight to its readings as before. The export gains
 `Chamber` and `Chamber type` columns, empty for tool-level rows.
 
+**Reading suggestions.** Every reading defined anywhere is offered as
+type-ahead in each "add a reading" box, filling in unit and limits when picked,
+and the existing spelling wins so one reading cannot become two Excel columns.
+The list is derived from what exists rather than stored, so it is always in
+step and needs no migration. Suggestions copy rather than link. Whole reading
+lists can be cloned between chamber types, and the setup screen warns when one
+reading name is logged in two different units.
+
 A chamber can also **override** its type's min and max for any reading, for
 when two chambers run the same process to different specs. Only the limits
 differ; name and unit still come from the type, so the chambers stay

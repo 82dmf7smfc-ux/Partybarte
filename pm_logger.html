@@ -309,7 +309,7 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // of the stored data, and only goes up if that layout changes in a way that
 // old data needs converting for. See migrateData().
 // ---------------------------------------------------------------------------
-var APP_VERSION = "1.5.0";
+var APP_VERSION = "1.6.0";
 var BUILD_DATE = "2026-08-24";
 var DATA_SHAPE = 3;
 
@@ -1627,6 +1627,8 @@ function renderTools() {
   }
   html += '</div>';
 
+  // One suggestion list, shared by every "add a reading" box below.
+  html += readingSuggestionsHtml();
   html += chamberTypesHtml();
 
   // One card per tool, holding that tool's data points.
@@ -1691,17 +1693,130 @@ function warnAboutDuplicateNames() {
     typeSeen[tkey] = true;
   }
 
+  // The same reading logged in two different units is the quietest problem
+  // here. Nothing looks wrong on the tablet, and it only shows up months later
+  // when a chart adds hours to minutes and the trend is nonsense.
+  var library = knownReadings();
+  for (var r = 0; r < library.length; r++) {
+    var unitKeys = Object.keys(library[r].unitsSeen);
+    if (unitKeys.length < 2) continue;
+    var shown = [];
+    for (var u = 0; u < unitKeys.length; u++) {
+      shown.push(library[r].unitsSeen[unitKeys[u]] === "" ? "(no unit)" : library[r].unitsSeen[unitKeys[u]]);
+    }
+    problems.push('"' + library[r].name + '" is logged in more than one unit ('
+      + shown.join(", ") + ') across ' + library[r].usedBy.join(", ")
+      + '. Excel will treat them as one column and add them together.');
+  }
+
   if (problems.length === 0) { box.innerHTML = ""; return; }
 
   box.innerHTML = '<div class="card" style="background:var(--warn-bg);border-color:#f0cf9a">'
-    + '<h2>Two things share a name</h2>'
+    + '<h2>Worth a look before you trend this</h2>'
     + '<p class="hint">' + problems.map(esc).join("<br>") + '</p>'
-    + '<p class="hint">Give them different names. Names are how an imported file '
-    + 'finds its way back to the right tool, so duplicates would merge together '
-    + 'if you ever restore from a backup.</p></div>';
+    + '<p class="hint">Names are how an imported file finds its way back to the right '
+    + 'tool, so duplicates merge together on a restore. And a reading logged in two '
+    + 'different units becomes one confused column in Excel. Neither breaks anything '
+    + 'today, which is exactly why they are easy to miss.</p></div>';
 }
 
 // The editor card for one tool.
+// ---------------------------------------------------------------------------
+// THE READING LIBRARY
+//
+// Every reading name you have used anywhere - on a chamber type or on a tool -
+// is offered as a suggestion when you add the next one. Type three letters of
+// "RF Time On" and it is there, with its unit and limits already filled in.
+//
+// This list is WORKED OUT from what already exists, not stored separately.
+// That is deliberate. A stored copy would have to be kept in step every time a
+// reading is renamed, deleted, or imported, and every one of those is a chance
+// to get out of step. Deriving it means it is always right, there is nothing
+// to migrate, and it updates the moment you add a reading.
+//
+// Picking a suggestion COPIES the name, unit and limits. It does not link
+// them. Editing the reading on one type never changes another, because an etch
+// chamber and a sputter chamber can measure the same thing to different specs.
+// ---------------------------------------------------------------------------
+function knownReadings() {
+  var byName = {};
+  var out = [];
+
+  function remember(point, where) {
+    // The "n:" prefix keeps a reading named something like "constructor" from
+    // colliding with a built-in property name.
+    var key = "n:" + point.name.trim().toLowerCase();
+    var unit = point.unit || "";
+
+    if (byName[key] === undefined) {
+      byName[key] = {
+        name: point.name.trim(),
+        unit: unit,
+        min: point.min === undefined ? null : point.min,
+        max: point.max === undefined ? null : point.max,
+        usedBy: [where],
+        unitsSeen: {}
+      };
+      byName[key].unitsSeen["u:" + unit.toLowerCase()] = unit;
+      out.push(byName[key]);
+      return;
+    }
+
+    var known = byName[key];
+    if (known.usedBy.indexOf(where) === -1) known.usedBy.push(where);
+    known.unitsSeen["u:" + unit.toLowerCase()] = unit;
+  }
+
+  for (var y = 0; y < DATA.chamberTypes.length; y++) {
+    var type = DATA.chamberTypes[y];
+    for (var q = 0; q < type.points.length; q++) remember(type.points[q], type.name);
+  }
+  for (var t = 0; t < DATA.tools.length; t++) {
+    for (var p = 0; p < DATA.tools[t].points.length; p++) remember(DATA.tools[t].points[p], DATA.tools[t].name);
+  }
+
+  out.sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
+  return out;
+}
+
+// One reading from the library, by name. Used when adding, to fill in the
+// unit and limits you already typed once somewhere else.
+function findKnownReading(name) {
+  var want = String(name).trim().toLowerCase();
+  var all = knownReadings();
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].name.trim().toLowerCase() === want) return all[i];
+  }
+  return null;
+}
+
+// The type-ahead list itself. One list, shared by every "add a reading" box on
+// the tab, rebuilt whenever the tab is drawn - so a reading you add becomes a
+// suggestion everywhere else straight away.
+function readingSuggestionsHtml() {
+  var all = knownReadings();
+  var html = '<datalist id="readingSuggestions">';
+  for (var i = 0; i < all.length; i++) {
+    var known = all[i];
+    // The label is what the browser shows beside the name in the drop-down.
+    var label = (known.unit ? known.unit : "no unit")
+      + "  \u00b7  " + plainLimits(known)
+      + "  \u00b7  used on " + known.usedBy.join(", ");
+    html += '<option value="' + esc(known.name) + '" label="' + esc(label) + '"></option>';
+  }
+  return html + '</datalist>';
+}
+
+// A short line telling the user the suggestions exist. A type-ahead box that
+// looks like a plain text box is a feature nobody finds.
+function suggestionsHintHtml() {
+  var n = knownReadings().length;
+  if (n === 0) return "";
+  return '<p class="hint" style="margin:6px 0 0">' + n
+    + (n === 1 ? ' reading has' : ' readings have')
+    + ' been set up already. Start typing to reuse one, with its unit and limits.</p>';
+}
+
 // ---------------------------------------------------------------------------
 // CHAMBER TYPES
 //
@@ -1749,9 +1864,33 @@ function chamberTypesHtml() {
 
     html += '<div class="row" style="margin-top:10px">'
       + '<div class="grow"><input type="text" id="newTypePoint_' + type.id + '" '
-      + 'placeholder="For example: RF hours"></div>'
+      + 'list="readingSuggestions" placeholder="For example: RF hours"></div>'
       + '<button onclick="addTypePoint(\'' + type.id + '\')">Add reading</button>'
-      + '</div></div>';
+      + '</div>'
+      + suggestionsHintHtml();
+
+    // Clone a whole reading list from a similar type. Two CVD types or two
+    // etch types usually share most of their readings, so this is one tap
+    // instead of typing the same list out again.
+    var otherTypes = [];
+    for (var o = 0; o < DATA.chamberTypes.length; o++) {
+      if (DATA.chamberTypes[o].id !== type.id && DATA.chamberTypes[o].points.length > 0) {
+        otherTypes.push(DATA.chamberTypes[o]);
+      }
+    }
+    if (otherTypes.length > 0) {
+      html += '<div class="row" style="margin-top:10px">'
+        + '<div class="grow"><select id="copyTypeFrom_' + type.id + '">';
+      for (var m2 = 0; m2 < otherTypes.length; m2++) {
+        html += '<option value="' + otherTypes[m2].id + '">' + esc(otherTypes[m2].name)
+          + ' (' + otherTypes[m2].points.length + ')</option>';
+      }
+      html += '</select></div>'
+        + '<button class="secondary" onclick="copyTypePoints(\'' + type.id + '\')">'
+        + 'Copy its readings here</button></div>';
+    }
+
+    html += '</div>';
   }
 
   html += '</div>';
@@ -1864,10 +2003,62 @@ function addTypePoint(typeId) {
       return;
     }
   }
-  type.points.push({ id: newId(), name: name, unit: "", min: null, max: null });
+  type.points.push(newPointFrom(name));
   save();
   render();
-  setMsg("typesMsg", "ok", "Added " + name + " to every " + type.name + " chamber.");
+  setMsg("typesMsg", "ok", "Added " + name + reusedNote(name)
+    + " to every " + type.name + " chamber.");
+}
+
+// Build a new reading. If this name has been used before, its unit and limits
+// come along, and the spelling already in use wins - so "rf time on" becomes
+// "RF Time On" rather than starting a second column in your spreadsheet.
+function newPointFrom(name) {
+  var known = findKnownReading(name);
+  if (!known) return { id: newId(), name: name, unit: "", min: null, max: null };
+  return { id: newId(), name: known.name, unit: known.unit, min: known.min, max: known.max };
+}
+
+// Says what was filled in for you, so a copied unit or limit is never a
+// surprise you find out about later.
+function reusedNote(name) {
+  var known = findKnownReading(name);
+  if (!known) return "";
+  var bits = [];
+  if (known.unit) bits.push(known.unit);
+  if (known.min !== null || known.max !== null) bits.push(plainLimits(known));
+  if (bits.length === 0) return " (reused)";
+  return " (" + bits.join(", ") + ", reused from " + known.usedBy[0] + ")";
+}
+
+// Copy every reading from another chamber type. Readings this type already
+// has, by name, are left alone rather than duplicated.
+function copyTypePoints(typeId) {
+  var type = findChamberType(typeId);
+  var picker = document.getElementById("copyTypeFrom_" + typeId);
+  if (!type || !picker) return;
+  var source = findChamberType(picker.value);
+  if (!source) return;
+
+  var added = 0;
+  for (var i = 0; i < source.points.length; i++) {
+    var point = source.points[i];
+    var already = false;
+    for (var k = 0; k < type.points.length; k++) {
+      if (type.points[k].name.trim().toLowerCase() === point.name.trim().toLowerCase()) already = true;
+    }
+    if (already) continue;
+    type.points.push({ id: newId(), name: point.name, unit: point.unit,
+                       min: point.min, max: point.max });
+    added++;
+  }
+  save();
+  render();
+  setMsg("typesMsg", added === 0 ? "info" : "ok",
+    added === 0
+      ? type.name + " already has every reading from " + source.name + "."
+      : "Copied " + added + " readings from " + source.name + " into " + type.name
+        + ". Adjust any limits that differ.");
 }
 
 function updateTypePoint(typeId, pointId, field, value) {
@@ -1877,6 +2068,8 @@ function updateTypePoint(typeId, pointId, field, value) {
     if (type.points[i].id === pointId) { applyPointField(type.points[i], field, value); break; }
   }
   save();
+  // Updates one small box, so it is safe to call while someone is typing.
+  warnAboutDuplicateNames();
 }
 
 function deleteTypePoint(typeId, pointId) {
@@ -1995,9 +2188,10 @@ function toolEditorHtml(tool, index) {
   // Add a new tool-level reading.
   html += '<div class="row" style="margin-top:10px">'
     + '<div class="grow"><input type="text" id="newPoint_' + tool.id + '" '
-    + 'placeholder="For example: N2 pressure"></div>'
+    + 'list="readingSuggestions" placeholder="For example: N2 pressure"></div>'
     + '<button onclick="addPoint(\'' + tool.id + '\')">Add tool reading</button>'
-    + '</div>';
+    + '</div>'
+    + suggestionsHintHtml();
 
   // Copy the tool-level reading list from another tool.
   var others = [];
@@ -2432,10 +2626,10 @@ function addPoint(toolId) {
   if (name === "") { setMsg("toolsMsg", "err", "Type a name for the reading first."); return; }
   if (findPointByName(tool, name)) { setMsg("toolsMsg", "err", tool.name + " already has a reading called that."); return; }
 
-  tool.points.push({ id: newId(), name: name, unit: "", min: null, max: null });
+  tool.points.push(newPointFrom(name));
   save();
   render();
-  setMsg("toolsMsg", "ok", "Added " + name + " to " + tool.name + ".");
+  setMsg("toolsMsg", "ok", "Added " + name + reusedNote(name) + " to " + tool.name + ".");
 }
 
 // Change one field of one data point. Min and max come in as text from the
@@ -3204,7 +3398,7 @@ function parseBackupJson(text) {
   for (var y = 0; y < sourceTypes.length; y++) {
     var st = sourceTypes[y];
     typesById[st.id] = st;
-    chamberTypes.push({ name: st.name, points: copyPoints(st.points) });
+    chamberTypes.push({ name: st.name, points: copyPointList(st.points) });
   }
 
   var tools = [];
@@ -3233,7 +3427,7 @@ function parseBackupJson(text) {
                       typeName: type ? type.name : "Imported",
                       limits: limits });
     }
-    tools.push({ name: t.name, points: copyPoints(t.points), chambers: chambers });
+    tools.push({ name: t.name, points: copyPointList(t.points), chambers: chambers });
   }
 
   // Flatten the saved entries into one row per reading.
@@ -3280,7 +3474,13 @@ function parseBackupJson(text) {
 }
 
 // Copy a reading list, keeping only the parts a file needs to carry.
-function copyPoints(points) {
+//
+// Named copyPointList, not copyPoints: there is already a copyPoints() used by
+// the Tools tab, and two functions with one name means the later one silently
+// replaces the earlier. That is exactly what happened here in 1.4.0, and it
+// killed the "Copy its tool readings here" button until 1.6.0 without any
+// error appearing anywhere.
+function copyPointList(points) {
   var out = [];
   for (var i = 0; i < (points || []).length; i++) {
     out.push({
