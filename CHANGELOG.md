@@ -26,6 +26,10 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
 ### Fixed
+- PM Round Logger: `effectivePoint()` rebuilt a reading without carrying its
+  new consumable flag, so a chamber with its own rating override dropped out of
+  the fleet summary silently - a missing row in an emailed report rather than
+  any visible error. Caught by the composition test before release.
 - PM Round Logger: a chamber whose type had no readings was counted on the
   round despite having nothing to log and no way to save, so a tool made only
   of such chambers could never be completed, the round could never reach
@@ -38,6 +42,27 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   now `copyPointList`, and a test covers the button.
 
 ### Added
+- PM Round Logger 1.8.0: life remaining. A reading can be marked as counting up
+  to a limit, where Max is a rated life rather than an alarm level, and the tool
+  reports `(rated life - value) / rated life` as a percentage. Marked
+  explicitly rather than inferred from the limits, because a one-sided alarm and
+  a rated life are indistinguishable from the numbers and guessing would report
+  a percentage for a process window. Per-chamber rating overrides are honoured,
+  and going past the rated life reports a negative percentage rather than
+  clamping at zero.
+- PM Round Logger 1.8.0: a fleet table on the Today tab showing percentage
+  remaining for every chamber before the round starts, collapsible, coloured
+  red under 15% and amber under 25% by editable thresholds, using the most
+  recent reading on or before the viewed date and naming any chamber not
+  logged for a fortnight.
+- PM Round Logger 1.8.0: "Generate email" on the Data tab builds the fleet
+  summary message and copies it to the clipboard as real HTML, so pasting into
+  Outlook keeps the table and its shading; it also downloads as a standalone
+  file, and falls back to selecting the table when the clipboard is refused.
+  The same renderer produces the on-screen tile and the email, so what is
+  reviewed each morning is exactly what colleagues receive.
+- PM Round Logger 1.8.0: the entry screen shows percentage of life remaining as
+  a consumable reading is typed.
 - PM Round Logger 1.7.0: chamber types and tools collapse to one-line summary
   rows saying what is inside them, expanding only where you are working. On a
   real six-type, three-tool, twelve-chamber setup this took the Tools tab from

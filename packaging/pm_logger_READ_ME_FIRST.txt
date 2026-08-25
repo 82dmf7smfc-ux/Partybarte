@@ -178,6 +178,59 @@ The export always shows the limit a chamber was ACTUALLY checked against, so
 the Min and Max columns always agree with the Status beside them.
 
 
+Kit life, and the fleet summary email
+-------------------------------------
+Some readings are not measurements, they are consumption: kit life, target
+life, RF energy. The number climbs until the part is replaced, and what you
+care about is how much is left.
+
+Tell the tool which readings work that way. On the Tools tab, tick
+"Counts up to a limit" on the reading and put the rated life in Max. From then
+on:
+
+  - The entry screen shows "62% of life remaining" as you type.
+  - The Today tab shows a fleet table of every chamber, with anything low
+    coloured, before you start the round.
+  - The Data tab can build the summary email for you.
+
+Only ticked readings get a percentage. A reading like chamber pressure, with a
+min AND a max, is a process window rather than a consumable, and reporting a
+percentage of it would be meaningless.
+
+  % remaining  =  (rated life - logged value) / rated life
+
+Nothing logged, no rated life, or a chamber that does not take that reading all
+show as N/A, which is why your table has N/A in it.
+
+A chamber past its rated life shows a NEGATIVE percentage, not zero. A kit at
+130% of life reads -30%, because "used up" and "thirty percent overdue" are
+different things to know.
+
+If a chamber has its own kit rating, set through its Limits button, that rating
+is what it is measured against.
+
+
+Sending the summary
+-------------------
+Data tab, "Generate email". It builds the message - opening line, date, and
+the table - and shows it to you first.
+
+  Copy for Outlook     Puts the table on the clipboard as real formatting.
+                       Paste into Outlook and the colours come with it.
+  Download as a file   Saves fleet_summary_2026-08-24.html for when the
+                       clipboard is blocked, or you want to keep the file.
+
+If the copy button cannot get permission, the table is selected for you
+instead - press Ctrl+C and the formatting still comes across.
+
+The opening line and the red and amber thresholds are boxes on that panel.
+Defaults are red under 15%, amber under 25%.
+
+The figures are the most recent reading on or before the date you are viewing.
+Any chamber not logged in the last two weeks is named underneath, because a
+percentage from three weeks ago is not the same fact as today's.
+
+
 About the limits
 ----------------
 A reading outside its min or max turns red and says why. The value still

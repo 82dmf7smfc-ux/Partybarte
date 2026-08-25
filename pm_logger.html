@@ -242,6 +242,31 @@
   /* One reading on one row where there is width for it, stacking on narrow
      screens. Five stacked rows per reading turns a setup screen into a
      scrolling exercise. */
+  /* The "counts up to a limit" tick, sized so it is tappable. */
+  .lifebox {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 400; font-size: 14px; margin: 0 6px 0 0;
+    min-height: 44px; white-space: nowrap;
+  }
+  .lifebox input { width: 22px; height: 22px; min-height: 0; }
+
+  /* The fleet summary. Deliberately dense: it is a table you scan, not a form.
+     It scrolls sideways inside its own box rather than stretching the page. */
+  .fleetwrap { overflow-x: auto; }
+  table.fleet { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.fleet th, table.fleet td {
+    border: 1px solid var(--line);
+    padding: 7px 10px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  table.fleet th { background: #eef1f5; text-align: left; font-size: 13px; }
+  table.fleet td.name { text-align: left; }
+  table.fleet td.tool { text-align: left; font-weight: 600; }
+  table.fleet td.na { color: var(--muted); text-align: left; }
+  table.fleet td.red   { background: #f8cbcb; color: #7d0000; font-weight: 700; }
+  table.fleet td.amber { background: #f2e6a8; color: #6b4e00; font-weight: 700; }
+
   .readingrow { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; }
   .readingrow .lab { font-weight: 600; font-size: 13px; margin-bottom: 3px; display: block; }
   @media (max-width: 720px) {
@@ -342,7 +367,7 @@ var STORAGE_KEY = "partybarte.pmlogger.v1";
 // of the stored data, and only goes up if that layout changes in a way that
 // old data needs converting for. See migrateData().
 // ---------------------------------------------------------------------------
-var APP_VERSION = "1.7.0";
+var APP_VERSION = "1.8.0";
 var BUILD_DATE = "2026-08-24";
 var DATA_SHAPE = 3;
 
@@ -382,6 +407,12 @@ function blankData() {
     lastOpenedWith: APP_VERSION,// app version that last touched it
     nextId: 0,       // counter used to hand out ids, see newId()
     lastExport: "",  // date of the last export, as YYYY-MM-DD
+
+    // When a consumable is low enough to colour, as a percentage of life left.
+    // Kept here rather than in the code because the right number is a
+    // maintenance judgement, not a software constant.
+    lifeRedBelow: 15,
+    lifeAmberBelow: 25,
 
     // Chamber types. A type is a NAME plus a list of readings, for example
     // "Etch" or "Strip". Chambers of the same type log the same things, so the
@@ -739,10 +770,15 @@ function effectivePoint(chamber, point) {
   if (!own) return point;
 
   // A copy, so overriding one chamber never edits the type everyone shares.
+  //
+  // Everything that is not a limit must be carried across. Forgetting isLife
+  // here made an overridden chamber vanish from the fleet summary - not an
+  // error, just a missing row in an email sent to the group.
   return {
     id: point.id,
     name: point.name,
     unit: point.unit,
+    isLife: !!point.isLife,
     min: own.min === undefined ? null : own.min,
     max: own.max === undefined ? null : own.max,
     overridden: true
@@ -981,6 +1017,231 @@ function limitHint(point) {
   if (point.min !== null) return "Expected " + point.min + " or above" + whose;
   if (point.max !== null) return "Expected " + point.max + " or below" + whose;
   return point.overridden ? "No limits, set for this chamber" : "No limits set";
+}
+
+// ---------------------------------------------------------------------------
+// LIFE REMAINING
+//
+// Most readings have a max meaning "flag it if the value goes above this". A
+// few mean something different: the value counts UP towards a rated life, and
+// what you actually care about is how much is left. Kit life, target life, RF
+// energy - all of them count up until the part is replaced.
+//
+// The two cannot be told apart from the numbers. A chamber pressure of 8 to 12
+// and a kit rated to 500 kW-hrs look identical to the code, which is why a
+// reading has to be MARKED as a consumable rather than guessed at. Guessing
+// would report "22% remaining" for a chamber pressure, in an email sent to
+// the whole group.
+// ---------------------------------------------------------------------------
+
+// How much life is left, as a percentage. Returns null - shown as N/A - when
+// the question does not apply: not a consumable, no rated life set, or nothing
+// logged yet.
+//
+// Going past the rated life gives a NEGATIVE number rather than stopping at
+// zero. A kit at 130% of its life reads -30%, because "used up" and "thirty
+// percent overdue" are different things to know.
+function lifeRemaining(value, point) {
+  if (!point || !point.isLife) return null;
+  if (point.max === null || point.max === undefined) return null;
+  if (Number(point.max) <= 0) return null;          // a life of zero has no meaning
+  if (value === undefined || value === null || String(value).trim() === "") return null;
+  var used = Number(value);
+  if (isNaN(used)) return null;
+  return ((Number(point.max) - used) / Number(point.max)) * 100;
+}
+
+// The colouring thresholds, with fallbacks so data written before 1.8.0 opens
+// unchanged.
+function lifeRedBelow() {
+  var n = Number(DATA.lifeRedBelow);
+  return isNaN(n) ? 15 : n;
+}
+function lifeAmberBelow() {
+  var n = Number(DATA.lifeAmberBelow);
+  return isNaN(n) ? 25 : n;
+}
+
+// "red", "amber", "ok", or "" for nothing to say.
+function lifeStatus(percent) {
+  if (percent === null) return "";
+  if (percent < lifeRedBelow()) return "red";
+  if (percent < lifeAmberBelow()) return "amber";
+  return "ok";
+}
+
+// The most recent reading on or before a date, and the day it came from.
+// Returns null if there has never been one.
+//
+// Dates are YYYY-MM-DD, so comparing them as text sorts them correctly and
+// there is no need to turn them into Date objects.
+function latestValue(toolId, unitId, pointId, onOrBefore) {
+  var dates = Object.keys(DATA.entries).sort();
+  var found = null;
+  for (var i = 0; i < dates.length; i++) {
+    if (dates[i] > onOrBefore) break;               // sorted, so nothing later matters
+    var entry = unitEntry(toolId, unitId, dates[i]);
+    if (!entry) continue;
+    var value = entry.values[pointId];
+    if (value === undefined || String(value).trim() === "") continue;
+    found = { value: value, date: dates[i] };       // keep going: later wins
+  }
+  return found;
+}
+
+// The consumable readings across the whole fleet, by name, in the order they
+// were first defined. These become the columns of the fleet table.
+function lifeMetrics() {
+  var seen = {};
+  var out = [];
+
+  function consider(point) {
+    if (!point.isLife) return;
+    var key = "n:" + point.name.trim().toLowerCase();
+    if (seen[key] === true) return;
+    seen[key] = true;
+    out.push(point.name.trim());
+  }
+
+  for (var y = 0; y < DATA.chamberTypes.length; y++) {
+    for (var q = 0; q < DATA.chamberTypes[y].points.length; q++) consider(DATA.chamberTypes[y].points[q]);
+  }
+  for (var t = 0; t < DATA.tools.length; t++) {
+    for (var p = 0; p < DATA.tools[t].points.length; p++) consider(DATA.tools[t].points[p]);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// The fleet table: one row per chamber, one column per consumable.
+//
+// Built once here and rendered twice - on the Today tab and into the email -
+// so what you look at each morning is exactly what your colleagues receive.
+// ---------------------------------------------------------------------------
+function fleetLife(date) {
+  var metrics = lifeMetrics();
+  var rows = [];
+  var lastUpdated = "";
+  var stale = [];
+
+  for (var t = 0; t < DATA.tools.length; t++) {
+    var tool = DATA.tools[t];
+    var units = toolUnits(tool);
+
+    for (var u = 0; u < units.length; u++) {
+      var unit = units[u];
+      var cells = [];
+      var anyValue = false;
+      var rowDate = "";
+
+      for (var m = 0; m < metrics.length; m++) {
+        // Does this unit take this reading at all? Limits come from
+        // chamberPoints(), so a chamber's own rating is already applied.
+        var point = null;
+        for (var i = 0; i < unit.points.length; i++) {
+          if (unit.points[i].name.trim().toLowerCase() === metrics[m].toLowerCase()) {
+            point = unit.points[i];
+          }
+        }
+        if (!point || !point.isLife) { cells.push({ percent: null, status: "" }); continue; }
+
+        var latest = latestValue(tool.id, unit.id, point.id, date);
+        if (!latest) { cells.push({ percent: null, status: "" }); continue; }
+
+        var percent = lifeRemaining(latest.value, point);
+        cells.push({
+          percent: percent,
+          status: lifeStatus(percent),
+          value: latest.value,
+          max: point.max,
+          unit: point.unit || "",
+          when: latest.date
+        });
+        anyValue = true;
+        if (latest.date > rowDate) rowDate = latest.date;
+        if (latest.date > lastUpdated) lastUpdated = latest.date;
+      }
+
+      // A unit that takes none of these readings is left out entirely, rather
+      // than filling the table with rows that are N/A all the way across.
+      var takesAny = false;
+      for (var c = 0; c < cells.length; c++) if (cells[c].percent !== null) takesAny = true;
+      if (!takesAny && !unitTakesAnyMetric(unit, metrics)) continue;
+
+      if (anyValue && rowDate !== "" && daysBetween(rowDate, date) > 14) {
+        stale.push(tool.name + " / " + unit.name + " (" + daysBetween(rowDate, date) + " days)");
+      }
+
+      rows.push({ tool: tool.name, unit: unit.name, kind: unit.kind, cells: cells, when: rowDate });
+    }
+  }
+
+  return { metrics: metrics, rows: rows, lastUpdated: lastUpdated, stale: stale };
+}
+
+// Does this unit take any of the fleet's consumable readings? Used to decide
+// whether a row belongs in the table at all, even before anything is logged.
+function unitTakesAnyMetric(unit, metrics) {
+  for (var i = 0; i < unit.points.length; i++) {
+    if (!unit.points[i].isLife) continue;
+    for (var m = 0; m < metrics.length; m++) {
+      if (unit.points[i].name.trim().toLowerCase() === metrics[m].toLowerCase()) return true;
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Render the fleet table.
+//
+// One renderer for both places it appears. The colours are written as inline
+// styles as well as classes, because an email client pasting this from the
+// clipboard has no stylesheet to consult - Outlook keeps inline styles and
+// throws everything else away.
+// ---------------------------------------------------------------------------
+function fleetTableHtml(fleet) {
+  if (fleet.metrics.length === 0) {
+    return '<p class="hint">No readings are marked as counting up to a limit yet. '
+      + 'Tick "Counts up to a limit" on a reading in the Tools tab - kit life, '
+      + 'target life - and it appears here as a percentage remaining.</p>';
+  }
+  if (fleet.rows.length === 0) {
+    return '<p class="hint">Nothing takes those readings yet.</p>';
+  }
+
+  var html = '<div class="fleetwrap"><table class="fleet">'
+    + '<tr><th>Tool</th><th>Chamber</th>';
+  for (var m = 0; m < fleet.metrics.length; m++) {
+    html += '<th style="text-align:right">' + esc(fleet.metrics[m]) + ' % remain</th>';
+  }
+  html += '</tr>';
+
+  var lastTool = null;
+  for (var r = 0; r < fleet.rows.length; r++) {
+    var row = fleet.rows[r];
+    // The tool name is written once per group, as in the sheet you send.
+    var toolCell = (row.tool === lastTool) ? "" : esc(row.tool);
+    lastTool = row.tool;
+
+    html += '<tr><td class="tool" style="text-align:left;font-weight:600">' + toolCell + '</td>'
+      + '<td class="name" style="text-align:left">' + esc(row.unit) + '</td>';
+
+    for (var c = 0; c < row.cells.length; c++) {
+      var cell = row.cells[c];
+      if (cell.percent === null) {
+        html += '<td class="na" style="text-align:left;color:#5b6570">N/A</td>';
+        continue;
+      }
+      var shade = cell.status === "red" ? ' style="text-align:right;background:#f8cbcb;color:#7d0000;font-weight:700"'
+        : cell.status === "amber" ? ' style="text-align:right;background:#f2e6a8;color:#6b4e00;font-weight:700"'
+        : ' style="text-align:right"';
+      html += '<td class="' + cell.status + '"' + shade + '>'
+        + Math.round(cell.percent) + '%</td>';
+    }
+    html += '</tr>';
+  }
+
+  return html + '</table></div>';
 }
 
 // ---------------------------------------------------------------------------
@@ -1286,6 +1547,8 @@ function renderToday() {
       + '</div>';
   }
 
+  html += fleetCardHtml();
+
   // Build the list: not-logged tools first, then logged ones. Within each
   // group the tools keep the order you set up on the Tools tab.
   var pending = [];
@@ -1301,6 +1564,60 @@ function renderToday() {
   html += '</div>';
 
   host.innerHTML = html;
+}
+
+// Whether the fleet summary on the Today tab is open. Open by default: you
+// asked to see it before starting a round. Collapsible because twelve chambers
+// of table between you and the round is a lot of thumb on a tablet.
+var FLEET_OPEN = true;
+
+function toggleFleet() {
+  FLEET_OPEN = !FLEET_OPEN;
+  render();
+}
+
+// The fleet summary card, above the round. Nothing to show if no reading has
+// been marked as counting up to a limit, in which case it stays out of the way
+// entirely rather than explaining itself every morning.
+function fleetCardHtml() {
+  var fleet = fleetLife(CURRENT_DATE);
+  if (fleet.metrics.length === 0) return "";
+
+  var low = 0;
+  for (var r = 0; r < fleet.rows.length; r++) {
+    for (var c = 0; c < fleet.rows[r].cells.length; c++) {
+      var st = fleet.rows[r].cells[c].status;
+      if (st === "red" || st === "amber") low++;
+    }
+  }
+
+  var headline = low === 0
+    ? "nothing low"
+    : low + (low === 1 ? " reading low" : " readings low");
+
+  var html = '<div class="card"' + (low > 0
+      ? ' style="background:var(--warn-bg);border-color:#f0cf9a"' : '') + '>'
+    + '<div class="spread">'
+    + '<h2 style="margin:0">Life remaining &mdash; ' + headline + '</h2>'
+    + '<button class="secondary small" onclick="toggleFleet()">'
+    + (FLEET_OPEN ? 'Hide' : 'Show') + '</button></div>';
+
+  if (!FLEET_OPEN) return html + '</div>';
+
+  html += '<p class="hint" style="margin:8px 0">'
+    + (fleet.lastUpdated === ""
+        ? 'Nothing logged yet.'
+        : 'Last updated ' + esc(fleet.lastUpdated) + '.')
+    + ' Under ' + lifeRedBelow() + '% is red, under ' + lifeAmberBelow() + '% amber.</p>'
+    + fleetTableHtml(fleet);
+
+  if (fleet.stale.length > 0) {
+    html += '<p class="hint" style="margin-top:10px"><strong>Not logged recently:</strong> '
+      + esc(fleet.stale.join(", ")) + '. Those percentages are as of the last reading, '
+      + 'not today.</p>';
+  }
+
+  return html + '</div>';
 }
 
 // One row in the tool list on the Today tab.
@@ -1560,7 +1877,8 @@ function renderEntry() {
       + 'id="val_' + point.id + '" class="reading ' + statusClass(status) + '" '
       + 'value="' + esc(value) + '" oninput="colorField(\'' + point.id + '\')">'
       + '<div class="spread" style="margin-top:6px">'
-      + '<span class="hint" style="margin:0">' + esc(limitHint(point)) + '</span>'
+      + '<span class="hint" style="margin:0">' + esc(limitHint(point))
+      + '<span id="life_' + point.id + '">' + esc(lifeNote(value, point)) + '</span></span>'
       + '<span class="pill ' + statusClass(status) + '" id="st_' + point.id + '">'
       + esc(statusText(status, point)) + '</span>'
       + '</div></div>';
@@ -1607,6 +1925,14 @@ function backFromEntry() {
   showTab("today");
 }
 
+// For a consumable, say how much life is left as you type. Doing that
+// subtraction in your head at the tool is exactly where mistakes come from.
+function lifeNote(value, point) {
+  var percent = lifeRemaining(value, point);
+  if (percent === null) return "";
+  return "  \u00b7  " + Math.round(percent) + "% of life remaining";
+}
+
 // Recolour one box while the user types. Purely cosmetic, changes no data.
 function colorField(pointId) {
   var tool = findTool(CURRENT_TOOL);
@@ -1626,6 +1952,9 @@ function colorField(pointId) {
   input.className = "reading " + statusClass(status);
   pill.className = "pill " + statusClass(status);
   pill.textContent = statusText(status, point);
+
+  var life = document.getElementById("life_" + pointId);
+  if (life) life.textContent = lifeNote(input.value, point);
 }
 
 // Save what is in the boxes, then move on. Blank boxes are saved as blank,
@@ -2100,12 +2429,20 @@ function pointEditorHtml(point, index, total, updateCall, moveCall, deleteCall) 
     + 'oninput="' + updateCall + ',\'max\',this.value)"></div>'
     + '</div>'
     + '<div class="row" style="margin-top:8px">'
+    + '<label class="lifebox"><input type="checkbox"' + (point.isLife ? ' checked' : '')
+    + ' oninput="' + updateCall + ',\'isLife\',this.checked)">'
+    + 'Counts up to a limit</label>'
     + '<button class="secondary small" onclick="' + moveCall + ',-1)"'
     + (index === 0 ? ' disabled' : '') + '>&#9650;</button>'
     + '<button class="secondary small" onclick="' + moveCall + ',1)"'
     + (index === total - 1 ? ' disabled' : '') + '>&#9660;</button>'
     + '<button class="danger small" onclick="' + deleteCall + '">Delete</button>'
-    + '</div></div>';
+    + '</div>'
+    + (point.isLife
+        ? '<p class="hint" style="margin:6px 0 0">Max is the rated life. The fleet '
+          + 'summary shows how much is left.</p>'
+        : '')
+    + '</div>';
 }
 
 // Which tools use a type, and which chambers on them. "Used by 4 chambers"
@@ -2306,6 +2643,10 @@ function applyPointField(point, field, value) {
   } else if (field === "min" || field === "max") {
     var text = String(value).trim();
     point[field] = (text === "" || isNaN(Number(text))) ? null : Number(text);
+  } else if (field === "isLife") {
+    // A consumable: the value counts UP towards max, which is the rated life
+    // rather than an alarm level. See lifeRemaining().
+    point.isLife = !!value;
   }
 }
 
@@ -3034,6 +3375,28 @@ function renderData() {
     + '</div><div class="msg" id="exportMsg"></div></div>';
 
   html += '<div class="card">'
+    + '<h2>Fleet summary email</h2>'
+    + '<p class="hint">Builds the percentage-remaining table for every chamber, '
+    + 'ready to paste into Outlook with its colours. Only readings ticked as '
+    + '"counts up to a limit" appear.</p>'
+    + '<div class="row" style="margin-bottom:10px">'
+    + '<div><label style="margin:0">Red below</label>'
+    + '<input type="number" step="any" id="redBox" style="width:110px" value="'
+    + lifeRedBelow() + '" oninput="updateThresholds()"></div>'
+    + '<div><label style="margin:0">Amber below</label>'
+    + '<input type="number" step="any" id="amberBox" style="width:110px" value="'
+    + lifeAmberBelow() + '" oninput="updateThresholds()"></div>'
+    + '<div class="grow"><label style="margin:0">Opening line</label>'
+    + '<input type="text" id="greetingBox" value="' + esc(emailGreeting()) + '" '
+    + 'oninput="updateGreeting()"></div>'
+    + '</div>'
+    + '<div class="big-actions">'
+    + '<button onclick="generateEmail()">Generate email</button>'
+    + '</div>'
+    + '<div id="emailPanel"></div>'
+    + '<div class="msg" id="emailMsg"></div></div>';
+
+  html += '<div class="card">'
     + '<h2>Import</h2>'
     + '<p class="hint">Pick one file, or select a whole folder of daily round files at once. '
     + 'Use this after a browser wipe, or to move your data onto a different tablet. '
@@ -3114,6 +3477,148 @@ function renderDiagnostics() {
 function setDiagNames(on) {
   DIAG_NAMES = on;
   document.getElementById("diagText").value = buildReport();
+}
+
+// ---------------------------------------------------------------------------
+// THE FLEET SUMMARY EMAIL
+//
+// Produces the message you used to assemble by hand: an opening line, the
+// date, and the table of percentages remaining with the low ones shaded.
+//
+// The colours are inline styles rather than classes because that is the only
+// styling an email client keeps. Pasting into Outlook has no stylesheet to
+// consult.
+// ---------------------------------------------------------------------------
+function emailGreeting() {
+  return DATA.emailGreeting || "Hello All,";
+}
+
+function updateGreeting() {
+  DATA.emailGreeting = document.getElementById("greetingBox").value;
+  save();
+}
+
+function updateThresholds() {
+  var red = Number(document.getElementById("redBox").value);
+  var amber = Number(document.getElementById("amberBox").value);
+  if (!isNaN(red)) DATA.lifeRedBelow = red;
+  if (!isNaN(amber)) DATA.lifeAmberBelow = amber;
+  save();
+  // Redraw only the generated table, so the boxes keep the cursor.
+  if (document.getElementById("emailBody")) refreshEmailBody();
+}
+
+// The whole message, as HTML. Also what gets copied and downloaded.
+function emailHtml() {
+  var fleet = fleetLife(CURRENT_DATE);
+  return '<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px">'
+    + '<p>' + esc(emailGreeting()) + '</p>'
+    + '<p>Here is a snapshot of percentages remaining on kit life for each '
+    + 'chamber by tool:</p>'
+    + '<p><strong>Fleet Summary</strong> &nbsp; Last updated &nbsp; '
+    + esc(fleet.lastUpdated === "" ? CURRENT_DATE : fleet.lastUpdated) + '</p>'
+    + fleetTableHtml(fleet)
+    + (fleet.stale.length > 0
+        ? '<p style="color:#5b6570"><em>Not logged in the last 14 days: '
+          + esc(fleet.stale.join(", ")) + '. Those figures are as of the last reading.</em></p>'
+        : '')
+    + '</div>';
+}
+
+// A plain-text version, for a client that refuses HTML.
+function emailText() {
+  var fleet = fleetLife(CURRENT_DATE);
+  var lines = [emailGreeting(), ""];
+  lines.push("Here is a snapshot of percentages remaining on kit life for each chamber by tool:");
+  lines.push("Fleet Summary - last updated " + (fleet.lastUpdated || CURRENT_DATE));
+  lines.push("");
+
+  var header = [padRight("Tool", 12), padRight("Chamber", 10)];
+  for (var m = 0; m < fleet.metrics.length; m++) header.push(padRight(fleet.metrics[m] + " %", 20));
+  lines.push(header.join(""));
+
+  for (var r = 0; r < fleet.rows.length; r++) {
+    var row = fleet.rows[r];
+    var out = [padRight(row.tool, 12), padRight(row.unit, 10)];
+    for (var c = 0; c < row.cells.length; c++) {
+      out.push(padRight(row.cells[c].percent === null
+        ? "N/A" : Math.round(row.cells[c].percent) + "%", 20));
+    }
+    lines.push(out.join(""));
+  }
+  return lines.join("\n");
+}
+
+function generateEmail() {
+  var fleet = fleetLife(CURRENT_DATE);
+  if (fleet.metrics.length === 0) {
+    setMsg("emailMsg", "err", "No readings are ticked as counting up to a limit yet, "
+      + "so there is nothing to report. Tick one on the Tools tab.");
+    return;
+  }
+  bump("emailsGenerated");
+  document.getElementById("emailPanel").innerHTML =
+    '<p class="hint" style="margin-top:12px">This is what will be pasted. '
+    + 'Check it, then copy.</p>'
+    + '<div id="emailBody" style="border:1px solid var(--line);border-radius:6px;'
+    + 'padding:12px;background:#fff;overflow-x:auto">' + emailHtml() + '</div>'
+    + '<div class="big-actions">'
+    + '<button onclick="copyEmail()">Copy for Outlook</button>'
+    + '<button class="secondary" onclick="downloadEmail()">Download as a file</button>'
+    + '<button class="secondary" onclick="hideEmail()">Hide</button>'
+    + '</div>';
+  setMsg("emailMsg", "ok", "Built from readings up to " + CURRENT_DATE + ".");
+}
+
+function refreshEmailBody() {
+  var box = document.getElementById("emailBody");
+  if (box) box.innerHTML = emailHtml();
+}
+
+function hideEmail() {
+  document.getElementById("emailPanel").innerHTML = "";
+  setMsg("emailMsg", "info", "");
+}
+
+// Put the table on the clipboard as real HTML, so pasting into Outlook keeps
+// the table and the shading. Falls back to selecting it for you, which
+// preserves formatting just as well when you press Ctrl+C yourself.
+async function copyEmail() {
+  var html = emailHtml();
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([emailText()], { type: "text/plain" })
+      })]);
+      setMsg("emailMsg", "ok", "Copied. Paste into Outlook and the table keeps its colours.");
+      return;
+    }
+  } catch (e) {
+    // Fall through to selecting it by hand.
+  }
+  selectEmailBody();
+  setMsg("emailMsg", "info", "This browser would not let the page copy for you. "
+    + "The table is selected - press Ctrl+C, and the formatting still comes across.");
+}
+
+function selectEmailBody() {
+  var box = document.getElementById("emailBody");
+  if (!box || !window.getSelection) return;
+  var range = document.createRange();
+  range.selectNodeContents(box);
+  var selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function downloadEmail() {
+  var name = "fleet_summary_" + CURRENT_DATE + ".html";
+  // A whole page rather than a fragment, so double-clicking it opens properly.
+  downloadFile('<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<title>Fleet summary ' + esc(CURRENT_DATE) + '</title></head><body>'
+    + emailHtml() + '</body></html>', name, "text/html");
+  setMsg("emailMsg", "ok", "Saved " + name + ". Open it, select all, and copy into Outlook.");
 }
 
 // ---------------------------------------------------------------------------

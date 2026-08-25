@@ -40,6 +40,16 @@ Tapping a chambered tool lists its chambers with their own done marks; a tool
 with no chambers goes straight to its readings as before. The export gains
 `Chamber` and `Chamber type` columns, empty for tool-level rows.
 
+**Kit life and the fleet summary.** Tick "counts up to a limit" on a reading
+and set its rated life in Max, and the tool tracks percentage remaining:
+`(rated life - value) / rated life`. The Today tab shows a fleet table of every
+chamber before the round, with low values coloured; the Data tab's
+**Generate email** builds the same table as a message and copies it to the
+clipboard as real HTML, so pasting into Outlook keeps the shading. Past the
+rated life reports a negative percentage rather than clamping at zero.
+Per-chamber rating overrides are honoured. Thresholds default to red under 15%,
+amber under 25%, and are editable.
+
 **Setup screen.** Chamber types and tools collapse to one-line summary rows,
 so a full setup stays about a screen tall instead of growing without limit. A
 "Setup not finished" panel at the top names anything incomplete. Enter submits
