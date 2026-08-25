@@ -213,7 +213,12 @@ is what it is measured against.
 Sending the summary
 -------------------
 Data tab, "Generate email". It builds the message - opening line, date, and
-the table - and shows it to you first.
+one small table per tool - and shows it to you first.
+
+There is a table per tool rather than one big grid, carrying only the readings
+that tool actually tracks. A grid spanning the whole fleet ends up mostly N/A,
+because your PVD tools and your etchers do not measure the same things, and it
+gets worse every time you tick another reading.
 
   Copy for Outlook     Puts the table on the clipboard as real formatting.
                        Paste into Outlook and the colours come with it.
@@ -222,6 +227,13 @@ the table - and shows it to you first.
 
 If the copy button cannot get permission, the table is selected for you
 instead - press Ctrl+C and the formatting still comes across.
+
+Every part of the table's appearance travels with it. Outlook throws away a
+web page's stylesheet when you paste and keeps only what is written on each
+element, so the borders, padding and shading are all written that way. If you
+ever edit the look of this table by hand, do it in fleetTablesHtml() and keep
+it inline - a style moved out into the page's CSS will look right on the
+tablet and arrive with no gridlines at all.
 
 The opening line and the red and amber thresholds are boxes on that panel.
 Defaults are red under 15%, amber under 25%.

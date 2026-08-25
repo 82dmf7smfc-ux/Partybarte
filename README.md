@@ -44,8 +44,10 @@ with no chambers goes straight to its readings as before. The export gains
 and set its rated life in Max, and the tool tracks percentage remaining:
 `(rated life - value) / rated life`. The Today tab shows a fleet table of every
 chamber before the round, with low values coloured; the Data tab's
-**Generate email** builds the same table as a message and copies it to the
-clipboard as real HTML, so pasting into Outlook keeps the shading. Past the
+**Generate email** builds the same tables as a message and copies them to the
+clipboard as real HTML. One table per tool carrying only that tool's readings,
+rather than one fleet-wide grid that is mostly N/A. Every style is written
+inline, since a pasted message keeps no stylesheet. Past the
 rated life reports a negative percentage rather than clamping at zero.
 Per-chamber rating overrides are honoured. Thresholds default to red under 15%,
 amber under 25%, and are editable.

@@ -26,6 +26,16 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   banner past 80 per cent. A save that fails because storage is full is now
   told apart from a browser that blocks storage outright, and says so.
 ### Fixed
+- PM Round Logger: the generated summary arrived in Outlook with no gridlines,
+  reading as text floating in columns. Only the cell shading was written as an
+  inline style; borders, padding, `border-collapse` and the header background
+  came from the page's stylesheet, which a mail client discards on paste.
+  Measured on the stripped markup, 65 of 65 cells had lost their border. Every
+  style is now written inline and the `table.fleet` CSS rules are gone, so
+  there is one way to style that table rather than two and nowhere for a style
+  to hide that will not travel. A test renders the message with no stylesheet
+  and reads the computed borders, padding and shading, which the previous test
+  - asserting the string contained the word `border` - could not have caught.
 - PM Round Logger: `effectivePoint()` rebuilt a reading without carrying its
   new consumable flag, so a chamber with its own rating override dropped out of
   the fleet summary silently - a missing row in an emailed report rather than
@@ -42,6 +52,14 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   now `copyPointList`, and a test covers the button.
 
 ### Added
+- PM Round Logger 1.9.0: the fleet summary is now one table per tool, carrying
+  only the readings that tool tracks, instead of a fleet-wide grid. On a real
+  four-consumable fleet this took N/A cells from 28 of 48 down to 2, and the
+  two that remain are meaningful. The tool name becomes a heading rather than a
+  repeated column, headers wrap onto two lines so a column is no wider than its
+  numbers, and the date reads 8/24/2026 as the sheet always has.
+- PM Round Logger 1.9.0: the tile and the email are rendered by the same
+  function and asserted to produce identical markup, so they cannot drift.
 - PM Round Logger 1.8.0: life remaining. A reading can be marked as counting up
   to a limit, where Max is a rated life rather than an alarm level, and the tool
   reports `(rated life - value) / rated life` as a percentage. Marked
