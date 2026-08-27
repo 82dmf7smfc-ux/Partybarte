@@ -115,6 +115,21 @@ away from anything you install later.
 
 ## Adding a new tool vendor
 
+### Blocks that ship with the tool
+
+| `--vendor` value | For | How downtime is stored |
+|---|---|---|
+| `amat` | Applied Materials logs. The default. | A duration column. |
+| `amat_setclear_example` | The same vendor when set and clear are separate rows. | Paired set and clear events. |
+| `picosun` | Picosun ALD systems. Picosun is part of Applied Materials. | An alarm-on and an alarm-off time on the same row. |
+| `picosun_setclear_example` | Picosun exports that put each event on its own row. | Paired set and clear events. |
+
+The column names in every block are placeholders. Open the block for your tool
+and change the names on the right to match the headers in your own export
+before the first run. Nothing else needs to change.
+
+### Making your own block
+
 You do not need to touch any Python file. Open
 `alarm_pareto/config/vendor_columns.json`. Copy an existing block. Give it a new
 name. Change the column names on the right to match your file headers. Save.

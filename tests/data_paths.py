@@ -5,6 +5,8 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).parent / "data"
 SAMPLE_CSV = DATA_DIR / "sample_alarm_log.csv"
+# A second sample in the paired-interval shape, used by the Picosun tests.
+SAMPLE_PICOSUN_CSV = DATA_DIR / "sample_picosun_log.csv"
 EXPECTED_JSON = DATA_DIR / "expected_summary.json"
 
 # The vendor config that ships inside the package.

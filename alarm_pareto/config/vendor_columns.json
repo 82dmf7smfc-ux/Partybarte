@@ -41,5 +41,37 @@
       "description": "AlarmText",
       "equipment": "ChamberID"
     }
+  },
+
+  "picosun": {
+    "description": "Picosun ALD system alarm log, one row per alarm with both an on and an off time. Picosun is part of Applied Materials. Placeholder column names. Edit these to match your real file headers.",
+    "delimiter": ",",
+    "timestamp_format": null,
+    "duration_unit": "seconds",
+    "pairing_keys": ["equipment", "fault_code"],
+    "event_values": {"set": "SET", "clear": "CLEAR"},
+    "columns": {
+      "ts_set": "AlarmOn",
+      "ts_clear": "AlarmOff",
+      "fault_code": "AlarmCode",
+      "description": "AlarmMessage",
+      "equipment": "Reactor"
+    }
+  },
+
+  "picosun_setclear_example": {
+    "description": "Picosun log when the alarm on and alarm off events land on separate rows. Copy this block instead of the one above if your export has one event per row.",
+    "delimiter": ",",
+    "timestamp_format": null,
+    "duration_unit": "seconds",
+    "pairing_keys": ["equipment", "fault_code"],
+    "event_values": {"set": "ON", "clear": "OFF"},
+    "columns": {
+      "ts_set": "EventTimestamp",
+      "event_type": "AlarmState",
+      "fault_code": "AlarmCode",
+      "description": "AlarmMessage",
+      "equipment": "Reactor"
+    }
   }
 }

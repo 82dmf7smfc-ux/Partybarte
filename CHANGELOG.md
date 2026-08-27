@@ -7,6 +7,17 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Picosun vendor blocks in `alarm_pareto/config/vendor_columns.json`. Picosun
+  ALD systems are part of Applied Materials. `picosun` reads a log that carries
+  an alarm-on and an alarm-off time on the same row. `picosun_setclear_example`
+  covers the export that puts each event on its own row. Both ship with
+  placeholder headers to edit, the same as the existing blocks.
+- Tests for the Picosun blocks, built on a second hand-checked sample log in the
+  paired-interval shape. They cover the window filter, the duration taken from
+  two timestamps, and the overlap merge for wall-clock downtime. A parametrized
+  test also checks that every vendor block that ships is usable: it names a
+  downtime shape the tool understands, maps every required internal name, and
+  only uses pairing keys that are mapped.
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,
   across Python 3.11 and 3.12.

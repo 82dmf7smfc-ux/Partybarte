@@ -47,6 +47,7 @@ keep good ideas so they are not lost between sessions.
 ## Engineering hygiene
 
 - Add a code formatter and a linter check to CI once the team agrees on a style.
-- Add tests for the set/clear pairing path and the paired-interval path in the
-  Python suite, to match the coverage the browser tool already exercises.
+- Add tests for the set/clear pairing path in the Python suite, to match the
+  coverage the browser tool already exercises. The paired-interval path is now
+  covered by the Picosun tests.
 - Choose and add a license file. The project has none yet.
