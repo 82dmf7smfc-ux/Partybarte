@@ -103,6 +103,15 @@ def main():
         for s in cls["sources"]:
             cited_by.setdefault(s["key"], []).append(cls["id"])
 
+    # Preserve verification state across regeneration. This file is rebuilt
+    # whenever the syllabus changes, and the fetch history must survive that.
+    # Losing it would silently reset every source to unverified, which is the
+    # one thing this file exists to prevent.
+    prior = {}
+    if OUT.exists():
+        prior = {k: v.get("verification", {})
+                 for k, v in json.loads(OUT.read_text())["sources"].items()}
+
     sources = {}
     for key, s in syl["sources"].items():
         host = urlparse(s["u"]).netloc
@@ -118,14 +127,14 @@ def main():
             "year_basis": basis,
             "free_substitute_note": s.get("sub"),
             "cited_by_classes": cited_by.get(key, []),
-            "verification": {
+            "verification": prior.get(key, {
                 "last_attempt": None,
                 "result": "not attempted",
                 "detail": None,
                 "contains": None,
                 "cached_pdf": None,
                 "notes_file": None,
-            },
+            }),
         }
 
     out = {
@@ -136,8 +145,10 @@ def main():
         "sources": sources,
     }
     OUT.write_text(json.dumps(out, indent=1) + "\n")
-    print("wrote %s with %d sources (%d free, %d paid)"
-          % (OUT.relative_to(ROOT), out["source_count"], out["free_count"], out["paid_count"]))
+    kept = sum(1 for v in sources.values() if v["verification"]["last_attempt"])
+    print("wrote %s with %d sources (%d free, %d paid), %d verification records preserved"
+          % (OUT.relative_to(ROOT), out["source_count"], out["free_count"],
+             out["paid_count"], kept))
 
 
 if __name__ == "__main__":
