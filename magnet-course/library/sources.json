@@ -1,0 +1,927 @@
+{
+ "generated_by": "tools/build_sources.py from syllabus/magnet-bench-syllabus.html",
+ "source_count": 40,
+ "free_count": 36,
+ "paid_count": 4,
+ "sources": {
+  "hall": {
+   "key": "hall",
+   "title": "Sanfilippo, Hall probes: physics and application to magnetometry",
+   "url": "https://arxiv.org/abs/1103.1271",
+   "free": true,
+   "publisher": "arXiv",
+   "type": "lecture notes",
+   "year": 2011,
+   "year_basis": "encoded in the arXiv identifier",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c06",
+    "c09",
+    "c10",
+    "c11",
+    "c30"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "coils": {
+   "key": "coils",
+   "title": "Fabrication and calibration of search coils (CAS 2009)",
+   "url": "https://arxiv.org/pdf/1104.0803",
+   "free": true,
+   "publisher": "arXiv",
+   "type": "lecture notes",
+   "year": 2011,
+   "year_basis": "encoded in the arXiv identifier",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c07",
+    "c30"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "bahrdt": {
+   "key": "bahrdt",
+   "title": "Bahrdt, Permanent magnets including undulators and wigglers",
+   "url": "https://arxiv.org/abs/1103.1573",
+   "free": true,
+   "publisher": "arXiv",
+   "type": "lecture notes",
+   "year": 2011,
+   "year_basis": "encoded in the arXiv identifier",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c01",
+    "c02",
+    "c03",
+    "c04",
+    "c05",
+    "c20",
+    "c24",
+    "c25",
+    "c27"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "sgobba": {
+   "key": "sgobba",
+   "title": "Sgobba, Physics and measurements of magnetic materials",
+   "url": "https://arxiv.org/abs/1103.1069",
+   "free": true,
+   "publisher": "arXiv",
+   "type": "lecture notes",
+   "year": 2011,
+   "year_basis": "encoded in the arXiv identifier",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c02",
+    "c05",
+    "c27"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "cas": {
+   "key": "cas",
+   "title": "CAS Magnets, Bruges 2009, full proceedings (CERN-2010-004)",
+   "url": "https://cds.cern.ch/record/1158462/files/cern-2010-004.pdf",
+   "free": true,
+   "publisher": "CERN Document Server",
+   "type": "proceedings",
+   "year": 2010,
+   "year_basis": "encoded in the CERN report number",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c09",
+    "c13",
+    "c29"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "casprog": {
+   "key": "casprog",
+   "title": "CAS Bruges 2009 programme with lecture slides",
+   "url": "https://cas.web.cern.ch/schools/bruges-2009",
+   "free": true,
+   "publisher": "CERN Accelerator School",
+   "type": "conference programme",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "jainov": {
+   "key": "jainov",
+   "title": "Jain, Overview of Magnetic Measurement Techniques",
+   "url": "https://www.bnl.gov/magnets/magnet_files/publications/overview.pdf",
+   "free": true,
+   "publisher": "Brookhaven National Laboratory",
+   "type": "lecture slides",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c01",
+    "c07",
+    "c08",
+    "c09",
+    "c16",
+    "c28"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "jainus": {
+   "key": "jainus",
+   "title": "Jain, USPAS Superconducting Magnet lecture set",
+   "url": "https://wpw.bnl.gov/rgupta/uspas-2006-by-animesh-jain/",
+   "free": true,
+   "publisher": "Brookhaven National Laboratory",
+   "type": "lecture archive",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c14",
+    "c17",
+    "c34"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "jainharm": {
+   "key": "jainharm",
+   "title": "Jain, Harmonic Description of 2D Fields",
+   "url": "https://wpw.bnl.gov/rgupta/wp-content/uploads/sites/9/2023/02/1_harmonicseries.pdf",
+   "free": true,
+   "publisher": "Brookhaven National Laboratory",
+   "type": "lecture slides",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c17"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "jainaxis": {
+   "key": "jainaxis",
+   "title": "Jain, Determination of Magnetic Axis",
+   "url": "https://wpw.bnl.gov/rgupta/wp-content/uploads/sites/9/2023/02/8_alignment.pdf",
+   "free": true,
+   "publisher": "Brookhaven National Laboratory",
+   "type": "lecture slides",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c17"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "immw20": {
+   "key": "immw20",
+   "title": "Jain, Overview of magnetic measurements for APS-U (IMMW20)",
+   "url": "https://www.diamond.ac.uk/dam/jcr:e8ca5fa8-9630-401d-958f-eef13d832123/A%20Jain.pdf",
+   "free": true,
+   "publisher": "Diamond Light Source",
+   "type": "conference presentation",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c13",
+    "c16",
+    "c23",
+    "c31"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "immw12": {
+   "key": "immw12",
+   "title": "Jain et al., IMMW-XII presentation (ESRF archive)",
+   "url": "https://www.esrf.fr/files/live/sites/www/files/events/conferences/2001/IMMW12/present/JainI.pdf",
+   "free": true,
+   "publisher": "ESRF",
+   "type": "conference presentation",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c14",
+    "c33"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "femmman": {
+   "key": "femmman",
+   "title": "FEMM 4.2 user manual",
+   "url": "https://www.femm.info/Archives/doc/manual.pdf",
+   "free": true,
+   "publisher": "FEMM (David Meeker)",
+   "type": "software manual",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c22"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "femmtut": {
+   "key": "femmtut",
+   "title": "FEMM magnetics tutorial",
+   "url": "https://sourceforge.net/p/femm/wiki/Magnetics%20Tutorial/",
+   "free": true,
+   "publisher": "SourceForge",
+   "type": "software tutorial",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c22"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "femmfaq": {
+   "key": "femmfaq",
+   "title": "FEMM FAQ, permanent magnet modeling",
+   "url": "https://www.femm.info/doku/doku.php?id=FAQ",
+   "free": true,
+   "publisher": "FEMM (David Meeker)",
+   "type": "software FAQ",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c04",
+    "c22"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "femmcas": {
+   "key": "femmcas",
+   "title": "Milanese, Introduction to the use of FEMM (CAS 2023)",
+   "url": "https://indico.cern.ch/event/1227234/contributions/5601012/attachments/2754519/4795801/CAS_magnets_2023_FEMM_intro.pdf",
+   "free": true,
+   "publisher": "CERN Indico",
+   "type": "lecture slides",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c22"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "feexer": {
+   "key": "feexer",
+   "title": "Finite element simulation of an accelerator magnet: an exercise",
+   "url": "https://arxiv.org/pdf/2006.10463",
+   "free": true,
+   "publisher": "arXiv",
+   "type": "tutorial paper",
+   "year": 2020,
+   "year_basis": "encoded in the arXiv identifier",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c22"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "magpy": {
+   "key": "magpy",
+   "title": "Magpylib documentation",
+   "url": "https://magpylib.readthedocs.io/",
+   "free": true,
+   "publisher": "Read the Docs",
+   "type": "software documentation",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c18",
+    "c21",
+    "c23"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "magpygh": {
+   "key": "magpygh",
+   "title": "Magpylib source and examples",
+   "url": "https://github.com/magpylib/magpylib",
+   "free": true,
+   "publisher": "GitHub",
+   "type": "software repository",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c19"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "http_403",
+    "detail": "403 378B application/json; charset=utf-8",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "magpypaper": {
+   "key": "magpypaper",
+   "title": "Magpylib: a free Python package for magnetic field computation (SoftwareX, open access)",
+   "url": "https://www.sciencedirect.com/science/article/pii/S2352711020300170",
+   "free": true,
+   "publisher": "Elsevier (SoftwareX, open access)",
+   "type": "journal article",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c21"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "arnoldmeas": {
+   "key": "arnoldmeas",
+   "title": "Arnold, Magnetic Properties of Permanent Magnets and Measuring Techniques",
+   "url": "https://www.arnoldmagnetics.com/wp-content/uploads/2021/11/White-Paper-Measurement-07.23.2021MS2a4.pdf",
+   "free": true,
+   "publisher": "Arnold Magnetic Technologies",
+   "type": "vendor white paper",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c03",
+    "c08",
+    "c25"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "arnoldunder": {
+   "key": "arnoldunder",
+   "title": "Arnold, Understanding Permanent Magnets",
+   "url": "https://www.allegromicro.com/-/media/files/technical-documents/arnold/understanding-permanent-magnets.pdf",
+   "free": true,
+   "publisher": "Allegro MicroSystems (hosting Arnold document)",
+   "type": "vendor white paper",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c04"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "pmg88": {
+   "key": "pmg88",
+   "title": "MMPA PMG-88, Permanent Magnet Guidelines",
+   "url": "https://www.automate.org/userAssets/a3/a3Uploads/pdf/permanent-magnet-guideline.pdf",
+   "free": true,
+   "publisher": "A3 (hosting MMPA document)",
+   "type": "industry guideline",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c03",
+    "c04",
+    "c25"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "mmpa": {
+   "key": "mmpa",
+   "title": "MMPA 0100-00 and PMG-88, free PDF downloads",
+   "url": "https://www.duramag.com/products-and-services/magnetic-standards-and-guidelines/",
+   "free": true,
+   "publisher": "Duramag / Bunting",
+   "type": "industry standard portal",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c05"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "npl": {
+   "key": "npl",
+   "title": "NPL Report MAT 54, permanent magnet measurement comparison under IEC 60404-5",
+   "url": "https://eprintspublications.npl.co.uk/5352/",
+   "free": true,
+   "publisher": "National Physical Laboratory",
+   "type": "national laboratory report",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c08"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "amamag": {
+   "key": "amamag",
+   "title": "MagCam field mapping and analysis (AMA Science open proceedings)",
+   "url": "https://www.ama-science.org/proceedings/details/543",
+   "free": true,
+   "publisher": "AMA Science",
+   "type": "conference proceedings",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c20"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "radia": {
+   "key": "radia",
+   "title": "Radia, open space magnetics solver",
+   "url": "https://pypi.org/project/radia/",
+   "free": true,
+   "publisher": "PyPI",
+   "type": "software package",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c22"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "http_403",
+    "detail": "403 95B text/plain",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "ema": {
+   "key": "ema",
+   "title": "European Magnetism Association software index",
+   "url": "https://magnetism.eu/43-software.htm",
+   "free": true,
+   "publisher": "European Magnetism Association",
+   "type": "software index",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c21"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "tn1297": {
+   "key": "tn1297",
+   "title": "NIST Technical Note 1297, uncertainty guidelines",
+   "url": "https://www.nist.gov/pml/nist-technical-note-1297",
+   "free": true,
+   "publisher": "NIST",
+   "type": "standards body landing page",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c10",
+    "c11",
+    "c32",
+    "c35"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "tn1297pdf": {
+   "key": "tn1297pdf",
+   "title": "NIST TN 1297 full PDF",
+   "url": "https://nvlpubs.nist.gov/nistpubs/legacy/tn/nbstechnicalnote1297.pdf",
+   "free": true,
+   "publisher": "NIST",
+   "type": "technical note",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c12",
+    "c34"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "nistunc": {
+   "key": "nistunc",
+   "title": "NIST measurement uncertainty topic page and GUM links",
+   "url": "https://www.nist.gov/itl/sed/topic-areas/measurement-uncertainty",
+   "free": true,
+   "publisher": "NIST",
+   "type": "topic page",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c12"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "nistbib": {
+   "key": "nistbib",
+   "title": "NIST uncertainty bibliography",
+   "url": "https://physics.nist.gov/cuu/Uncertainty/bibliography.html",
+   "free": true,
+   "publisher": "NIST",
+   "type": "bibliography",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c12"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "a977": {
+   "key": "a977",
+   "title": "ASTM A977 / A977M, hysteresigraph method",
+   "url": "https://www.astm.org/Standards/A977.htm",
+   "free": false,
+   "publisher": "ASTM International",
+   "type": "standard",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": "Covered free by the Arnold measurement white paper and MMPA PMG-88. Buy only if a customer cites the standard.",
+   "cited_by_classes": [
+    "c03"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "a773": {
+   "key": "a773",
+   "title": "ASTM A773 / A773M, low coercivity DC properties",
+   "url": "https://www.astm.org/Standards/A773.htm",
+   "free": false,
+   "publisher": "ASTM International",
+   "type": "standard",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": "Covered free by Sgobba on soft magnetic materials. Rarely needed for this program.",
+   "cited_by_classes": [],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "iec": {
+   "key": "iec",
+   "title": "IEC 60404-5, permanent magnet measurement methods",
+   "url": "https://webstore.ansi.org/standards/iec/iec60404ed2015",
+   "free": false,
+   "publisher": "ANSI Webstore (IEC)",
+   "type": "standard",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": "MMPA 0100-00 carries the IEC TC 68 material free, and NPL Report MAT 54 shows the method in use.",
+   "cited_by_classes": [
+    "c08"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "magcam": {
+   "key": "magcam",
+   "title": "Magcam, inspecting field distributions of permanent magnets",
+   "url": "https://www.magcam.com/blog/how-inspect-magnetic-field-distributions-permanent-magnets-different-sizes-shapes-and-types",
+   "free": true,
+   "publisher": "MagCam NV",
+   "type": "vendor blog post",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c01",
+    "c15",
+    "c18",
+    "c19"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "magcamieee": {
+   "key": "magcamieee",
+   "title": "Inline magnet inspection using MagCam field mapping (IEEE)",
+   "url": "https://ieeexplore.ieee.org/document/6085537/",
+   "free": false,
+   "publisher": "IEEE",
+   "type": "journal article",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": "Same authors and content in the open AMA Science proceedings. Skip the IEEE version.",
+   "cited_by_classes": [
+    "c20"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "bcam": {
+   "key": "bcam",
+   "title": "A magnetic field camera for real-time subsurface imaging",
+   "url": "https://arxiv.org/pdf/1904.05620",
+   "free": true,
+   "publisher": "arXiv",
+   "type": "preprint",
+   "year": 2019,
+   "year_basis": "encoded in the arXiv identifier",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c15",
+    "c20"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "visc": {
+   "key": "visc",
+   "title": "Evaluation of time-dependent magnetic losses of permanent magnets",
+   "url": "https://doi.org/10.3390/met16030322",
+   "free": true,
+   "publisher": "DOI resolver",
+   "type": "journal article",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [
+    "c24",
+    "c25",
+    "c26"
+   ],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  },
+  "uspas": {
+   "key": "uspas",
+   "title": "USPAS course archive, superconducting accelerator magnets",
+   "url": "https://uspas.fnal.gov/programs/2001/Rice/courses/Super-Magnets.shtml",
+   "free": true,
+   "publisher": "US Particle Accelerator School",
+   "type": "course archive",
+   "year": null,
+   "year_basis": "needs fetch",
+   "free_substitute_note": null,
+   "cited_by_classes": [],
+   "verification": {
+    "last_attempt": "2026-08-27",
+    "result": "blocked",
+    "detail": "egress proxy refused CONNECT (curl: (56) CONNECT tunnel failed, response 403)",
+    "contains": null,
+    "cached_pdf": null,
+    "notes_file": null
+   }
+  }
+ }
+}

@@ -1,0 +1,20 @@
+# Python environment for the worked examples.
+#
+# Every class ships a runnable worked.py. These are the packages they use.
+#
+# VERSIONS ARE NOT PINNED YET. Pinning requires installing the packages and
+# recording what actually resolved, and this environment has no package index
+# access. Do not invent pins. At the first session with network, run:
+#
+#     pip install -r requirements.txt
+#     pip freeze > requirements.lock.txt
+#
+# then copy the resolved versions into the pin column below. Until that happens,
+# any number printed by a worked example is tied to an unrecorded environment,
+# which weakens every result in the course.
+
+magpylib      # analytic permanent magnet field computation, the modeling spine
+numpy         # arrays and linear algebra
+scipy         # optimisation, interpolation, signal processing for map work
+matplotlib    # the frozen plotting module from class 19
+pandas        # scan data tables and the trending work in unit 8
