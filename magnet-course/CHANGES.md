@@ -124,3 +124,26 @@ no source is marked verified and no citation appears anywhere in this
 repository.
 
 No edit suggested. The rule is the right one. The environment has to change.
+
+---
+
+## 7. The reference part is asked to do two incompatible jobs
+
+`CLAUDE.md` defines `shared/reference-part.md` as "the specific magnet used in
+all worked examples". Class 14 defines the reference magnet as the stable
+control that "never changes duty" and separates instrument drift from real
+change.
+
+These want different objects. The worked example part should be representative
+of what the course studies, which is mostly sintered NdFeB: large temperature
+coefficients, a corrosion problem, and detectable aging. The control part should
+be the least changeable thing available, because a control that ages is not a
+control.
+
+Suggested change: use two parts. A sintered NdFeB part for the worked examples,
+and an SmCo part as the session control, appearing in class 14 and the session
+checklist only. Cost is one extra magnet and one extra column in the session
+log.
+
+Not applied. It changes what `CLAUDE.md` asks for, and the part cannot be chosen
+in this environment anyway. The full argument is in `shared/reference-part.md`.
