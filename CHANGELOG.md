@@ -7,6 +7,18 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- A third downtime number, "in range". Overlaps are merged as with wall clock,
+  and every fault is also cut down to the parts that fall inside the hours the
+  report covers. It answers how much of a shift the tool spent down, which
+  neither of the other two numbers can: they credit a fault to the shift it
+  started in, whole. Available on both tools, and as
+  `--downtime-method in_range` for ranking.
+- `alarm_pareto/reporting_range.py`, which works out the blocks of clock time a
+  report covers and clips alarms against them. Thirty days of night shift is
+  thirty blocks, not one, and that list is what the new number is measured
+  against.
+- The reports now say how much clock time they cover, in how many blocks, and
+  what share of it the tool spent down.
 - Import feedback in the browser tool. It now says how much it is reading
   before it starts, and warns when an import is large enough to be slow or to
   risk running the tab out of memory. Reading and analysis block the page, so

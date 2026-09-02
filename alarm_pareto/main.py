@@ -48,9 +48,14 @@ def build_arg_parser():
                         "so 22:00 to 06:00 is the night shift.")
     p.add_argument("--top-n", type=int, default=15,
                    help="How many rows before the rest become 'Other'. Default: 15.")
-    p.add_argument("--downtime-method", choices=[agg.METHOD_ATTRIBUTED, agg.METHOD_WALLCLOCK],
+    p.add_argument("--downtime-method",
+                   choices=[agg.METHOD_ATTRIBUTED, agg.METHOD_WALLCLOCK, agg.METHOD_IN_RANGE],
                    default=agg.METHOD_ATTRIBUTED,
-                   help="Which downtime number drives the downtime ranking. Default: attributed.")
+                   help="Which downtime number drives the downtime ranking. "
+                        "'attributed' credits each fault its full duration. "
+                        "'wallclock' merges overlaps. 'in_range' merges overlaps and "
+                        "also cuts each fault down to the hours the report covers, "
+                        "which is the one to use with a shift. Default: attributed.")
     p.add_argument("--output-dir", default="output",
                    help="Folder for the output files. Default: output.")
     return p
@@ -93,6 +98,10 @@ def run(args):
         window_days=args.window_days, top_n=args.top_n,
         downtime_method=args.downtime_method,
         tod_start=tod_start, tod_end=tod_end,
+        # The whole file, not the filtered rows. The in-range number follows the
+        # clock rather than the onset, so it needs the alarms that started
+        # before the window or before the shift and ran into the report.
+        full_table=table,
     )
 
     # Make sure the output folder exists.
@@ -129,6 +138,9 @@ def main(argv=None):
     print("  Total faults: %d" % grand["total_faults"])
     print("  Attributed downtime: %.2f hours" % grand["attributed_downtime_hours"])
     print("  True wall-clock downtime: %.2f hours" % grand["wallclock_downtime_hours"])
+    print("  In-range downtime: %.2f hours of %.2f hours covered (%.1f%%)" % (
+        grand["in_range_downtime_hours"], grand["range_hours"],
+        grand["in_range_downtime_pct"]))
     print("  Workbook: %s" % out["xlsx"])
     print("  Deck:     %s" % out["pptx"])
     return 0

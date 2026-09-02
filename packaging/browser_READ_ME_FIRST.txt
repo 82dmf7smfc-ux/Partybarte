@@ -32,6 +32,28 @@ alarm_pareto.html      The tool. This is the only file you need.
 sample_alarm_log.csv   A small example elog you can import to test it.
 screenshot.png         What the tool looks like when it has run.
 
+The three downtime numbers
+--------------------------
+The page shows three downtime totals. They answer different questions and must
+never be mixed.
+
+  Attributed     Each fault credited its whole duration. Best for ranking
+                 which fault costs the most.
+  True wall clock  Overlapping faults merged so shared time counts once. Best
+                 for "how long was the tool down" over a plain window.
+  In range       Overlaps merged, and each fault also cut down to the hours
+                 the report covers. Best for anything to do with a shift.
+
+The third one matters as soon as you pick a shift. A fault that starts at 17:50
+and runs four hours is credited entirely to the day shift by the first two,
+because that is when it started. In range splits it the way the clock does: ten
+minutes of day shift, three hours fifty of night shift. It is also the only one
+that cannot exceed the length of the report, so it is the one to use when you
+want to say "the tool was down for X percent of night shift".
+
+Pick it in the "Downtime ranking method" box. All three totals are shown
+whichever one you rank by.
+
 How much data it can handle
 ---------------------------
 There is no row limit. What limits you is the memory in your browser tab.

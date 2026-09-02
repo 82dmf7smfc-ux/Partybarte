@@ -65,6 +65,9 @@ def write_workbook(result, windowed_table, output_path):
 def _method_label(method):
     if method == agg.METHOD_ATTRIBUTED:
         return "Attributed downtime (each fault credited its full duration)"
+    if method == agg.METHOD_IN_RANGE:
+        return ("In-range downtime (overlaps merged, and each fault cut down to "
+                "the hours this report covers)")
     return "True wall-clock downtime (overlaps merged, counted once)"
 
 
@@ -81,7 +84,26 @@ def _write_window_data(ws, windowed_table, result):
     )
     ws["A2"].font = NOTE_FONT
 
-    start_row = 4
+    # Spell out the three downtime numbers here, on the data sheet, where the
+    # rows they came from are sitting right underneath.
+    ws["A3"] = (
+        "Downtime, three ways. Attributed %.2f h (each fault its full duration). "
+        "True wall clock %.2f h (overlaps merged). "
+        "In range %.2f h of the %.2f h this report covers, %.1f%% (overlaps merged and "
+        "each fault cut to the covered hours). The three answer different questions. "
+        "Do not mix them." % (
+            grand["attributed_downtime_hours"],
+            grand["wallclock_downtime_hours"],
+            grand["in_range_downtime_hours"],
+            grand["range_hours"],
+            grand["in_range_downtime_pct"],
+        )
+    )
+    ws["A3"].font = NOTE_FONT
+    ws["A4"] = "Time covered: %s" % grand["range_description"]
+    ws["A4"].font = NOTE_FONT
+
+    start_row = 6
     _write_dataframe(ws, windowed_table, start_row=start_row, start_col=1)
     _autosize(ws, windowed_table, start_col=1)
 
@@ -127,7 +149,7 @@ def _write_summary_sheet(ws, result, level, method, method_label):
     )
 
     # Right table: ranked by downtime, using the chosen method.
-    metric_hours = "attributed_hours" if method == agg.METHOD_ATTRIBUTED else "wallclock_hours"
+    metric_hours = agg.METHOD_COLUMNS[method].replace("_s", "_hours")
     downtime_display = _select_columns(
         by_downtime, level,
         [("rank", "Rank"), (level, nice_level), ("count", "Count"),

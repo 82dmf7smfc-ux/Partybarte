@@ -48,6 +48,8 @@ def write_deck(result, output_path):
 def _method_label(method):
     if method == agg.METHOD_ATTRIBUTED:
         return "Attributed downtime (each fault gets its full duration)"
+    if method == agg.METHOD_IN_RANGE:
+        return "In-range downtime (overlaps merged, each fault cut to the covered hours)"
     return "True wall-clock downtime (overlaps merged)"
 
 
@@ -98,7 +100,7 @@ def _add_pareto_slide(prs, result, level, method, method_label):
         value_col="count", cum_col="cum_count_pct",
         title="By occurrence count", value_axis="Count",
     )
-    metric_hours = "attributed_hours" if method == agg.METHOD_ATTRIBUTED else "wallclock_hours"
+    metric_hours = agg.METHOD_COLUMNS[method].replace("_s", "_hours")
     downtime_png = _pareto_png(
         tables["by_downtime"], level,
         value_col=metric_hours, cum_col="cum_downtime_pct",
@@ -123,23 +125,33 @@ def _add_summary_slide(prs, result, method_label):
     lines.append("Time of day covered: %s" % grand["time_of_day_label"])
     lines.append("Total faults in window: %d" % grand["total_faults"])
     lines.append("")
-    lines.append("Total downtime, both methods (never mix these):")
-    lines.append("  Attributed: %.2f hours" % grand["attributed_downtime_hours"])
-    lines.append("  True wall clock: %.2f hours" % grand["wallclock_downtime_hours"])
+    lines.append("Time covered by this report: %s" % grand["range_description"])
+    lines.append("")
+    lines.append("Total downtime, three ways (never mix these):")
+    lines.append("  Attributed: %.2f hours  (each fault credited its full duration)"
+                 % grand["attributed_downtime_hours"])
+    lines.append("  True wall clock: %.2f hours  (overlaps merged, by fault onset)"
+                 % grand["wallclock_downtime_hours"])
+    lines.append("  In range: %.2f hours of %.2f covered, %.1f%%  (overlaps merged, cut to the hours above)"
+                 % (grand["in_range_downtime_hours"], grand["range_hours"],
+                    grand["in_range_downtime_pct"]))
     lines.append("")
     lines.append("Top three offenders by %s, at fault-code level:" % result["downtime_method"])
     if result["top_offenders"]:
         for i, off in enumerate(result["top_offenders"], start=1):
-            lines.append("  %d. %s  |  %d faults  |  %.2f h attributed  |  %.2f h wall clock" % (
-                i, off["name"], off["count"], off["attributed_hours"], off["wallclock_hours"]))
+            lines.append("  %d. %s  |  %d faults  |  %.2f h attributed  |  %.2f h wall clock  |  %.2f h in range" % (
+                i, off["name"], off["count"], off["attributed_hours"],
+                off["wallclock_hours"], off["in_range_hours"]))
     else:
         lines.append("  No faults in the window.")
 
-    box = _add_textbox(slide, Inches(0.6), Inches(1.2), Inches(12), Inches(5.5),
-                       "\n".join(lines), size=16)
-    # Give the body a little more room per line.
+    # Three downtime numbers plus a per-offender breakdown of all three makes
+    # for long lines, so the summary sits a little smaller than it used to and
+    # runs the full width of the slide. At 14pt these lines do not wrap.
+    box = _add_textbox(slide, Inches(0.5), Inches(1.1), Inches(12.4), Inches(6.0),
+                       "\n".join(lines), size=14)
     for para in box.text_frame.paragraphs:
-        para.space_after = Pt(4)
+        para.space_after = Pt(3)
 
 
 def _pareto_png(table, level, value_col, cum_col, title, value_axis):

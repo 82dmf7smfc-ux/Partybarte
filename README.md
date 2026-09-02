@@ -69,11 +69,11 @@ Two files land in the `output` folder.
 2. `alarm_pareto.pptx`. A slide deck. One Pareto slide per grouping level. Plus
    a summary slide with the headline numbers.
 
-## The two downtime numbers
+## The three downtime numbers
 
-This is the most important idea in the tool. There are two different ways to
-add up downtime. They answer different questions. The tool reports both and
-never mixes them.
+This is the most important idea in the tool. There are three different ways to
+add up downtime. They answer three different questions. The tool reports all
+three and never mixes them.
 
 1. **Attributed downtime.** Each fault is credited its own full duration. If ten
    alarms each lasted four hours, the attributed total is forty hours. Use this
@@ -81,8 +81,59 @@ never mixes them.
 2. **True wall-clock downtime.** Overlapping alarms are merged first, then
    summed. If two alarms are active at the same time, the shared time is counted
    once. Use this to answer how long the tool was actually down.
+3. **In-range downtime.** Overlaps are merged as above, and every fault is also
+   cut down to the parts that fall inside the hours the report covers. Use this
+   to answer how much of a shift the tool spent down.
 
-Every sheet and slide says which method produced the number.
+### Why the third one exists
+
+Numbers 2 and 3 are the same thing until you narrow the report to a shift. Then
+they come apart, because they count by different rules:
+
+| | Counts a fault by | Bounded by the clock |
+|---|---|---|
+| Attributed | when it started, whole duration | no |
+| True wall clock | when it started, overlaps merged | no |
+| In range | where its downtime actually landed | yes |
+
+Take an alarm that starts at 17:50 and runs four hours, with a 06:00 to 18:00
+day shift and an 18:00 to 06:00 night shift.
+
+- Wall clock puts all four hours on the **day shift**, because that is when the
+  fault started, and gives the night shift nothing.
+- In range splits it the way the clock does: **ten minutes** of day shift and
+  **three hours fifty** of night shift.
+
+This gives the third number a property the other two do not have. Run the same
+log for the day shift and for the night shift, and the two in-range figures add
+back up to the figure for the whole window. Neither of the other two does that.
+It also cannot exceed the length of the report, so "the tool was down for 62% of
+night shift" is a sentence you can only write with this number.
+
+Because it follows the clock rather than the fault onset, the in-range number is
+built from every alarm in the file, not just the rows that passed the window and
+shift filters. An alarm that began before the window opened, or before the shift
+started, still had the tool on the floor during the reported hours, and this
+number counts that part of it.
+
+### Which to use
+
+- Ranking which fault to go fix: **attributed**. It is the default for a reason.
+- Reporting how long the tool was down over a plain window: **wall clock**.
+- Anything to do with a shift, or any sentence with a percentage in it:
+  **in range**.
+
+Pass `--downtime-method in_range` to rank by it. Every sheet and slide says
+which method produced the number, and all three totals appear on the summary
+slide and the data sheet whichever one you rank by.
+
+### What the report covers
+
+Once a report is narrowed to a shift, the time it covers is no longer one
+unbroken block. Thirty days of night shift is thirty separate blocks, one per
+night, each running 18:00 on one day to 06:00 on the next. The tool builds that
+list, tells you how many blocks and how many hours it came to, and clips against
+it. That list is also what the percentage is measured against.
 
 ## First time setup
 
@@ -114,7 +165,7 @@ away from anything you install later.
 | `--start-time` | Keep only alarms that start at or after this clock time, as `HH:MM`. | no time filter |
 | `--end-time` | Keep only alarms that start before this clock time, as `HH:MM`. | no time filter |
 | `--top-n` | How many rows before the rest become "Other". | `15` |
-| `--downtime-method` | `attributed` or `wallclock`. Drives the downtime ranking. | `attributed` |
+| `--downtime-method` | `attributed`, `wallclock`, or `in_range`. Drives the downtime ranking. | `attributed` |
 | `--output-dir` | Folder for the output files. | `output` |
 
 ### Filtering by time of day
@@ -142,6 +193,10 @@ Three things to know.
 
 The time-of-day filter runs after the trailing window, so the window start and
 end printed on the report still describe the file, not the shift.
+
+When you filter to a shift, use `--downtime-method in_range` as well. The other
+two numbers credit a fault to the shift it started in, whole, which is not what
+you want once you are comparing shifts. See **The three downtime numbers** above.
 
 ## How much data can it handle
 
@@ -236,6 +291,7 @@ The pipeline is split into small modules. Each does one job.
 | `alarm_pareto/parse.py` | Read the file into a raw table. |
 | `alarm_pareto/normalize.py` | Rename vendor columns to internal names. |
 | `alarm_pareto/window.py` | Keep only the trailing window, then the chosen hours of the day. |
+| `alarm_pareto/reporting_range.py` | Work out which blocks of clock time the report covers, and clip alarms to them. |
 | `alarm_pareto/aggregate.py` | Build the count and downtime rankings. |
 | `alarm_pareto/render_xlsx.py` | Write the Excel workbook. |
 | `alarm_pareto/render_pptx.py` | Write the PowerPoint deck. |

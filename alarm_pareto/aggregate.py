@@ -2,7 +2,8 @@
 
 This is the heart of the tool. It turns rows of alarms into ranked tables.
 
-Two downtime numbers are produced. They must never be mixed.
+Three downtime numbers are produced. They answer three different questions and
+must never be mixed.
 
 1. Attributed downtime. Each alarm is credited its own full duration. If ten
    alarms each lasted four hours, the attributed total is forty hours. This is
@@ -12,6 +13,30 @@ Two downtime numbers are produced. They must never be mixed.
    If two alarms overlap, the shared time is counted once. This answers how much
    time the tool was actually down.
 
+3. In-range downtime. Wall-clock downtime, but every alarm is first cut down to
+   the parts that fall inside the reporting range, and alarms are gathered by
+   where their downtime lands rather than by when they started. This answers
+   how much of the reported time the tool spent down.
+
+Numbers 2 and 3 are the same thing when the report covers a plain window and no
+alarm runs off the end of it. They come apart as soon as a shift is chosen. An
+alarm that starts at 17:50 and runs four hours contributes all four hours to
+number 2 for the day shift, because that is when it started, and contributes
+nothing to the night shift. Number 3 splits it the way the clock does: ten
+minutes of day shift, three hours fifty of night shift.
+
+The two counting rules differ on purpose:
+
+    number 2   which faults began in these hours, and how long they ran
+    number 3   how much of these hours the tool was down
+
+Because number 3 follows the clock and not the onset, it is built from every
+alarm in the file, not only the rows that survived the window and shift
+filters. An alarm that began before the window opened, or before the shift
+started, still put the tool on the floor during the reported time, and number 3
+counts that part of it. The clipping in reporting_range.py is what does the
+filtering for this number, which is why it does not need the row filters.
+
 The overlap merge is the main correctness risk in the whole tool, so it lives in
 one small tested function, merged_seconds.
 """
@@ -19,14 +44,23 @@ one small tested function, merged_seconds.
 import pandas as pd
 
 from . import normalize as nz
+from . import reporting_range as rr
 from . import window as window_mod
 
 # The three grouping levels we report on. The value is the internal column name.
 GROUPING_LEVELS = ["fault_code", "description", "equipment"]
 
-# Labels for the two downtime methods, used on sheets and slides.
+# Labels for the three downtime methods, used on sheets and slides.
 METHOD_ATTRIBUTED = "attributed"
 METHOD_WALLCLOCK = "wallclock"
+METHOD_IN_RANGE = "in_range"
+
+# Which column each method ranks on.
+METHOD_COLUMNS = {
+    METHOD_ATTRIBUTED: "attributed_s",
+    METHOD_WALLCLOCK: "wallclock_s",
+    METHOD_IN_RANGE: "in_range_s",
+}
 
 SECONDS_PER_HOUR = 3600.0
 
@@ -168,8 +202,15 @@ def _make_occurrence(set_row, clear_time):
     }
 
 
-def _rank_table(occ, level, downtime_method, top_n):
+def _rank_table(occ, level, downtime_method, top_n, in_range_by_group=None):
     """Build one ranked table for a single grouping level.
+
+    occ: the occurrences that passed the window and shift filters. These decide
+        which groups appear and supply the count and attributed numbers.
+    in_range_by_group: in-range seconds per group, computed elsewhere from every
+        alarm in the file rather than from occ. See the module docstring for why
+        the two use different row sets. None means no in-range number, which
+        leaves the column at zero.
 
     Returns a dict with two DataFrames:
         by_count    sorted by occurrence count, high to low
@@ -190,20 +231,26 @@ def _rank_table(occ, level, downtime_method, top_n):
         wall[group_value] = merged_seconds(pairs)
     wallclock = pd.Series(wall, name="wallclock_s")
 
-    # Put the three measures side by side, one row per group. rename_axis forces
+    # Put the measures side by side, one row per group. rename_axis forces
     # the group column to be named after the level, no matter how pandas labels
     # the index after the join.
     merged = pd.concat([counts, attributed, wallclock], axis=1)
     merged = merged.rename_axis(level).reset_index()
     merged[level] = merged[level].astype(str)
 
+    # In-range downtime per group, looked up by group name. Groups with no
+    # in-range time, and every group when no range was supplied, get zero.
+    lookup = in_range_by_group or {}
+    merged["in_range_s"] = merged[level].map(lambda name: float(lookup.get(name, 0.0)))
+
     # Add hour versions for easy reading. Seconds stay as the exact value.
     merged["attributed_hours"] = merged["attributed_s"] / SECONDS_PER_HOUR
     merged["wallclock_hours"] = merged["wallclock_s"] / SECONDS_PER_HOUR
+    merged["in_range_hours"] = merged["in_range_s"] / SECONDS_PER_HOUR
 
     by_count = _sorted_with_other(merged, level, "count", top_n, pct_from="count")
 
-    metric_col = "attributed_s" if downtime_method == METHOD_ATTRIBUTED else "wallclock_s"
+    metric_col = METHOD_COLUMNS[downtime_method]
     by_downtime = _sorted_with_other(merged, level, metric_col, top_n, pct_from="downtime")
 
     return {"by_count": by_count, "by_downtime": by_downtime}
@@ -216,17 +263,20 @@ def _sorted_with_other(merged, level, sort_col, top_n, pct_from):
     if len(ordered) > top_n:
         head = ordered.iloc[:top_n].copy()
         tail = ordered.iloc[top_n:]
-        # Build a single Other row by summing the tail. Wall-clock is summed
-        # too. This slightly overstates the Other wall-clock if tail groups
-        # overlap each other, but it keeps the tail readable. The headline
-        # wall-clock number never uses this bucket, so the key number is safe.
+        # Build a single Other row by summing the tail. The two merged measures,
+        # wall-clock and in-range, are summed too. That slightly overstates them
+        # if tail groups overlapped each other, but it keeps the tail readable.
+        # The headline numbers are computed from the raw intervals and never go
+        # near this bucket, so the numbers that matter are safe.
         other = {
             level: "Other",
             "count": int(tail["count"].sum()),
             "attributed_s": float(tail["attributed_s"].sum()),
             "wallclock_s": float(tail["wallclock_s"].sum()),
+            "in_range_s": float(tail["in_range_s"].sum()),
             "attributed_hours": float(tail["attributed_hours"].sum()),
             "wallclock_hours": float(tail["wallclock_hours"].sum()),
+            "in_range_hours": float(tail["in_range_hours"].sum()),
         }
         result = pd.concat([head, pd.DataFrame([other])], ignore_index=True)
     else:
@@ -257,17 +307,28 @@ def _add_percent(df, value_col, pct_col, cum_col):
 
 def aggregate(windowed_table, mode, vendor_config, window_start, window_end,
               window_days=30, top_n=15, downtime_method=METHOD_ATTRIBUTED,
-              tod_start=None, tod_end=None):
+              tod_start=None, tod_end=None, full_table=None):
     """Run the full aggregation and return every table plus the headline numbers.
 
-    tod_start and tod_end are the time-of-day bounds in minutes since midnight,
-    or None when no time-of-day filter was applied. They are carried through so
-    the workbook and the deck can say which hours the report covers.
+    windowed_table: the rows that passed the window and shift filters. These
+        drive the counts, the attributed downtime, and the wall-clock downtime.
+    tod_start, tod_end: the time-of-day bounds in minutes since midnight, or
+        None when no shift was chosen. Carried through so the workbook and the
+        deck can say which hours the report covers, and used to build the
+        reporting range.
+    full_table: every row in the file, before the window and shift filters, used
+        for the in-range downtime number. That number follows the clock rather
+        than the onset, so an alarm that started before the window or before the
+        shift still counts for the part that landed inside the report. Pass None
+        to fall back to windowed_table, which makes the number a little low
+        wherever an alarm straddled the start of the range.
 
     Returns a dictionary. See the module and README for the shape.
     """
-    if downtime_method not in (METHOD_ATTRIBUTED, METHOD_WALLCLOCK):
-        raise ValueError("downtime_method must be 'attributed' or 'wallclock'.")
+    if downtime_method not in METHOD_COLUMNS:
+        raise ValueError(
+            "downtime_method must be one of: %s." % ", ".join(sorted(METHOD_COLUMNS))
+        )
 
     occ = build_occurrences(windowed_table, mode, vendor_config)
 
@@ -279,10 +340,18 @@ def aggregate(windowed_table, mode, vendor_config, window_start, window_end,
     all_pairs = list(zip(occ["ts_set"], occ["ts_end"])) if total_faults else []
     total_wallclock_s = merged_seconds(all_pairs)
 
+    # The third number. Build the blocks of clock time the report covers, then
+    # cut every alarm in the file down to the parts that land inside them.
+    ranges = rr.build_ranges(window_start, window_end, tod_start, tod_end)
+    range_seconds = rr.total_seconds(ranges)
+    clock_occ = occ if full_table is None else build_occurrences(full_table, mode, vendor_config)
+    total_in_range_s, in_range_by_group = _in_range_totals(clock_occ, ranges)
+
     levels = {}
     for level in GROUPING_LEVELS:
         if total_faults:
-            levels[level] = _rank_table(occ, level, downtime_method, top_n)
+            levels[level] = _rank_table(occ, level, downtime_method, top_n,
+                                        in_range_by_group.get(level))
         else:
             empty = pd.DataFrame()
             levels[level] = {"by_count": empty, "by_downtime": empty}
@@ -292,12 +361,24 @@ def aggregate(windowed_table, mode, vendor_config, window_start, window_end,
 
     return {
         "occurrences": occ,
+        "reporting_ranges": ranges,
         "grand": {
             "total_faults": total_faults,
             "attributed_downtime_s": total_attributed_s,
             "attributed_downtime_hours": total_attributed_s / SECONDS_PER_HOUR,
             "wallclock_downtime_s": total_wallclock_s,
             "wallclock_downtime_hours": total_wallclock_s / SECONDS_PER_HOUR,
+            "in_range_downtime_s": total_in_range_s,
+            "in_range_downtime_hours": total_in_range_s / SECONDS_PER_HOUR,
+            # How much clock time the report covers, and what share of it the
+            # tool spent down. The share is the number people actually quote.
+            "range_seconds": range_seconds,
+            "range_hours": range_seconds / SECONDS_PER_HOUR,
+            "range_blocks": len(ranges),
+            "range_description": rr.describe(ranges),
+            "in_range_downtime_pct": (
+                total_in_range_s / range_seconds * 100.0 if range_seconds > 0 else 0.0
+            ),
             "window_start": window_start,
             "window_end": window_end,
             "window_days": window_days,
@@ -310,6 +391,41 @@ def aggregate(windowed_table, mode, vendor_config, window_start, window_end,
         "top_n": top_n,
         "top_offenders": top_offenders,
     }
+
+
+def _in_range_totals(occ, ranges):
+    """In-range downtime overall and per group.
+
+    occ: occurrences to measure. Normally every occurrence in the file, because
+        this number follows the clock rather than the onset.
+    ranges: the reporting range from reporting_range.build_ranges.
+
+    Returns (total_seconds, {level: {group_name: seconds}}).
+
+    Each group is clipped and merged on its own, so a group's number is the
+    clock time during which at least one alarm of that group was active inside
+    the range. Group numbers therefore do not add up to the total whenever two
+    different groups were down at the same moment, exactly as with wall-clock.
+    """
+    empty_by_level = {level: {} for level in GROUPING_LEVELS}
+    if not ranges or occ.empty:
+        return 0.0, empty_by_level
+
+    pairs = list(zip(occ["ts_set"], occ["ts_end"]))
+    total = merged_seconds(rr.clip_intervals(pairs, ranges))
+
+    by_level = {}
+    for level in GROUPING_LEVELS:
+        per_group = {}
+        for group_value, part in occ.groupby(level, dropna=False):
+            group_pairs = list(zip(part["ts_set"], part["ts_end"]))
+            seconds = merged_seconds(rr.clip_intervals(group_pairs, ranges))
+            if seconds:
+                # str because the ranked tables cast their group column to text.
+                per_group[str(group_value)] = seconds
+        by_level[level] = per_group
+
+    return total, by_level
 
 
 def _top_three(by_downtime_table, level):
@@ -325,6 +441,7 @@ def _top_three(by_downtime_table, level):
                 "count": int(row["count"]),
                 "attributed_hours": float(row["attributed_hours"]),
                 "wallclock_hours": float(row["wallclock_hours"]),
+                "in_range_hours": float(row["in_range_hours"]),
             }
         )
     return picks
