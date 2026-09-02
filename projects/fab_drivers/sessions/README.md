@@ -14,7 +14,18 @@ under `../fab_drivers/devices/` yet.
 
 | File | Device | Built |
 |---|---|---|
-| `session_01_lakeshore.md` | Lakeshore 218 / 224 / 336 temperature monitors | not yet |
+| `session_01_lakeshore.md` | Lakeshore 218 / 224 / 336 temperature monitors | blocked, see below |
 
 Sessions 2 to 10 get their files as the sessions before them finish. The build
 order is in `../CLAUDE.md`.
+
+## Session 1 is blocked on its manual
+
+It ran and stopped at the first step. The machine these sessions run on cannot
+reach `lakeshore.com` or any mirror of its manuals, and the rule is that a
+driver is never written from memory of a protocol. `../REVIEW.md` has the
+detail.
+
+`../manuals/FETCH_PROMPT.md` is the way out. Hand it to a session that does have
+internet access. It comes back with a zip of the manuals. Unpack that into
+`../manuals/`, then run `session_01_lakeshore.md` again.

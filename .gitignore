@@ -13,3 +13,11 @@ dist/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Vendor equipment manuals. They are fetched into
+# projects/fab_drivers/manuals/ and read there. They are not committed, because
+# they are the manufacturers' copyrighted documents and some of them are large.
+# Each driver's PROTOCOL.md names its manual and records the file hash instead.
+projects/fab_drivers/manuals/*.pdf
+projects/fab_drivers/manuals/**/*.pdf
+projects/fab_drivers/manuals/*.zip

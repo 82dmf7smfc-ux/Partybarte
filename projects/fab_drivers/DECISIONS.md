@@ -139,6 +139,30 @@ left free for actual working instructions if we ever want them.
   Chosen by the owner. The notice line carries a placeholder until the exact
   name is supplied.
 
+- **2026-09-02. Manuals are fetched out of band, by a separate session, and are
+  not committed.** The machines these driver sessions run on cannot reach the
+  manufacturers' websites. The network policy allows source and package hosts
+  and almost nothing else, so `lakeshore.com` and every mirror of its manuals is
+  refused. A session cannot fetch its own sources, and the research rule is not
+  negotiable, so the documents have to arrive by hand. `manuals/FETCH_PROMPT.md`
+  is the prompt that collects them, written to be handed to a session that does
+  have access. The PDFs themselves stay out of git, because they are the
+  manufacturers' copyrighted documents. Each `PROTOCOL.md` records its manual's
+  part number and SHA-256 instead, so a later reader can tell whether they are
+  holding the same document.
+
+- **2026-09-02. A vendor's own driver source is not a substitute for the
+  manual.** Lake Shore Cryotronics publishes a Python driver on GitHub and PyPI,
+  and GitHub is reachable from here when `lakeshore.com` is not. It contains the
+  serial settings and the query strings, and it is written by the manufacturer,
+  so it is tempting. It was not used to write anything. Two reasons. It is
+  undated with respect to firmware and says nothing about which models or
+  revisions each choice applies to, and it does not carry the worked examples
+  that settle what a reply actually looks like. The rule asks for a document
+  that shows a command next to its real answer, and source code is not that.
+  It stays useful as a cross-check once the manual is in hand, and disagreement
+  between the two is worth writing down.
+
 ## Open questions
 1. **Which machine runs the poller long term?** The existing heat exchanger
    Raspberry Pi logger is mentioned for the chiller. If that becomes the home for

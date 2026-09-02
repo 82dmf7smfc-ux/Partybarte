@@ -7,10 +7,59 @@ actually checked, what was only assumed, and where to push hardest.
 Nothing here is a defence of the code. It is a list of the places most likely to
 be wrong, written by the person who wrote them, while they are still fresh.
 
+## Session 1, the Lakeshore driver, is blocked on its manual
+
+Nothing was written for it. No `devices/lakeshore/` folder exists, and that is
+deliberate rather than unfinished.
+
+The session could not reach any Lake Shore manual. The network policy on this
+machine allows source and package hosts and refuses the rest, so
+`lakeshore.com` is blocked, and so is every mirror found by searching: a Jefferson
+Lab copy, a University of Hawaii copy, an Oak Ridge copy, and the manual
+aggregator sites. The refusal is at the egress proxy, so no amount of retrying
+changes it.
+
+The project rule is that a driver is never written from memory of a protocol. So
+the driver stops here rather than shipping plausible looking SCPI. Plausible
+command syntax that was never checked is worse than no driver, because it looks
+finished and nobody goes back to it.
+
+What was found, and deliberately not used:
+
+- Lake Shore Cryotronics publishes its own Python driver, on GitHub and on PyPI
+  as `lakeshore`. GitHub is reachable when `lakeshore.com` is not. It carries the
+  serial settings and the query strings, and the manufacturer wrote it. It was
+  read, and no code was written from it. `DECISIONS.md` has the reasoning. In
+  short, it has no worked examples and says nothing about which models or
+  firmware revisions each choice applies to.
+
+  Two things in it are worth cross-checking once the manual arrives, and are
+  recorded here as claims to test rather than as facts:
+
+  1. It opens a Model 224 at 57600 baud, 7 data bits, odd parity, 1 stop bit, no
+     flow control, and uses 57600 for the Model 336 too. Whether those are the
+     only rates, and what the instruments ship set to, is not stated.
+  2. It sends a bare line feed after a command and treats a carriage return and
+     line feed pair as the end of a reply. Whether the instrument requires both
+     characters on the way in is not stated.
+  3. It reads the Model 336 reading status as bit 0 invalid reading, bit 4
+     temperature under range, bit 5 temperature over range, bit 6 sensor units
+     zero, bit 7 sensor units over range.
+
+  None of that is settled until the manual says so.
+
+- The Model 218 is not in that driver at all, so it offers nothing for the oldest
+  of the three instruments.
+
+To unblock it, `manuals/FETCH_PROMPT.md` collects the documents. It is written to
+be handed to a session that has internet access, and it lists the ten questions
+the three Lake Shore manuals have to answer before the driver can be written.
+
 ## What was verified, and how
 
-- **78 automated tests pass**, 56 of them for this project. Run
-  `pytest -q projects/fab_drivers` from the repository root.
+- **92 automated tests pass**, 70 of them for this project. Run
+  `pytest -q projects/fab_drivers` from the repository root. The count in this
+  line was stale, and was corrected by re-running the suite on 2026-09-02.
 - **The core imports and runs with pyserial absent.** That is the state of the
   GitHub runner. `open_serial_port` gives a clear message instead of a stack
   trace.
