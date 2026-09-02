@@ -73,6 +73,21 @@ class MockSerial:
         out, self._buffer = self._buffer[:cut], self._buffer[cut:]
         return out
 
+    def read(self, size=1):
+        """Return up to size buffered bytes, the way pyserial's read does.
+
+        If fewer than size bytes are waiting, return what there is. That is what
+        a real port does when it times out partway through a reply, and it is
+        how the transport tells a short frame from silence.
+
+        This exists for the binary protocols, which have no terminator to read
+        up to and carry their own length instead.
+        """
+        if not self.is_open:
+            raise IOError("read from a closed mock port")
+        out, self._buffer = self._buffer[:size], self._buffer[size:]
+        return out
+
     def reset_input_buffer(self):
         """Throw away anything not yet read, the way pyserial does."""
         self._buffer = b""

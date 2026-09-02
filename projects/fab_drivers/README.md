@@ -46,7 +46,7 @@ this version.
 
 ## What is here now
 
-The shared core, and two drivers of the ten.
+The shared core, and three drivers of the ten.
 
 The Lakeshore driver reads a 218, 224 or 336 temperature monitor. It was written
 without a Lake Shore manual, from a research file the owner supplied, because
@@ -58,7 +58,16 @@ relayed through a web search tool and from the EPICS `epics-modules/vac` device
 support read directly from GitHub. Every site hosting one of these manuals is
 refused by this machine's network egress policy.
 
-**Read both driver sections of `REVIEW.md` before trusting either one on a
+The Thermo chiller driver reads a NESLAB RTE bath or a ThermoFlex recirculating
+chiller: temperature, setpoint, pump pressures, flow and fault state. It is the
+first binary protocol here, framed and checksummed, and **the first one written
+with the manufacturer's manual open.** Two Thermo NESLAB manuals were read in
+full, found as PDFs in a public laboratory repository on GitHub after the usual
+sites refused. Nineteen complete frames printed in those manuals are checksum
+tests. The ThermoFlex half of it is the weak half and rests on one open source
+library.
+
+**Read all three driver sections of `REVIEW.md` before trusting any of them on a
 tool.** Each lists what is backed by a worked example, what is assumed, and what
 to check first on a bench.
 
@@ -74,6 +83,7 @@ to check first on a bench.
 | `fab_drivers/core/trend_page.py` | Build one self-contained trend page for one device. |
 | `fab_drivers/devices/lakeshore/` | Lakeshore 218, 224 and 336 temperature monitors. |
 | `fab_drivers/devices/granville_phillips/` | Granville-Phillips 275, 375, 350 and 356 pressure gauges. |
+| `fab_drivers/devices/thermo_chiller/` | Thermo NESLAB and ThermoFlex chillers. |
 | `manuals/` | The manufacturers' documents. Supplied by the owner, never fetched. |
 
 ## The standards every driver follows

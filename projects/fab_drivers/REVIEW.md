@@ -259,16 +259,202 @@ That is not a gap more tests of this kind can close.
    hole here.
 5. Find out whether a read-units command exists. That is the finding above.
 
+## The Thermo chiller driver had two manuals, and one family inside it did not
+
+**This is the first driver in this project written with a manufacturer's manual
+open.** Two Thermo NESLAB manuals were read directly, in full, from PDFs that
+came with the public repository `github.com/octopode/bathtime`. So most of this
+driver is not an assumption, and this section is much shorter than the two above
+it for that reason.
+
+What the manuals cover is the NESLAB RTE line. What they do not cover is the
+ThermoFlex line, and **everything ThermoFlex specific in this driver rests on
+one open source library and no manual**. That is the finding, and it is the
+first thing to check.
+
+Hardware access exists for this device. Unlike every item in the two sections
+above, these can be settled this week rather than never, so each one is written
+to be checked on its own.
+
+### The one thing to check before trusting a ThermoFlex reading
+
+1. **The ThermoFlex command bytes are from code, not from a manual.** `read_flow`
+   is `10`, `read_supply_pressure` is `28`, `read_suction_pressure` is `29`, and
+   the four flow and pressure alarm limits are `30`, `50`, `48` and `68`. All
+   seven come from `Python/DvG_dev_ThermoFlex_chiller__fun_RS232.py` in
+   `Dennis-van-Gils/MHT_Tunnel`, read directly, which is working code written
+   against a real ThermoFlex in 2018.
+
+   It is not a manual. It carries no worked examples and does not say which
+   ThermoFlex model or firmware it was written against.
+
+   **How to check it in one command.** Send `read_supply_pressure` and compare
+   the number against the front panel. If the pressure on the screen and the
+   number in the log agree, the byte is right. Repeat for flow. Ten minutes.
+
+2. **The ThermoFlex fault bit table is from the same code and nothing else.**
+   `THERMOFLEX_STATUS_BITS` in `driver.py`. Every name and every bit position in
+   it. The RTE table next to it is from the manual's Table 2 and is not in
+   doubt.
+
+   This is the item where being wrong looks most like working. A driver that
+   puts "low flow fault" in the wrong bit still returns a dictionary of
+   plausible names and still trends. Nothing announces it.
+
+   **How to check it.** Cause one fault you can cause safely, most easily a low
+   flow or low level warning by closing a valve or dropping the reservoir, and
+   read the raw status bytes out of the audit log. Check which bit moved against
+   the table. One fault checked is worth more than the whole table assumed.
+
+   The partial comfort is that `read_faults()` counts every bit whose name
+   contains "fault", so "is anything wrong at all" comes out right even if an
+   individual name is in the wrong place. Only the naming is at risk.
+
+3. **The ThermoFlex serial appendix was never read.** Its manual's Appendix C is
+   titled "NC Serial Communications Protocol", the same as the NESLAB one, and
+   relayed search results confirmed the master-slave model and the default port
+   settings of 9600 8-N-1 with an RS-485 address defaulting to 1. The command
+   table and the status table could not be retrieved.
+   `manuals/FETCH_PROMPT_THERMO_CHILLER.md` asks for this one document. It would
+   close items 1 and 2 together.
+
+### Checked against the manuals, and not in doubt
+
+These are here so a reviewer knows which parts do not need re-checking.
+
+- The frame layout, the checksum rule, and the two lead characters. Quoted from
+  both manuals in `PROTOCOL.md`.
+- **Nineteen complete frames with their checksums**, taken out of the two
+  manuals and made into tests. Eighteen agree with this code exactly. See below
+  for the one that does not.
+- The command bytes `00`, `09`, `20`, `21`, `40`, `60`, `70`, and the write
+  bytes `C0`, `E0`, `F0` to `F6` and `81` that are banned. All from Table 1 in
+  one or both manuals.
+- The qualifier byte, and that the value is a **signed** 16 bit integer. The
+  manual's own worked example of -10.5 degrees as `FF 97` settles it.
+- The RTE fault bit table, from Table 2.
+- The port settings, the one second timeout, and the RS-485 turnaround delay.
+
+### Small things that are unverified, each checkable on its own
+
+4. **One printed checksum in the Digital Plus manual disagrees with the manual's
+   own rule.** Table 1 prints Read Cool Proportional Band as
+   `CA 00 01 74 00 84`. Summing gives `75`, and `75 XOR FF` is `8A`. The
+   ThermoFlex library also sends `8A`. This driver computes every checksum, so
+   it sends `8A` and never copies a printed one.
+
+   Almost certainly a misprint, and possibly an artefact of extracting text from
+   the PDF rather than an error in the paper manual. It affects nothing this
+   driver sends, because that command is a PID read and is not on any allowed
+   list. **How to check it:** look at a paper copy of the table, or send the
+   command once and see whether the chiller answers or returns a bad checksum
+   error.
+
+5. **The unit names for indexes 2 to 11 are from the ThermoFlex library only.**
+   The manual's table names only index 0, no unit, and index 1, degrees C. The
+   nine others, including bar, PSI and litres per minute, come from the library.
+   The nibble split itself is safe, because it reproduces all four values the
+   manual's table lists.
+
+   **How to check it:** read a pressure with the chiller set to bar, then set to
+   PSI at the panel, and see which index comes back each time.
+
+6. **Error code `02` is not in either manual.** The manuals list `01` for a bad
+   command and `03` for a bad checksum. The ThermoFlex library also handles `02`
+   as bad data. The driver reports it and says where the code came from.
+
+7. **The protocol version bytes nobody has seen.** `read_acknowledge` returns
+   two version bytes and no source here says what a real chiller reports. The
+   ThermoFlex library expects `00 00` or `00 01`. The driver returns them raw
+   rather than checking them. **How to check it:** send the command and write
+   the bytes down. It is step 4 of the bench session in `PROTOCOL.md`.
+
+8. **The display text command `07` is deliberately not implemented.** The
+   ThermoFlex library reads the front panel text with it. It is genuinely useful
+   and it is in no manual read here, so it is not on any allowed list. Add it
+   once somebody confirms it.
+
+9. **The pacing between commands, 0.05 seconds, is a judgement and not sourced.**
+   The same figure as the two earlier drivers. Nothing in either manual gives a
+   required gap. The one second timeout is sourced, from both manuals.
+
+10. **The two manuals disagree about the cable.** The RTE 110 manual describes a
+    crossover, so a null modem. The Digital Plus manual asks for a straight
+    male to female extension. Both are quoted in `PROTOCOL.md` and the bench
+    session says to try one then the other.
+
+11. **RS-485 has never been driven by this project.** The lead character, the
+    address range and the address checking are implemented and tested against
+    the mock. No real RS-485 pair has ever been touched. The 5 millisecond
+    turnaround the manual specifies is not managed by this driver, which needs
+    an adapter that switches direction itself.
+
+### The core change this driver forced
+
+12. **`SerialTransport` grew a `reply_size` hook and `MockSerial` grew
+    `read(n)`.** Eight more drivers inherit this. The terminator path is
+    unchanged and a test asserts that, and all 226 other tests passed before and
+    after. What has never run against real hardware is the sized-read path
+    itself, and this driver is the first user of it. If a frame ever comes back
+    one byte short or one byte long on a bench, that code is where to look
+    first.
+
+13. **The trend generator grew an `overlays` argument.** Two lines on one pair
+    of axes, for a reading and its setpoint. Also inherited by every later
+    driver. A page with no overlays renders exactly as before, and a test
+    asserts that.
+
+### What the tests do and do not prove
+
+68 tests cover this driver and 8 more cover the two core changes it forced. They
+all run against the mock.
+
+**What is different here, and it matters.** In the two drivers above, the mock
+was written from the same sources as the driver, so both would be wrong
+together, and no number of tests of that kind could close the gap. Here, the
+nineteen checksum tests are checked against the manufacturer's own printed
+bytes, and the mock computes its checksums with deliberately separate code. So
+the framing and the checksum are proved against something outside this project.
+That is a genuinely stronger position than either earlier driver is in.
+
+What the tests still cannot prove is that the ThermoFlex command bytes address
+the registers their names say, because the mock answers whatever byte the driver
+asks for. Only the bench settles that, and items 1 and 2 above say how.
+
+### First bench visit, in order
+
+The full step by step is in `PROTOCOL.md` and is written for somebody standing
+at the machine. In review terms the order is:
+
+1. `read_acknowledge`, and write down the exact reply bytes. Settles item 7.
+2. `read_internal_temperature`, and check the number and the qualifier byte
+   against the front panel. Confirms the framing, the checksum and the qualifier
+   in one command.
+3. On a ThermoFlex, `read_supply_pressure` and `read_flow` against the panel.
+   Settles item 1.
+4. Cause one safe fault and read the raw status bytes. Settles item 2, which is
+   the one where being wrong looks like working.
+5. Check the units index by switching the panel between bar and PSI. Settles
+   item 5.
+
 ## What was verified, and how
 
-- **145 automated tests pass** for this project. 30 of them are the Lakeshore
-  driver, 35 the Granville-Phillips driver, and the rest the core. Run
-  `pytest -q projects/fab_drivers` from the repository root.
-- **Neither driver touches the transport directly.** Checked by grepping
-  `devices/lakeshore/` and `devices/granville_phillips/` for `exchange(` and
-  `transport.`. The only match in either is the word transport in a docstring.
-  Every command goes through `Device.query`, so the safety gate holds for both.
-  Do the same grep on the next eight.
+- **227 automated tests pass** for this project. 30 of them are the Lakeshore
+  driver, 35 the Granville-Phillips driver, 67 the Thermo chiller driver, and
+  the rest the core. Run `pytest -q projects/fab_drivers` from the repository
+  root.
+- **No driver touches the transport directly.** Checked by grepping
+  `devices/lakeshore/`, `devices/granville_phillips/` and
+  `devices/thermo_chiller/` for `exchange(` and `transport.`. Every command goes
+  through `Device.query`, so the safety gate holds for all three. Do the same
+  grep on the next seven.
+
+  The only matches in any of the three are the word transport in a docstring.
+
+  One thing the grep does not catch, so it is written here instead.
+  `build_transport()` in the chiller driver constructs a `SerialTransport` with
+  the `reply_size` hook this protocol needs. It builds a transport, it does not
+  send through one, and every command still goes through `Device.query`.
 - **The Lakeshore trend page was generated and looked at**, not only asserted
   on. A six hour cooldown on a 336, four inputs, with a deliberate forty minute
   gap in one of them. The gap draws as a break in the line rather than a join,
@@ -287,6 +473,32 @@ That is not a gap more tests of this kind can close.
   One gridline per decade." underneath the words "No readings in this window",
   which is noise. Both are fixed. This is the argument for generating the page
   and opening it rather than trusting the assertions.
+- **The Thermo chiller checksum was checked against nineteen frames printed in
+  two Thermo NESLAB manuals**, read directly from the PDFs. Eighteen agree byte
+  for byte. The nineteenth, Read Cool Proportional Band, is printed as `84`
+  where the manual's own rule gives `8A`, and one independent implementation
+  also sends `8A`. Every one of the nineteen is a parametrised test. The mock
+  computes its checksums with deliberately separate code, so the manual's bytes
+  are what decides, not agreement between two files in this repository.
+
+  **This is the strongest verification in the project so far**, and it is the
+  standard `tests/test_device.py` set with the CTI checksum. It is worth being
+  clear about what it does and does not cover: it proves the framing and the
+  checksum, not that a ThermoFlex command byte reads the register its name says.
+
+- **The Thermo chiller trend page was generated and rendered in a browser,** not
+  only asserted on. Three days of a ThermoFlex at an 18 degree setpoint, with
+  the bath drifting five degrees up over the last day as the flow falls away,
+  and a deliberate two hour gap in every column.
+
+  Opening it found one real thing the tests had not. The setpoint was on its own
+  chart with its own axis, so a flat setpoint filled its chart exactly as much
+  as a temperature that had drifted five degrees, and the divergence, which is
+  the only thing that page is for, was not visible anywhere. The shared
+  generator grew an `overlays` argument as a result and the two now share one
+  pair of axes. That is the second time in three sessions that opening the page
+  found something the assertions did not.
+
 - **The core imports and runs with pyserial absent.** That is the state of the
   GitHub runner. `open_serial_port` gives a clear message instead of a stack
   trace.

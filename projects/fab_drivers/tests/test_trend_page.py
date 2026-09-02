@@ -286,3 +286,97 @@ def test_ordinary_numbers_are_still_shown_plainly(tmp_path):
         ["temp_k"], "Monitor")
     assert "77.35" in page
     assert "E+" not in page
+
+
+# ---------------------------------------------------------------------------
+# Two lines on one chart
+#
+# A reading and the setpoint it is supposed to be holding belong on the same
+# axes. On separate charts each one scales to its own values, so a setpoint
+# that never moves fills its chart just as much as a temperature that has
+# drifted, and the gap between them, which is the only thing worth looking at,
+# is nowhere on the page.
+# ---------------------------------------------------------------------------
+
+def overlay_rows():
+    """A reading drifting away from a setpoint that does not move."""
+    return [
+        {"timestamp": "2026-09-01 10:00:00", "Temp": "18.0", "Setpoint": "18.0"},
+        {"timestamp": "2026-09-01 10:10:00", "Temp": "19.5", "Setpoint": "18.0"},
+        {"timestamp": "2026-09-01 10:20:00", "Temp": "22.0", "Setpoint": "18.0"},
+    ]
+
+
+def test_an_overlaid_column_is_drawn_on_the_other_columns_chart():
+    page = render_trend_page(overlay_rows(), ["Temp", "Setpoint"], "Chiller",
+                             overlays={"Temp": "Setpoint"})
+    # One chart, holding both names, and a legend saying which line is which.
+    assert page.count("<svg") == 1
+    assert "Temp and Setpoint" in page
+    assert 'class="line alt"' in page
+    assert 'class="key alt"' in page
+
+
+def test_an_overlaid_column_still_gets_its_own_summary_row():
+    # It has no chart of its own, but its latest, lowest and highest are still
+    # worth having in the table.
+    page = render_trend_page(overlay_rows(), ["Temp", "Setpoint"], "Chiller",
+                             overlays={"Temp": "Setpoint"})
+    assert "<td>Setpoint</td>" in page
+    assert "<td>Temp</td>" in page
+
+
+def test_both_lines_share_one_axis():
+    # The whole point. The axis has to cover both series, so the gap between
+    # them is to scale. If the axis only covered the first, the setpoint would
+    # be drawn off the bottom of the chart.
+    page = render_trend_page(overlay_rows(), ["Temp", "Setpoint"], "Chiller",
+                             overlays={"Temp": "Setpoint"})
+    # The axis runs from the lowest reading on either line to the highest.
+    assert ">18<" in page or ">18.00<" in page
+    assert ">22<" in page or ">22.00<" in page
+
+
+def test_a_page_with_no_overlays_is_exactly_as_it_was():
+    # Nine other drivers use this path and none of them asked for a change.
+    page = render_trend_page(overlay_rows(), ["Temp", "Setpoint"], "Chiller")
+    assert page.count("<svg") == 2
+    assert 'class="line alt"' not in page
+    assert "Temp and Setpoint" not in page
+
+
+def test_a_misspelled_overlay_column_is_refused():
+    # Silently dropping the second line would leave a page that looks finished
+    # and answers the wrong question.
+    with pytest.raises(ValueError) as caught:
+        render_trend_page(overlay_rows(), ["Temp", "Setpoint"], "Chiller",
+                          overlays={"Temp": "Set point"})
+    assert "not being plotted" in str(caught.value)
+
+
+def test_a_chain_of_overlays_is_refused():
+    # Two lines on one axis is readable. Three is not, and a chain is a way of
+    # asking for three without noticing.
+    rows = [{"timestamp": "t", "A": "1", "B": "2", "C": "3"}]
+    with pytest.raises(ValueError) as caught:
+        render_trend_page(rows, ["A", "B", "C"], "Thing",
+                          overlays={"A": "B", "B": "C"})
+    assert "chain" in str(caught.value)
+
+
+def test_a_gap_in_the_second_line_stays_a_gap():
+    # Two readings each side of the hole, so each side is a line rather than a
+    # lone dot. A single reading between two gaps is drawn as a dot instead,
+    # which is a different case and is tested elsewhere.
+    rows = [
+        {"timestamp": "t1", "Temp": "18.0", "Setpoint": "18.0"},
+        {"timestamp": "t2", "Temp": "18.5", "Setpoint": "18.0"},
+        {"timestamp": "t3", "Temp": "19.0", "Setpoint": ""},
+        {"timestamp": "t4", "Temp": "19.5", "Setpoint": "18.0"},
+        {"timestamp": "t5", "Temp": "20.0", "Setpoint": "18.0"},
+    ]
+    page = render_trend_page(rows, ["Temp", "Setpoint"], "Chiller",
+                             overlays={"Temp": "Setpoint"})
+    # The setpoint is drawn as two runs with a break, not one line straight
+    # through the hole.
+    assert page.count('class="line alt"') == 2

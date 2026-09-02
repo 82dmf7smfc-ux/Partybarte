@@ -388,6 +388,157 @@ left free for actual working instructions if we ever want them.
   warning that only lives in a markdown file is one nobody reads at the bench.
   Whoever holds the 375 manual should settle this in ten minutes.
 
+- **2026-09-02. The core transport learned to read a reply by its length, not
+  by a terminator.** This is the first shared-code change a driver has forced,
+  and eight more drivers inherit it, so it is written up here in full.
+
+  `SerialTransport` read up to a terminator, usually a carriage return. That
+  works for every ASCII protocol and cannot work for a binary one. Any byte
+  value can appear in a payload, so there is no byte left over to mean "the
+  frame ends here". A `\r` inside a checksum would cut a frame in half, and the
+  half left in the buffer would be read as the front of the next reply.
+
+  What binary protocols have instead is a length. The chiller writes the number
+  of data bytes at index 4, so the whole frame is `6 + n` bytes.
+
+  So `SerialTransport` grew one optional argument, `reply_size`. It is a
+  function the driver supplies. Given the bytes that have arrived so far it
+  returns the total frame length, or `None` for "I still cannot tell". The
+  transport reads a byte at a time until it can tell, then asks for exactly the
+  rest.
+
+  Three things about the shape of it were deliberate.
+
+  It is optional and defaults to `None`, so the nine drivers that read up to a
+  terminator behave exactly as they did. A test asserts that.
+
+  It is a function rather than a fixed offset, because the next binary drivers
+  do not agree on where the length lives. Modbus RTU derives it from the
+  function code, AE Bus packs a length into the low bits of a header byte. A
+  number would have covered this device and nothing else.
+
+  It stops at the declared length rather than draining the buffer. That is the
+  bug worth naming: read one byte too many and the next exchange starts on
+  somebody else's last byte, and every reply from then on is off by one while
+  still looking like data. There is a test for exactly that.
+
+  `MockSerial` grew `read(n)` to match, returning what is there when less is
+  there, which is what a real port does when it times out mid-frame.
+
+- **2026-09-02. `parse_reply` returns a structure for this driver, and the base
+  class did not change.** The two earlier drivers return text and turn it into a
+  number in a separate step. A binary protocol has no text stage.
+
+  The checking has to happen in `parse_reply`, because that is where `core/device.py`
+  says a driver checks its checksum, and because a corrupted frame must never
+  become a number. But what the data bytes mean depends on which command was
+  asked: three bytes are a measurement, four or five are the fault bits, two are
+  a protocol version. So returning a number was not possible and returning bytes
+  would have thrown away the checking.
+
+  `parse_reply` therefore returns an `NcReply`: the frame unwrapped, with the
+  checksum, the error command, the lead character and the echoed address already
+  checked. The caller reads the part it wants.
+
+  **The base class needed no change at all.** `Device.parse_reply` already
+  returns whatever the driver wants, and this was checked before touching shared
+  code rather than after.
+
+- **2026-09-02. The checksum was proved against nineteen frames printed in the
+  manuals before it was trusted.** Two Thermo NESLAB manuals were read directly,
+  which is a first for this project, and between them they print nineteen
+  complete frames with their checksums. Every one is a parametrised test.
+
+  This was worth the effort for a specific reason. The mock also computes
+  checksums, and a mock that shares the driver's arithmetic will agree with a
+  broken driver and prove nothing. So the mock computes its checksums with its
+  own code, deliberately duplicated, and the manual's own bytes are what decides
+  which of them is right.
+
+  **Eighteen agree. One does not.** The Digital Plus manual prints Read Cool
+  Proportional Band as `CA 00 01 74 00 84`, and the manual's own stated rule
+  gives `8A`. The one independent implementation found also sends `8A`. It is
+  almost certainly a misprint. The driver computes every checksum and copies
+  none, so it sends `8A`, and the disagreement is a test of its own so that
+  anybody changing the checksum has to come and look at it.
+
+- **2026-09-02. Neslab and ThermoFlex are one class, because they are one
+  protocol.** The session brief asked for this to be checked rather than
+  assumed, on the grounds that two genuinely different protocols in one class
+  with a flag is how a driver becomes unreadable. It was checked.
+
+  They share the framing, the checksum, the address bytes, the two lead
+  characters, the error replies, the qualifier byte layout, and the command
+  bytes for temperature, setpoint and the temperature limits. A working
+  ThermoFlex library builds `[0xCA, 0x00, 0x01]` frames with the NESLAB
+  checksum, which is the NESLAB manual's protocol exactly.
+
+  What differs is which registers exist behind it, and what the fault bits mean.
+  A ThermoFlex has a pump, so it has flow and pressure to read and a bath does
+  not. That is a capability list, not a second protocol, and `ModelProfile`
+  already existed to hold exactly that, from the Granville-Phillips driver.
+
+  **What would reverse this.** If a bench visit shows a ThermoFlex framing a
+  message differently, or computing its checksum over a different range, split
+  the class. Different command bytes would not be enough on their own, and
+  neither would the different status tables, which are already two separate
+  named tables rather than a flag inside one.
+
+- **2026-09-02. Reading a setpoint is allowed. Writing one is banned twice
+  over.** These are one bit apart. Read Setpoint is command `70` and Set
+  Setpoint is command `F0`, and the manual's Table 1 separates them into a READ
+  block and a SET block.
+
+  Reading it is worth having, because a chiller drifting from its setpoint is
+  the fault a trend exists to catch, and you cannot see the drift without both
+  numbers. Writing it changes the temperature of the water feeding live
+  equipment.
+
+  So the read is on the allowed list and the write is on the banned list with
+  its reason. That is the same protection every other driver has.
+
+  This device got a second one as well. Every write command in both manuals has
+  bit 7 set and every read command does not, across the whole of both tables.
+  `build_frame` refuses any command byte at or above `0x80` outright. That is an
+  observed regularity and not a rule either manual states, so it is written down
+  as such, and it is a second line of defence rather than the first. What it
+  catches is a future session adding something to an allowed list without
+  reading `PROTOCOL.md`, which is a likelier failure than the policy itself
+  going wrong.
+
+- **2026-09-02. A reading in the wrong unit is refused, not converted.** Unlike
+  the Granville-Phillips gauges, this instrument states its unit in every single
+  reply. That is a gift and the driver spends it: each command says what unit it
+  expects, and a reply in any other unit raises instead of being converted.
+
+  Converting quietly would put two units in one trend column with every number
+  in it plausible, which is the failure the gauge driver could only make visible
+  and not prevent. Here it can be prevented, so it is.
+
+- **2026-09-02. The shared trend generator learned to draw two lines on one
+  chart.** A reading and the setpoint it is holding were on separate charts, and
+  the page was generated and looked at, which is how this was caught.
+
+  Separate charts cannot answer the question a setpoint is for. Each chart
+  scales itself to its own readings, so a setpoint that has not moved all week
+  fills its chart from top to bottom exactly as much as a temperature that has
+  climbed five degrees. Both look flat, or both look dramatic, and the gap
+  between them is nowhere on the page.
+
+  So `render_trend_page` grew an `overlays` argument, and `_chart_svg` now takes
+  a list of series sharing one axis. The second line is drawn in another colour
+  **and** dashed, so it survives a black and white printout and a reader who
+  cannot separate the two colours.
+
+  It went in the shared generator rather than in this driver because a value and
+  its setpoint is not a chiller thing. The Watlow heater zones have it too. The
+  brief says to improve the generator rather than work around it, and this is
+  what that looks like.
+
+  Two lines, not three. A chain of overlays raises, because three lines on one
+  axis stops being readable and a chain is a way of asking for three without
+  noticing.
+
 ## Open questions
 1. **Which machine runs the poller long term?** The existing heat exchanger
    Raspberry Pi logger is mentioned for the chiller. If that becomes the home for

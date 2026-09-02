@@ -11,8 +11,18 @@ too.
 If the network refuses a download, which is what happens on these machines for
 most manufacturer sites, say so plainly and write a fetch prompt.
 `FETCH_PROMPT.md` is the worked example of one. It goes to somebody with better
-access and comes back as a zip that gets unpacked here. Two are outstanding, one
-for Lake Shore and one for Granville-Phillips.
+access and comes back as a zip that gets unpacked here. Three are outstanding,
+one for Lake Shore, one for Granville-Phillips and one for the ThermoFlex
+chillers.
+
+**Look on GitHub before writing a fetch prompt.** The Thermo chiller session
+found two Thermo NESLAB manuals as ordinary PDF files in the `manuals/` folder
+of a public laboratory repository, `github.com/octopode/bathtime`, and read them
+in full. `github.com` is reachable on these machines when nothing else is. Lab
+groups keep the manuals for the instruments they automate next to the code that
+drives them, so a repository that has a driver for a device may well have the
+device's manual too. That is worth thirty seconds of looking before deciding a
+document cannot be had.
 
 ## The part that does not bend
 
@@ -36,10 +46,14 @@ check first.
 
 ## The shape of a fetch prompt
 
-There are two outstanding requests. `FETCH_PROMPT.md` asks for the Lake Shore
+There are three outstanding requests. `FETCH_PROMPT.md` asks for the Lake Shore
 temperature monitor manuals and the later devices in the plan.
 `FETCH_PROMPT_GRANVILLE_PHILLIPS.md` asks for the Granville-Phillips gauge
 manuals and carries thirteen numbered questions the driver needs answered.
+`FETCH_PROMPT_THERMO_CHILLER.md` asks for one document, the ThermoFlex serial
+appendix, and is much shorter than the other two because that session had
+manuals for most of what it built. It is the example to copy when most of a
+protocol is already sourced and a specific hole is left.
 `FETCH_PROMPT.md` is the worked example of this shape. A new one covers:
 
 - **What it is for.** The prompt goes to a session starting from nothing, so it

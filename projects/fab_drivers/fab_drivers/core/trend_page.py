@@ -142,12 +142,22 @@ def _decade_label(exponent):
     return "1E%+03d" % exponent
 
 
-def _chart_svg(points, scale=LINEAR):
-    """Draw one column as an SVG line chart.
+def _chart_svg(series, scale=LINEAR):
+    """Draw one chart, holding one line or two.
 
-    points is a list of (index, value_or_None), already in time order.
+    series is a list of point lists. Each point list is a list of
+    (index, value_or_None), already in time order. The first one is the main
+    reading and the second, if there is one, is drawn over it on the same axes
+    in another colour and dashed.
 
-    scale is LINEAR or LOG. Pressure needs LOG, because it runs from atmosphere
+    Two lines on one chart is what makes a setpoint useful. A reading and the
+    setpoint it is supposed to be holding, on separate charts with separate
+    axes, cannot be compared by eye: each chart scales to its own values, so a
+    flat setpoint and a drifting temperature both look like they fill the
+    chart. On one pair of axes the gap between them is the whole point.
+
+    scale is LINEAR or LOG, and applies to every line on the chart, because
+    they share an axis. Pressure needs LOG, because it runs from atmosphere
     down to 1e-9 torr, and on a linear axis every reading below about 1 torr
     sits flat on the bottom of the chart. The pumpdown that matters is then
     invisible.
@@ -158,9 +168,14 @@ def _chart_svg(points, scale=LINEAR):
 
     dropped = 0
     if scale == LOG:
-        points, dropped = _positive_only(points)
+        cleaned = []
+        for points in series:
+            kept, lost = _positive_only(points)
+            cleaned.append(kept)
+            dropped += lost
+        series = cleaned
 
-    values = [v for _, v in points if v is not None]
+    values = [v for points in series for _, v in points if v is not None]
     if not values:
         if dropped:
             return ('<p class="nodata">No readings in this window that a log '
@@ -181,7 +196,7 @@ def _chart_svg(points, scale=LINEAR):
 
     plot_width = CHART_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
     plot_height = CHART_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
-    last_index = max(len(points) - 1, 1)
+    last_index = max(max(len(points) for points in series) - 1, 1)
 
     def place(value):
         """Where a value sits on the axis. 0 is the bottom, 1 is the top."""
@@ -228,16 +243,22 @@ def _chart_svg(points, scale=LINEAR):
             parts.append('<text class="ylabel" x="%.1f" y="%.1f">%s</text>'
                          % (MARGIN_LEFT - 8, y + 4, _tidy_number(value)))
 
-    for run in _segments(points):
-        if len(run) == 1:
-            # A lone reading between two gaps would be an invisible line, so
-            # show it as a dot instead.
-            x, value = run[0]
-            parts.append('<circle class="point" cx="%.1f" cy="%.1f" r="2.5"/>'
-                         % (sx(x), sy(value)))
-            continue
-        coords = " ".join("%.1f,%.1f" % (sx(x), sy(v)) for x, v in run)
-        parts.append('<polyline class="line" points="%s"/>' % coords)
+    for order, points in enumerate(series):
+        # The first line is plain, and every one after it is dashed and in the
+        # second colour. Only two are expected. More than two on one axis stops
+        # being readable, which is why nothing offers it.
+        extra = "" if order == 0 else " alt"
+        for run in _segments(points):
+            if len(run) == 1:
+                # A lone reading between two gaps would be an invisible line,
+                # so show it as a dot instead.
+                x, value = run[0]
+                parts.append('<circle class="point%s" cx="%.1f" cy="%.1f" '
+                             'r="2.5"/>' % (extra, sx(x), sy(value)))
+                continue
+            coords = " ".join("%.1f,%.1f" % (sx(x), sy(v)) for x, v in run)
+            parts.append('<polyline class="line%s" points="%s"/>'
+                         % (extra, coords))
 
     return ('<svg class="chart" viewBox="0 0 %d %d" preserveAspectRatio="none" '
             'role="img">%s</svg>' % (CHART_WIDTH, CHART_HEIGHT, "".join(parts)))
@@ -302,12 +323,12 @@ PAGE_TEMPLATE = """<!doctype html>
 <style>
   :root {
     --ink: #1a1a1a; --soft: #666; --rule: #d8d8d8;
-    --bg: #ffffff; --panel: #f7f7f7; --line: #1f6feb;
+    --bg: #ffffff; --panel: #f7f7f7; --line: #1f6feb; --line2: #b8860b;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --ink: #e8e8e8; --soft: #a0a0a0; --rule: #3a3a3a;
-      --bg: #161616; --panel: #202020; --line: #5aa0ff;
+      --bg: #161616; --panel: #202020; --line: #5aa0ff; --line2: #e0b040;
     }
   }
   body { margin: 0; padding: 24px; background: var(--bg); color: var(--ink);
@@ -322,6 +343,16 @@ PAGE_TEMPLATE = """<!doctype html>
   .chart { width: 100%; height: 220px; background: var(--panel); border: 1px solid var(--rule); }
   .line { fill: none; stroke: var(--line); stroke-width: 1.6; }
   .point { fill: var(--line); }
+  /* The second line on a chart that has two, drawn dashed as well as in
+     another colour. A reader who cannot tell the two colours apart can still
+     tell the two lines apart, and so can a black and white printout. */
+  .line.alt { stroke: var(--line2); stroke-dasharray: 5 3; }
+  .point.alt { fill: var(--line2); }
+  .legend { color: var(--soft); font-size: 12px; margin: 0 0 6px; }
+  .key { display: inline-block; width: 22px; border-top: 2px solid var(--line);
+         margin: 0 6px 4px 0; vertical-align: middle; }
+  .key.alt { border-top: 2px dashed var(--line2); }
+  .legend span + .key { margin-left: 18px; }
   .grid { stroke: var(--rule); stroke-width: 1; }
   .ylabel { fill: var(--soft); font-size: 11px; text-anchor: end; }
   .nodata { color: var(--soft); font-style: italic; }
@@ -344,7 +375,8 @@ reading that failed, not a reading of zero.
 """
 
 
-def render_trend_page(rows, columns, title, built_at=None, scales=None):
+def render_trend_page(rows, columns, title, built_at=None, scales=None,
+                      overlays=None):
     """Return the HTML for one device's trend page.
 
     rows:    the reading rows, oldest first, as read_history returns them.
@@ -356,9 +388,23 @@ def render_trend_page(rows, columns, title, built_at=None, scales=None):
              runs over nine decades and a linear axis hides all of it below
              about 1 torr. The choice belongs to the driver, because only the
              driver knows what the column holds.
+    overlays: an optional dictionary of column name to the column drawn over
+             it on the same axes. Use it for a reading and the setpoint it is
+             supposed to be holding.
+
+             This exists because separate charts cannot answer the question a
+             setpoint is for. Each chart scales to its own values, so a
+             setpoint that never moves fills its chart exactly as much as a
+             temperature that has drifted five degrees, and the gap between
+             them, which is the only thing worth looking at, is nowhere on the
+             page. On shared axes it is the first thing you see.
+
+             The overlaid column still gets its own row in the summary table.
+             It does not get a chart of its own, because it already has one.
     """
     built_at = built_at or datetime.datetime.now()
     scales = dict(scales or {})
+    overlays = dict(overlays or {})
 
     unknown = set(scales) - set(columns)
     if unknown:
@@ -369,6 +415,25 @@ def render_trend_page(rows, columns, title, built_at=None, scales=None):
             "these columns were given a scale but are not being plotted: %s. "
             "The columns are: %s"
             % (", ".join(sorted(unknown)), ", ".join(columns)))
+
+    # Same reasoning. A misspelled name here would silently drop the second
+    # line off a chart and leave a page that looks finished.
+    named = set(overlays) | set(overlays.values())
+    unknown = named - set(columns)
+    if unknown:
+        raise ValueError(
+            "these columns were named in overlays but are not being plotted: "
+            "%s. The columns are: %s"
+            % (", ".join(sorted(unknown)), ", ".join(columns)))
+
+    # A column cannot be drawn over something and also have something drawn
+    # over it. Two lines on one axis is readable and three is not, and a chain
+    # of overlays is a way of asking for three without noticing.
+    both = set(overlays) & set(overlays.values())
+    if both:
+        raise ValueError(
+            "these columns are both overlaid and overlaid on: %s. A chart "
+            "holds two lines, not a chain of them." % ", ".join(sorted(both)))
 
     series = {}
     for column in columns:
@@ -386,17 +451,39 @@ def render_trend_page(rows, columns, title, built_at=None, scales=None):
                '<th>Highest</th><th>Points</th></tr>%s</table>'
                % "".join(summary_rows))
 
+    # A column drawn over another one has no chart of its own, because it is
+    # already on that one.
+    drawn_elsewhere = set(overlays.values())
+
     charts = []
     for column in columns:
+        if column in drawn_elsewhere:
+            continue
         scale = scales.get(column, LINEAR)
-        dropped = _count_non_positive(series[column]) if scale == LOG else 0
-        plotted = [value for _, value in series[column]
+        companion = overlays.get(column)
+        lines = [series[column]]
+        if companion:
+            lines.append(series[companion])
+
+        dropped = sum(_count_non_positive(line) for line in lines) \
+            if scale == LOG else 0
+        plotted = [value for line in lines for _, value in line
                    if value is not None and (scale == LINEAR or value > 0)]
         note = _chart_note(scale, dropped, bool(plotted))
+
+        if companion:
+            heading = "%s and %s" % (column, companion)
+            legend = ('<p class="legend"><i class="key"></i><span>%s</span>'
+                      '<i class="key alt"></i><span>%s</span></p>'
+                      % (html.escape(column), html.escape(companion)))
+        else:
+            heading = column
+            legend = ""
+
         charts.append(
-            '<section><h2>%s</h2>%s%s</section>'
-            % (html.escape(column),
-               _chart_svg(series[column], scale=scale),
+            '<section><h2>%s</h2>%s%s%s</section>'
+            % (html.escape(heading), legend,
+               _chart_svg(lines, scale=scale),
                ('<p class="span">%s</p>' % html.escape(note)) if note else ""))
 
     if rows:
@@ -417,15 +504,16 @@ def render_trend_page(rows, columns, title, built_at=None, scales=None):
 
 
 def write_trend_page(history_folder, name, columns, out_path, title=None,
-                     days=7, today=None, built_at=None, scales=None):
+                     days=7, today=None, built_at=None, scales=None,
+                     overlays=None):
     """Read a device's history and write its trend page. Returns the path.
 
-    scales is passed straight through to render_trend_page. See it for what a
-    scale is and when a column needs one.
+    scales and overlays are passed straight through to render_trend_page. See
+    it for what each one is and when a column needs one.
     """
     rows = read_history(history_folder, name, days=days, today=today)
     page = render_trend_page(rows, columns, title or name, built_at=built_at,
-                             scales=scales)
+                             scales=scales, overlays=overlays)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(page, encoding="utf-8")

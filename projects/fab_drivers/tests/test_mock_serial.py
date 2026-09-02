@@ -43,3 +43,21 @@ def test_resetting_the_input_buffer_throws_away_a_stale_reply():
     port.write(b"q\r")
     port.reset_input_buffer()
     assert port.read_until(b"\r") == b""
+
+
+def test_reading_a_fixed_number_of_bytes():
+    # The binary protocols read by length rather than up to a terminator, so
+    # the mock has to offer read the way pyserial does.
+    port = MockSerial(lambda written: bytes([0xCA, 0x00, 0x01, 0x20, 0x00]))
+    port.write(b"q")
+    assert port.read(3) == bytes([0xCA, 0x00, 0x01])
+    assert port.read(2) == bytes([0x20, 0x00])
+
+
+def test_reading_more_than_is_there_returns_what_is_there():
+    # This is how a real port behaves when it times out partway through a
+    # reply, and it is how the transport tells a short frame from silence.
+    port = MockSerial(lambda written: b"ab")
+    port.write(b"q")
+    assert port.read(10) == b"ab"
+    assert port.read(10) == b""
