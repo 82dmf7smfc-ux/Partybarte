@@ -12,9 +12,11 @@ list, the environment setup script, the pytest settings, the packaging script,
 and these documents.
 
 When you add a project, make a new folder under `projects`. Give it a read me,
-a `tests` folder, and a `conftest.py` that puts the project folder on the import
-path, the way `projects/alarm_pareto/conftest.py` does. Then add a row to the
-project table in the root read me. You do not have to touch the CI workflow.
+a `tests` folder, its own `requirements.txt`, and a `conftest.py` that puts the
+project folder on the import path, the way `projects/alarm_pareto/conftest.py`
+does. Add the new requirements file to the list at the top of the root
+`requirements.txt`, and add a row to the project table in the root read me. You
+do not have to touch the CI workflow.
 It runs `pytest -q` from the root, and `pytest.ini` points that at every project
 folder.
 
@@ -25,9 +27,18 @@ decide where shared code should live before it is written.
 ## Ground rules
 
 - These rules apply to every project in the repository, not just one.
-- The tools must run fully offline. Never add a runtime network call.
-- Use only these Python packages: pandas, numpy, openpyxl, python-pptx,
-  matplotlib, pytest. Every new package is an IT approval request, so ask first.
+- Nothing leaves the building. Never reach the internet, at any point, for any
+  reason. No telemetry, no content delivery networks, no fonts fetched from the
+  web.
+- Talking to equipment is not the same thing. A driver reading a gauge over
+  RS-232, or over a socket to a tool on the fab network, is doing its job. The
+  rule above is about the internet, not about local links. This wording replaced
+  a blanket ban on network calls, which the driver library would have broken on
+  its first day for no good reason.
+- Every new package is an IT approval request, so ask first. Add a package in the
+  same change that first imports it, so nobody is asked to approve a wheel that
+  nothing uses. What is pinned today: alarm_pareto uses pandas, numpy, openpyxl,
+  python-pptx and matplotlib; fab_drivers uses pyserial; both use pytest.
 - Keep the browser tool a single self-contained HTML file. No outside scripts,
   no content delivery networks, no fonts fetched from the web.
 - Match the writing style of the existing comments. Short sentences. Plain
@@ -35,9 +46,10 @@ decide where shared code should live before it is written.
 
 ## Set up a development environment
 
-You need Python and the pinned packages. There is one environment for the whole
-repository, built at the root and shared by every project. On a machine with
-internet, run this from the repository root:
+You need Python and the pinned packages. Each project pins what it needs in its
+own `requirements.txt`, and the file at the root gathers them. There is one
+environment for the whole repository, built at the root and shared by every
+project. On a machine with internet, run this from the repository root:
 
     python -m venv .venv
     .venv\Scripts\python.exe -m pip install -r requirements.txt

@@ -8,6 +8,7 @@ project lives in its own folder under `projects` and has its own read me.
 | Project | What it does |
 |---|---|
 | [`projects/alarm_pareto`](projects/alarm_pareto/README.md) | Ranks the faults in a semiconductor tool alarm log, by how often each one happens and by how much downtime it causes. Comes as a zero-install browser page and as a Python command line tool. |
+| [`projects/fab_drivers`](projects/fab_drivers/README.md) | A library of small, read-only monitoring drivers for fab equipment. Reads values over serial, logs every raw frame, and trends the readings into daily CSV files. Read its safety section before connecting anything. |
 
 ## How this repository is laid out
 
@@ -18,7 +19,7 @@ whole repository stays at the root.
 | Path | What it is |
 |---|---|
 | `projects/` | One folder per project. This is where the code lives. |
-| `requirements.txt` | The pinned Python packages, shared by every project. |
+| `requirements.txt` | Gathers each project's pinned packages into one install. |
 | `setup_venv.bat` | Builds the one shared `.venv` environment on Windows. |
 | `pytest.ini` | Points pytest at every project, so one command runs all tests. |
 | `tools/build_zips.py` | Builds the download packages for release. |
@@ -31,10 +32,17 @@ whole repository stays at the root.
 
 These are not style preferences. They come from where these tools have to run.
 
-1. **Fully offline.** No project makes a network call at runtime. The machines
-   these tools run on have no internet, and the data must not leave them.
+1. **Nothing leaves the building.** No project reaches the internet, at any
+   point, for any reason. No telemetry. No content delivery networks. No fonts
+   fetched from the web. The machines these tools run on have no internet, and
+   the data on them must not leave.
+
+   Talking to a piece of equipment is not the same thing. A driver that reads a
+   gauge over RS-232, or over a socket to a tool on the fab network, is doing
+   exactly what it is for. The rule is about the internet, not about local
+   links.
 2. **Ask before adding a package.** Every Python package is an IT approval
-   request. Use what is already in `requirements.txt` where you can.
+   request. Use what a project already pins where you can.
 3. **A browser tool stays one file.** No outside scripts, no content delivery
    networks, no fonts fetched from the web.
 4. **Plain code and plain writing.** Short sentences. Common words. Comments
@@ -56,6 +64,10 @@ On an offline machine, get the wheel files from IT, put them in one folder, and
 run `setup_venv.bat C:\path\to\wheel_folder`. A wheel is a pre-built package
 file. There is one environment for the whole repository, so you only do this
 once, not once per project.
+
+Each project pins its own packages, in its own folder. The file at the root just
+gathers them. That way a download package only asks a person to approve the
+packages that tool really imports.
 
 ## Running the tests
 

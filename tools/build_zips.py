@@ -73,14 +73,14 @@ def build_python_zip():
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
         _add_tree(zf, PARETO / "alarm_pareto", f"{top}/alarm_pareto")
         _add_tree(zf, PARETO / "tests", f"{top}/tests")
-        # The pinned package list and the environment setup script are shared by
-        # the whole repository, so they come from the root. The conftest and the
-        # read me belong to this project. Inside the zip they all sit together at
-        # the top level, which is the flat layout the person downloading it
-        # expects.
-        for name in ["requirements.txt", "setup_venv.bat"]:
-            _add_file(zf, ROOT / name, f"{top}/{name}")
-        for name in ["conftest.py", "README.md"]:
+        # The environment setup script is shared by the whole repository, so it
+        # comes from the root. Everything else belongs to this project, including
+        # its package list, which names only the packages this tool imports. That
+        # keeps the approval request short for whoever installs it. Inside the
+        # zip they all sit together at the top level, which is the flat layout
+        # the person downloading it expects.
+        _add_file(zf, ROOT / "setup_venv.bat", f"{top}/setup_venv.bat")
+        for name in ["requirements.txt", "conftest.py", "README.md"]:
             _add_file(zf, PARETO / name, f"{top}/{name}")
     return target
 

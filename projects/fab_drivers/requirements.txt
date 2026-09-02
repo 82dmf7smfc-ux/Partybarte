@@ -1,0 +1,21 @@
+# Packages this project needs. Exact pinned versions. Not ranges. A driver must
+# behave the same way in eighteen months.
+#
+# This file is self-contained on purpose. It ships inside the download package,
+# where it is the only requirements file present.
+#
+# Install from local wheels like this (offline):
+#   pip install --no-index --find-links C:\path\to\wheels -r requirements.txt
+#
+# What each one is for:
+#   pyserial    talk to RS-232 and RS-485 devices over a COM port
+#   pytest      run the tests
+#
+# Packages that later drivers will need, so you can plan the approval requests:
+#   pymodbus    driver 9, Watlow EZ-Zone over Modbus RTU
+#   secsgem     driver 10, SECS/GEM over HSMS
+# Neither is listed below yet. Add it in the same change that adds its driver,
+# so nobody is asked to approve a wheel that nothing imports.
+#
+pyserial==3.5
+pytest==8.3.2

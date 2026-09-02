@@ -1,0 +1,78 @@
+"""Decide which commands a driver is allowed to send.
+
+Why this exists
+---------------
+These tools connect to production equipment. Some commands only read a value.
+Others change what the machine is doing. A regen start on a cryopump is a
+multi-hour machine event. A port lockout command can cut the tool's own software
+off from its pumps.
+
+Version 1 of every driver in this library is read-only. The safe way to hold
+that line is not to remember it. It is to make the wrong command impossible to
+send. A driver lists the commands it is allowed to use. Anything not on that
+list is refused here, before a single byte reaches the port.
+
+This runs before the frame is built, so a banned command never becomes bytes.
+"""
+
+
+class CommandRefused(Exception):
+    """Raised when a command is not on the allowed list.
+
+    Catching this in a driver would defeat the point. Let it stop the program.
+    """
+
+
+class CommandPolicy:
+    """The list of commands one device is allowed to receive.
+
+    device_name: a plain name used in error messages, like "Lakeshore 336".
+    allowed:     the commands this driver may send. Read commands only in v1.
+    banned:      commands that are known to be dangerous on this device. These
+                 are refused with a louder message that says why. A command does
+                 not need to be listed here to be refused. Anything missing from
+                 'allowed' is refused too. This list exists so the reason is
+                 recorded next to the command, where the next person will read
+                 it.
+    """
+
+    def __init__(self, device_name, allowed, banned=None):
+        self.device_name = device_name
+        # A set makes the check fast and makes duplicates harmless.
+        self.allowed = set(allowed)
+        # Banned entries map a command to the reason it must never be sent.
+        self.banned = dict(banned or {})
+
+        # A command in both lists is a mistake in the driver, not a runtime
+        # problem. Catch it as early as possible, when the policy is built.
+        overlap = self.allowed & set(self.banned)
+        if overlap:
+            raise ValueError(
+                "%s: these commands are both allowed and banned: %s"
+                % (device_name, ", ".join(sorted(overlap)))
+            )
+
+    def check(self, command):
+        """Let the command through, or raise CommandRefused.
+
+        Returns the command unchanged so a caller can write:
+            command = policy.check(command)
+        """
+        if command in self.banned:
+            raise CommandRefused(
+                "%s: command %r is banned. %s"
+                % (self.device_name, command, self.banned[command])
+            )
+        if command not in self.allowed:
+            raise CommandRefused(
+                "%s: command %r is not on the read-only allowed list. If this "
+                "command only reads a value, add it to the driver's allowed "
+                "list and say so in DECISIONS.md. If it changes what the "
+                "machine is doing, it does not belong in this version."
+                % (self.device_name, command)
+            )
+        return command
+
+    def is_allowed(self, command):
+        """Answer the same question without raising. Useful in tests and menus."""
+        return command in self.allowed and command not in self.banned

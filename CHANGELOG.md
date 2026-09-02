@@ -16,8 +16,22 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - Added `pytest.ini`, so `pytest -q` from the repository root runs every
   project's tests, and two projects can each have a `tests` folder without
   their test files colliding.
+- Split the pinned package list. Each project now pins what it imports, in its
+  own folder, and the file at the root gathers them. A download package no
+  longer asks people to approve packages the tool never imports.
+- Reworded the offline rule. It always meant that nothing reaches the internet.
+  Read literally it also banned talking to equipment over a local socket, which
+  is what the driver library exists to do.
 
 ### Added
+- `projects/fab_drivers`, a new project. A library of small, read-only
+  monitoring drivers for fab equipment. This change adds the shared core only:
+  the command policy that enforces read-only, raw frame audit logging, daily CSV
+  history, a mock serial port for working with no hardware, the serial
+  transport, the driver base class with the one second timeout and two retries,
+  and a gentle poller that marks readings stale instead of guessing. No device
+  driver yet, so the first one lands in a tested template. 50 tests, none of
+  which need hardware.
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,
   across Python 3.11 and 3.12.

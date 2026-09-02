@@ -1,13 +1,22 @@
-# Exact pinned versions. Not ranges. This tool must build the same way in
-# eighteen months. If IT gives you wheel files with different versions, edit
-# the numbers here to match those wheels, then keep this file with the project.
+# The package list for the whole repository.
+#
+# Each project pins the packages it actually needs, in its own folder. This file
+# just gathers them, so one install from the repository root gives you an
+# environment that can run every project and every test.
+#
+# It works this way for two reasons. A download package should only ask a person
+# to approve the packages that tool really imports. And when you ask IT to
+# approve wheels for one tool, you want to hand them a short list, not the whole
+# repository.
 #
 # Install from local wheels like this (offline):
 #   pip install --no-index --find-links C:\path\to\wheels -r requirements.txt
 #
-pandas==2.2.2
-numpy==1.26.4
-openpyxl==3.1.5
-python-pptx==1.0.2
-matplotlib==3.9.2
+# pip reads the paths below relative to this file, so run it from the root.
+#
+-r projects/alarm_pareto/requirements.txt
+-r projects/fab_drivers/requirements.txt
+
+# Shared by every project. Listed here as well so a fresh environment can always
+# run the tests, even before any project has been installed.
 pytest==8.3.2
