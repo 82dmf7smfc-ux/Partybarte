@@ -3,6 +3,10 @@
 Feed this file to a session that has unrestricted internet access. It starts
 from nothing, so everything it needs is here.
 
+This is the standing way documents arrive in this repository. Sessions doing the
+work never fetch their own sources. They write a request like this one and stop.
+`README.md` next to this file has the rule and the reason.
+
 ## What this is for
 
 A separate project builds read-only monitoring drivers for fab equipment. Its

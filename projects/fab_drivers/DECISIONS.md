@@ -139,17 +139,36 @@ left free for actual working instructions if we ever want them.
   Chosen by the owner. The notice line carries a placeholder until the exact
   name is supplied.
 
-- **2026-09-02. Manuals are fetched out of band, by a separate session, and are
-  not committed.** The machines these driver sessions run on cannot reach the
-  manufacturers' websites. The network policy allows source and package hosts
-  and almost nothing else, so `lakeshore.com` and every mirror of its manuals is
-  refused. A session cannot fetch its own sources, and the research rule is not
-  negotiable, so the documents have to arrive by hand. `manuals/FETCH_PROMPT.md`
-  is the prompt that collects them, written to be handed to a session that does
-  have access. The PDFs themselves stay out of git, because they are the
-  manufacturers' copyrighted documents. Each `PROTOCOL.md` records its manual's
-  part number and SHA-256 instead, so a later reader can tell whether they are
-  holding the same document.
+- **2026-09-02. Outside documents are supplied by the owner, never fetched by
+  the session doing the work.** Decided by the project owner, and it holds at
+  every stage of every project here, not only the driver sessions. A session
+  that needs a manual, a register map, a specification or a standard it does not
+  have writes a fetch prompt, hands it over as a file, and stops.
+
+  The practical reason is that these machines cannot reach the manufacturers'
+  websites, and rediscovering that every session is waste.
+
+  The real reason is what happens next when fetching is hard. The substitutes
+  are all within reach: a search snippet, a summary site, a forum answer, a
+  vendor's own driver source, or memory of a protocol that resembles this one.
+  Each of them produces code that looks finished and was never checked. The rule
+  removes the temptation by removing the choice, which is the same reasoning as
+  the read-only allowed list. Writing a rule down did not hold the line there
+  either. Making the wrong move impossible to reach does.
+
+  One distinction is kept deliberately. Searching for candidate links is allowed,
+  because a fetch prompt carrying exact URLs saves the owner a hunt. Reading a
+  search result for the answer is not. The line is that a link is a lead and a
+  snippet is not evidence.
+
+- **2026-09-02. The manuals live in `manuals/` and are not committed.** They are
+  the manufacturers' copyrighted documents and some are large, so `.gitignore`
+  keeps the PDFs out. What is committed is the fetch prompt and the manifest
+  that arrives with a delivery, because those record where each document came
+  from, its part number and its SHA-256. Each `PROTOCOL.md` names its manual and
+  repeats the hash, so a later reader can tell whether the document in their
+  hands is the one the driver was written against, and a reviewer can tell that
+  a manual was really read rather than assumed.
 
 - **2026-09-02. A vendor's own driver source is not a substitute for the
   manual.** Lake Shore Cryotronics publishes a Python driver on GitHub and PyPI,

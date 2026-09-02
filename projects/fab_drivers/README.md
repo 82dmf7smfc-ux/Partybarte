@@ -49,6 +49,10 @@ this version.
 The shared core, and no device drivers yet. The core was built first so that the
 first real driver drops into a tested template instead of inventing one.
 
+The Lakeshore driver, which is first in the build order, is blocked on its
+manual. `manuals/FETCH_PROMPT.md` is the request that unblocks it. `REVIEW.md`
+says what was found and what was deliberately not used.
+
 | File | Job |
 |---|---|
 | `fab_drivers/core/policy.py` | Decide which commands may be sent. The safety gate. |
@@ -60,13 +64,18 @@ first real driver drops into a tested template instead of inventing one.
 | `fab_drivers/core/poller.py` | Read a set of values on a gentle repeating loop. |
 | `fab_drivers/core/trend_page.py` | Build one self-contained trend page for one device. |
 | `fab_drivers/devices/` | One folder per piece of equipment. Empty for now. |
+| `manuals/` | The manufacturers' documents. Supplied by the owner, never fetched. |
 
 ## The standards every driver follows
 
-- **Research first.** Find the official protocol or programming manual. Verify
-  the command syntax against worked examples before writing any code. Do not
-  write a driver from memory of a protocol. If the manual cannot be found, the
-  driver is blocked on the document, and that is the honest answer.
+- **Research first.** Verify the command syntax against worked examples in the
+  manufacturer's own manual before writing any code. Do not write a driver from
+  memory of a protocol.
+- **The manual is supplied, not fetched.** The project owner provides the
+  documents and they live in `manuals/`. A session that needs one it does not
+  have writes a fetch prompt, hands it over, and stops. It does not go looking
+  for a substitute. `manuals/README.md` has the procedure. A driver blocked on a
+  document is the honest answer.
 - **Read-only version 1.** Setpoint writes and control actions are excluded
   until someone asks for them explicitly.
 - **Python and pyserial.** Standard library everywhere else. `pymodbus` and
@@ -96,7 +105,8 @@ Make a folder under `fab_drivers/devices/`. Put four things in it.
 
 1. `PROTOCOL.md`. The frame format, the checksum if there is one, the result
    codes, the commands used in version 1, and the commands banned outright.
-   Write it from the manual, and name the manual and its part number.
+   Write it from the manual in `manuals/`, and name that manual, its part
+   number and its SHA-256.
 2. `driver.py`. A class that inherits from `core.device.Device` and writes two
    methods, `build_frame` and `parse_reply`. Build its `CommandPolicy` here, with
    the read-only command list and the banned list with reasons. Always send

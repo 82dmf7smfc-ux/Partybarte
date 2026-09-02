@@ -33,14 +33,20 @@ reviewer will catch them, and do not gold-plate either.
 
 ## Rules that do not bend
 
-1. **Research first. Never write a driver from memory of a protocol.** Find the
-   official programming or protocol manual. Prefer free direct PDFs. idealvac.com
-   hosts many vacuum manuals. Verify the command syntax against worked examples
-   in the manual before writing code that sends anything.
+1. **Research first. Never write a driver from memory of a protocol.** Verify
+   the command syntax against worked examples in the manufacturer's own manual
+   before writing code that sends anything.
 
-   If the manual cannot be found, say so and stop. A driver blocked on a document
-   is an honest outcome. Plausible looking command syntax that was never verified
-   is worse than no driver, because it looks finished.
+   **You do not fetch the manual. The project owner supplies it.** This is a
+   standing decision and it holds at every stage of every project here, not just
+   the driver sessions. Do not try to download a document. Do not work around a
+   blocked download. Do not substitute a summary, a search result, a forum post,
+   a third party library, or your own memory. See the next section for what to
+   do instead.
+
+   A stage blocked on a document is an honest outcome. Plausible looking command
+   syntax that was never verified is worse than no driver, because it looks
+   finished and nobody goes back to it.
 
 2. **Read-only. Version 1 reads values and does nothing else.** No setpoint
    writes, no control actions, no parameter changes. The `CommandPolicy` enforces
@@ -65,6 +71,48 @@ reviewer will catch them, and do not gold-plate either.
 7. **Nothing reaches the internet at runtime.** Talking to equipment over a
    serial port or a local socket is the job. Fetching anything from the web is
    not.
+
+## When you need a document you do not have
+
+This applies to any stage of any project here, and to any external document: a
+programming manual, a register map, a protocol specification, a standard, a
+vendor application note.
+
+The order is always the same.
+
+1. **Look in `manuals/` first.** The document may already be there. `manuals/`
+   has one folder per manufacturer and a `MANIFEST.md` saying what arrived, from
+   where, with its part number and its SHA-256.
+
+2. **If it is not there, stop the work that needs it.** Do the parts of the
+   session that do not depend on the missing document, and only those.
+
+3. **Write a fetch prompt and hand it over as a file.** `manuals/README.md` has
+   the procedure and the shape a fetch prompt takes. Hand over the file itself.
+   Do not paste it into the chat as text, and do not describe it instead of
+   producing it.
+
+4. **Say plainly what is blocked and why.** Record it in `REVIEW.md` so the next
+   session does not repeat the search, and mark the row in `sessions/README.md`.
+
+5. **Stop there.** The owner runs the fetch prompt and puts the documents in
+   `manuals/`. The session runs again with them in hand.
+
+Searching for candidate links is allowed, and it is worth doing, because a fetch
+prompt carrying exact URLs saves the owner a hunt. Fetching is not, and neither
+is any attempt to get around a refused fetch.
+
+There is a trap in that distinction. A search result shows you snippets, and a
+snippet can look like it answers a protocol question. It does not. A snippet is
+not a worked example and it is not a manual. Put the link in the fetch prompt
+and write nothing from what the snippet said.
+
+A vendor's own source code is the same trap wearing better clothes. Several of
+these manufacturers publish drivers on GitHub, which is often reachable when
+their own website is not. That code is worth reading once the manual is in hand,
+as a cross-check, and disagreement between the two is worth writing down. It is
+not a source to write from. It carries no worked examples and does not say which
+models or firmware revisions its choices apply to.
 
 ## What a driver session produces
 
@@ -146,7 +194,10 @@ runs next.
 
 - `pytest -q projects/fab_drivers` passes, and so does `pytest -q` from the root.
 - The new tests pass with no hardware.
-- `PROTOCOL.md` names its source manual and part number.
+- `PROTOCOL.md` names its source manual, its part number and its SHA-256, and
+  that manual is a real document in `manuals/`, not one you were told about.
+- Nothing was written from memory, from a search result, or from a vendor's
+  source code.
 - Nothing state-changing is on an allowed list.
 - `DECISIONS.md` has a dated entry.
 - The trend page is generated and opened once, to check it actually shows what
