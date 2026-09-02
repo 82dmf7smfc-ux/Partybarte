@@ -19,6 +19,7 @@ one small tested function, merged_seconds.
 import pandas as pd
 
 from . import normalize as nz
+from . import window as window_mod
 
 # The three grouping levels we report on. The value is the internal column name.
 GROUPING_LEVELS = ["fault_code", "description", "equipment"]
@@ -255,8 +256,13 @@ def _add_percent(df, value_col, pct_col, cum_col):
 
 
 def aggregate(windowed_table, mode, vendor_config, window_start, window_end,
-              window_days=30, top_n=15, downtime_method=METHOD_ATTRIBUTED):
+              window_days=30, top_n=15, downtime_method=METHOD_ATTRIBUTED,
+              tod_start=None, tod_end=None):
     """Run the full aggregation and return every table plus the headline numbers.
+
+    tod_start and tod_end are the time-of-day bounds in minutes since midnight,
+    or None when no time-of-day filter was applied. They are carried through so
+    the workbook and the deck can say which hours the report covers.
 
     Returns a dictionary. See the module and README for the shape.
     """
@@ -295,6 +301,9 @@ def aggregate(windowed_table, mode, vendor_config, window_start, window_end,
             "window_start": window_start,
             "window_end": window_end,
             "window_days": window_days,
+            "tod_start": tod_start,
+            "tod_end": tod_end,
+            "time_of_day_label": window_mod.time_of_day_label(tod_start, tod_end),
         },
         "levels": levels,
         "downtime_method": downtime_method,

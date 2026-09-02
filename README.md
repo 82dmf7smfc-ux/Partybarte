@@ -39,8 +39,10 @@ Open `alarm_pareto.html` in a browser. There is nothing to install.
 3. Tell it how downtime is stored. Three choices. A duration column. Or separate
    set and clear rows that it should pair. Or none, in which case it ranks by
    count only.
-4. Set the window length, the top-N cutoff, and the downtime method. Click
-   "Analyze".
+4. Set the window length, the top-N cutoff, and the downtime method. To report
+   on one shift, pick a shift preset or type the two time-of-day boxes yourself.
+   Leave them empty for all hours. A "from" later than a "to" wraps past
+   midnight, so 22:00 to 06:00 is the night shift. Click "Analyze".
 5. Read the summary and the Pareto charts. Switch grouping level with the tabs.
    Download a CSV summary, or use "Print / Save as PDF" to make a report.
 
@@ -109,9 +111,37 @@ away from anything you install later.
 | `--vendor` | Which config block to use. | `amat` |
 | `--config` | Path to the vendor config JSON. | the one that ships with the tool |
 | `--window-days` | How many days back to include. | `30` |
+| `--start-time` | Keep only alarms that start at or after this clock time, as `HH:MM`. | no time filter |
+| `--end-time` | Keep only alarms that start before this clock time, as `HH:MM`. | no time filter |
 | `--top-n` | How many rows before the rest become "Other". | `15` |
 | `--downtime-method` | `attributed` or `wallclock`. Drives the downtime ranking. | `attributed` |
 | `--output-dir` | Folder for the output files. | `output` |
+
+### Filtering by time of day
+
+`--start-time` and `--end-time` narrow the report to a range of clock hours, so
+it can cover one shift. Give both or neither.
+
+```
+.venv\Scripts\python.exe -m alarm_pareto.main --input log.csv --start-time 06:00 --end-time 18:00
+.venv\Scripts\python.exe -m alarm_pareto.main --input log.csv --start-time 18:00 --end-time 06:00
+```
+
+Three things to know.
+
+1. The range keeps the start minute and stops just before the end minute. That
+   is what makes `06:00` to `18:00` and `18:00` to `06:00` add up to a whole day
+   with nothing counted twice.
+2. A start later than the end wraps past midnight, so `22:00` to `06:00` is the
+   night shift.
+3. Alarms are picked by the time they started, the same rule the trailing window
+   uses. An alarm that starts at 17:50 and runs four hours counts its whole four
+   hours against the day shift. The downtime number therefore answers "downtime
+   from faults that began in these hours", not "clock time the tool spent down
+   during these hours".
+
+The time-of-day filter runs after the trailing window, so the window start and
+end printed on the report still describe the file, not the shift.
 
 ## Adding a new tool vendor
 
@@ -148,7 +178,7 @@ The pipeline is split into small modules. Each does one job.
 |---|---|
 | `alarm_pareto/parse.py` | Read the file into a raw table. |
 | `alarm_pareto/normalize.py` | Rename vendor columns to internal names. |
-| `alarm_pareto/window.py` | Keep only the trailing window. |
+| `alarm_pareto/window.py` | Keep only the trailing window, then the chosen hours of the day. |
 | `alarm_pareto/aggregate.py` | Build the count and downtime rankings. |
 | `alarm_pareto/render_xlsx.py` | Write the Excel workbook. |
 | `alarm_pareto/render_pptx.py` | Write the PowerPoint deck. |

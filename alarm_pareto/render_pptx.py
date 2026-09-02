@@ -76,7 +76,9 @@ def _add_title_slide(prs, result, method_label):
     subtitle = "Window: %s to %s  (%s days)" % (
         _fmt_ts(grand["window_start"]), _fmt_ts(grand["window_end"]), grand["window_days"])
     _add_textbox(slide, Inches(0.7), Inches(3.6), Inches(12), Inches(0.7), subtitle, size=20)
-    _add_textbox(slide, Inches(0.7), Inches(4.3), Inches(12), Inches(0.7),
+    _add_textbox(slide, Inches(0.7), Inches(4.2), Inches(12), Inches(0.6),
+                 "Time of day: %s" % grand["time_of_day_label"], size=16)
+    _add_textbox(slide, Inches(0.7), Inches(4.8), Inches(12), Inches(0.7),
                  "Downtime ranking method: %s" % method_label, size=16)
 
 
@@ -118,6 +120,7 @@ def _add_summary_slide(prs, result, method_label):
     lines = []
     lines.append("Date range covered: %s to %s (%s days)" % (
         _fmt_ts(grand["window_start"]), _fmt_ts(grand["window_end"]), grand["window_days"]))
+    lines.append("Time of day covered: %s" % grand["time_of_day_label"])
     lines.append("Total faults in window: %d" % grand["total_faults"])
     lines.append("")
     lines.append("Total downtime, both methods (never mix these):")

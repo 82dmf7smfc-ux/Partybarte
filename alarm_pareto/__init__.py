@@ -11,7 +11,7 @@ should be a text edit to the JSON config, not a code change.
 Module order in the pipeline:
     parse      -> read the file into a raw table
     normalize  -> rename vendor columns to standard names
-    window     -> keep only the trailing time window
+    window     -> keep only the trailing time window, then the chosen hours
     aggregate  -> build the count and downtime rankings
     render_xlsx-> write the Excel workbook
     render_pptx-> write the PowerPoint deck

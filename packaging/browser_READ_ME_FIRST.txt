@@ -17,7 +17,12 @@ How to use it
    required.
 4. Choose how downtime is stored: a duration column, or separate set and clear
    rows to pair, or none (rank by count only).
-5. Set the window length and the top-N cutoff. Click "Analyze".
+5. Set the window length and the top-N cutoff. To cover one shift, pick a
+   shift preset or fill in the two time-of-day boxes yourself. Leave them empty
+   for all hours. A "from" later than a "to" wraps past midnight, so 22:00 to
+   06:00 is the night shift. Alarms are picked by the time they started, so an
+   alarm that runs past the end of the range still counts its whole duration.
+   Click "Analyze".
 6. Read the summary and the Pareto charts. Use the tabs to switch grouping
    level. Download a CSV summary, or use "Print / Save as PDF" for a report.
 

@@ -73,10 +73,11 @@ def _write_window_data(ws, windowed_table, result):
     grand = result["grand"]
     ws["A1"] = "Filtered alarm data for the reporting window"
     ws["A1"].font = TITLE_FONT
-    ws["A2"] = "Window start: %s   Window end: %s   Length: %s days" % (
+    ws["A2"] = "Window start: %s   Window end: %s   Length: %s days   Time of day: %s" % (
         _fmt_ts(grand["window_start"]),
         _fmt_ts(grand["window_end"]),
         grand["window_days"],
+        grand["time_of_day_label"],
     )
     ws["A2"].font = NOTE_FONT
 

@@ -171,6 +171,25 @@
         <input type="number" id="windowDays" value="30" min="1" step="1" style="width:90px">
       </div>
       <div class="field">
+        <label>Time of day, from</label>
+        <input type="time" id="todStart" style="width:110px">
+      </div>
+      <div class="field">
+        <label>Time of day, to</label>
+        <input type="time" id="todEnd" style="width:110px">
+      </div>
+      <div class="field">
+        <label>Shift preset</label>
+        <select id="todPreset">
+          <option value="">All hours</option>
+          <option value="06:00|18:00">Day shift, 06:00 to 18:00</option>
+          <option value="18:00|06:00">Night shift, 18:00 to 06:00</option>
+          <option value="06:00|14:00">1st shift, 06:00 to 14:00</option>
+          <option value="14:00|22:00">2nd shift, 14:00 to 22:00</option>
+          <option value="22:00|06:00">3rd shift, 22:00 to 06:00</option>
+        </select>
+      </div>
+      <div class="field">
         <label>Top rows before "Other"</label>
         <input type="number" id="topN" value="15" min="1" step="1" style="width:90px">
       </div>
@@ -186,6 +205,11 @@
       </div>
     </div>
     <p class="hint">The window ends at the latest timestamp found in your files, not today's date.</p>
+    <p class="hint">Leave both time boxes empty to cover all hours. The range keeps the "from"
+      minute and stops just before the "to" minute, so two shifts add up to one day with nothing
+      counted twice. A "from" later than the "to" wraps past midnight, so 22:00 to 06:00 is the
+      night shift. Alarms are picked by the time they started; an alarm that runs past the end of
+      the range still counts its whole duration.</p>
   </div>
 
   <div id="results" style="display:none">
@@ -559,6 +583,52 @@ function applyWindow(occ, windowDays) {
   return { kept: kept, start: start, end: end };
 }
 
+// Minutes since midnight for a clock time typed as "HH:MM". Blank means no
+// bound, which means no time-of-day filter.
+function parseTimeOfDay(text) {
+  if (text === null || text === undefined) return null;
+  var raw = String(text).trim();
+  if (!raw) return null;
+  var m = /^(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?$/.exec(raw);
+  if (!m) return null;
+  var hour = parseInt(m[1], 10);
+  var minute = m[2] ? parseInt(m[2], 10) : 0;
+  if (hour < 0 || hour > 24 || minute < 0 || minute > 59) return null;
+  if (hour === 24 && minute !== 0) return null;
+  return hour * 60 + minute;
+}
+
+function formatTimeOfDay(minutes) {
+  if (minutes === null) return "";
+  var h = Math.floor(minutes / 60), m = minutes % 60;
+  return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+}
+
+// A range only filters when both bounds are set and they are not the whole day.
+function isTimeOfDayFiltered(start, end) {
+  if (start === null || end === null) return false;
+  if (start === end) return false;
+  if (start === 0 && end === 1440) return false;
+  return true;
+}
+
+function timeOfDayLabel(start, end) {
+  if (!isTimeOfDayFiltered(start, end)) return "All hours";
+  var label = formatTimeOfDay(start) + " to " + formatTimeOfDay(end);
+  if (start > end) label += " (crosses midnight)";
+  return label;
+}
+
+// Keep occurrences that started inside the given hours of the day. Half open,
+// and a start later than the end wraps past midnight.
+function applyTimeOfDay(occ, start, end) {
+  if (!isTimeOfDayFiltered(start, end)) return occ;
+  return occ.filter(function (o) {
+    var m = o.start.getHours() * 60 + o.start.getMinutes();
+    return (start < end) ? (m >= start && m < end) : (m >= start || m < end);
+  });
+}
+
 // Merge overlapping intervals and return the total seconds covered once.
 function mergedSeconds(intervals) {
   var clean = intervals.filter(function (p) { return p[1] > p[0]; });
@@ -637,6 +707,21 @@ function collapse(sorted, topN, sortField) {
 // ---------------------------------------------------------------------------
 document.getElementById("runBtn").addEventListener("click", runAnalysis);
 
+// The preset dropdown just fills the two time boxes. Typing in the boxes then
+// clears the dropdown, so it never claims a shift that is no longer selected.
+document.getElementById("todPreset").addEventListener("change", function () {
+  var parts = this.value ? this.value.split("|") : ["", ""];
+  document.getElementById("todStart").value = parts[0];
+  document.getElementById("todEnd").value = parts[1];
+});
+["todStart", "todEnd"].forEach(function (id) {
+  document.getElementById(id).addEventListener("input", function () {
+    var preset = document.getElementById("todPreset");
+    var current = document.getElementById("todStart").value + "|" + document.getElementById("todEnd").value;
+    if (preset.value && preset.value !== current) preset.value = "";
+  });
+});
+
 function runAnalysis() {
   var map = readMapping();
   if (!map.ts_set) { setMsg("mapMsg", "err", "Please choose the Timestamp column."); return; }
@@ -652,8 +737,32 @@ function runAnalysis() {
   var topN = Math.max(1, parseInt(document.getElementById("topN").value, 10) || 15);
   var method = document.getElementById("method").value;
 
+  var todStartText = document.getElementById("todStart").value;
+  var todEndText = document.getElementById("todEnd").value;
+  var todStart = parseTimeOfDay(todStartText);
+  var todEnd = parseTimeOfDay(todEndText);
+  // Older browsers show a plain text box instead of a clock picker, so text
+  // that is filled in but unreadable has to be caught here.
+  if ((todStartText.trim() && todStart === null) || (todEndText.trim() && todEnd === null)) {
+    setMsg("mapMsg", "err", "Time of day must look like HH:MM, for example 06:00.");
+    return;
+  }
+  if ((todStart === null) !== (todEnd === null)) {
+    setMsg("mapMsg", "err", "Give both time-of-day boxes, or leave both empty.");
+    return;
+  }
+
   var win = applyWindow(built.occ, windowDays);
   if (!win.kept.length) { setMsg("summaryMsg", "err", "No rows fall inside the " + windowDays + " day window."); document.getElementById("results").style.display = ""; return; }
+
+  // Narrow those days to a range of clock hours. This runs after the trailing
+  // window so the window start and end stay tied to the files, not the shift.
+  win.kept = applyTimeOfDay(win.kept, todStart, todEnd);
+  if (!win.kept.length) {
+    setMsg("summaryMsg", "err", "No rows start between " + formatTimeOfDay(todStart) + " and " + formatTimeOfDay(todEnd) + " inside the " + windowDays + " day window.");
+    document.getElementById("results").style.display = "";
+    return;
+  }
 
   var grandAttrib = win.kept.reduce(function (s, o) { return s + o.durSec; }, 0);
   var grandWall = mergedSeconds(win.kept.map(function (o) { return [o.start, o.end]; }));
@@ -664,6 +773,7 @@ function runAnalysis() {
   STATE.lastResult = {
     map: map, method: method, windowDays: windowDays, topN: topN,
     windowStart: win.start, windowEnd: win.end,
+    todStart: todStart, todEnd: todEnd, todLabel: timeOfDayLabel(todStart, todEnd),
     totalFaults: win.kept.length, grandAttrib: grandAttrib, grandWall: grandWall,
     hasDowntime: (map.downMode !== "none"), levels: levels,
     unparsed: built.unparsed, kept: win.kept
@@ -689,10 +799,12 @@ function renderResults() {
     stat(R.totalFaults, "Total faults in window") +
     stat(hours(R.grandAttrib), "Attributed downtime (h)") +
     stat(hours(R.grandWall), "True wall-clock downtime (h)") +
-    stat(R.windowDays, "Window length (days)");
+    stat(R.windowDays, "Window length (days)") +
+    stat(R.todLabel, "Time of day");
 
   document.getElementById("rangeFoot").innerHTML =
     "Date range: <b>" + fmt(R.windowStart) + "</b> to <b>" + fmt(R.windowEnd) + "</b>. " +
+    "Time of day: <b>" + esc(R.todLabel) + "</b>. " +
     "Downtime ranking method: <b>" + methodLabel + "</b>. " +
     "The two downtime numbers answer different questions and are never mixed.";
 
@@ -829,6 +941,7 @@ function exportCsv() {
   out.push(["Window start", fmt(R.windowStart)]);
   out.push(["Window end", fmt(R.windowEnd)]);
   out.push(["Window days", R.windowDays]);
+  out.push(["Time of day", R.todLabel]);
   out.push(["Total faults", R.totalFaults]);
   out.push(["Attributed downtime (h)", hours(R.grandAttrib)]);
   out.push(["True wall-clock downtime (h)", hours(R.grandWall)]);
