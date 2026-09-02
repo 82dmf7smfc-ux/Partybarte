@@ -120,6 +120,22 @@ Match the house style. Short sentences. Plain words. No em dashes. Boring
 explicit code with comments, written for a smart reader who is a beginner in
 Python. A comment saying why is worth more than one saying what.
 
+## Ending a session, and starting the next one
+
+A session starts with no memory of the one before it. So the last act of every
+session is to write the next one's starting prompt into `NEXT_SESSION.md`, and to
+print that prompt in the chat as well so it can be copied straight into a new
+session.
+
+The prompt is not a reminder of what device comes next. It has to carry a session
+that begins from nothing. It says where things stand, what to build, the order to
+do it in, and the decisions that device forces which the core has not met yet.
+That last part is the valuable one. It is written while the design is fresh, by
+the session that just saw the gap.
+
+The file lives in the repository rather than in a chat window because a prompt
+that exists only in a chat log is one closed tab away from being lost.
+
 ## Before finishing a session
 
 - `pytest -q projects/fab_drivers` passes, and so does `pytest -q` from the root.
@@ -132,6 +148,10 @@ Python. A comment saying why is worth more than one saying what.
 - Anything you could not verify is written down as unverified, in `REVIEW.md`,
   not left implied. The review pass depends on knowing what was checked and what
   was assumed.
+- `NEXT_SESSION.md` has been rewritten for the session that follows, and the
+  same prompt has been printed in the chat.
+- The work is committed and pushed. A session that ends with work only on disk
+  has produced nothing, because the next session is a different machine.
 
 ## The SECS/GEM warning, for session ten
 
