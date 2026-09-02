@@ -7,6 +7,17 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Changed
+- The shared trend page generator draws a column on a linear or a logarithmic
+  axis, chosen per column by the driver. Pressure runs from atmosphere down to
+  1e-9 torr, and on a linear axis every reading below about 1 torr lands on the
+  bottom pixel of the chart, so the part of a pumpdown that matters is
+  invisible. Three of the ten planned drivers read pressure, so the fix belongs
+  in the shared generator rather than in one driver. A log axis is snapped to
+  whole decades with one gridline each. A gap still breaks the line, and a zero
+  or negative reading becomes a gap too, counted and reported under the chart,
+  because a log axis has nowhere to put it.
+- The trend page summary table shows a number outside the range 0.01 to 100000
+  in scientific notation. A reading of 1e-9 torr previously showed as `0.00`.
 - Reorganised the repository to hold more than one project. The alarm_pareto
   tool moved from the root into `projects/alarm_pareto`, with its code, tests,
   sample data, packaging read me, screenshot, and read me all inside that
@@ -31,6 +42,26 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   is what the driver library exists to do.
 
 ### Added
+- `fab_drivers/devices/granville_phillips/`, a read-only driver for the
+  Granville-Phillips 275, 375, 350 and 356 pressure gauges. ASCII messages with
+  `#` address framing over RS-232 or RS-485. The gauge address is checked
+  separately from the command, and the address the instrument echoes back is
+  checked against the one that was sent, which is the only way to notice a
+  second module on a shared pair answering with a plausible pressure from the
+  wrong gauge. A reading of `9.99E+09` means the gauge has nothing to give and
+  is recorded as a gap rather than trended as a pressure. 35 tests, none of
+  which need hardware.
+
+  No Granville-Phillips manual could be opened. Every site hosting one is
+  refused by the network egress policy. The driver rests on one worked exchange
+  relayed through a web search tool and on the EPICS `epics-modules/vac` device
+  support read directly from GitHub, and the Granville-Phillips section of
+  `REVIEW.md` lists item by item what is verified and what is assumed.
+- `projects/fab_drivers/manuals/FETCH_PROMPT_GRANVILLE_PHILLIPS.md`, the request
+  for the gauge manuals, with thirteen numbered questions the documents have to
+  answer. Two of them decide whether the driver is correct: how a Series 375
+  selects a gauge channel, and whether any of these instruments can be asked
+  which pressure units it is configured for.
 - `LICENSE`, BSD 3-Clause. The copyright holder line carries a placeholder until
   the exact name is supplied.
 - `fab_drivers/core/trend_page.py`, the shared trend page generator. Each driver

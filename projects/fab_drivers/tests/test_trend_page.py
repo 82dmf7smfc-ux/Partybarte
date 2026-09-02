@@ -3,6 +3,8 @@
 import datetime
 import re
 
+import pytest
+
 from fab_drivers.core.history import HistoryWriter
 from fab_drivers.core.trend_page import (
     read_history, render_trend_page, write_trend_page,
@@ -152,3 +154,135 @@ def test_writing_the_page_creates_the_file(tmp_path):
                                today=datetime.date(2026, 9, 2))
     assert written.exists()
     assert "Test device" in written.read_text(encoding="utf-8")
+
+
+# ---- the log scale, which pressure needs and temperature does not ----
+
+def test_a_linear_axis_hides_a_pumpdown_and_a_log_axis_does_not(tmp_path):
+    # This is the whole reason the generator learned about scales. The readings
+    # cross five decades. On a linear axis every one of them below about 1 torr
+    # lands on the bottom of the chart, so the part of the pumpdown that matters
+    # is a flat line along the bottom edge.
+    make_history(tmp_path, [7.5e2, 2.0e1, 4.0e-1, 6.0e-3, 9.0e-4],
+                 column="p_torr")
+    rows = read_history(tmp_path, "testdev", days=1,
+                        today=datetime.date(2026, 9, 2))
+
+    linear = render_trend_page(rows, ["p_torr"], "Gauge")
+    logged = render_trend_page(rows, ["p_torr"], "Gauge",
+                               scales={"p_torr": "log"})
+
+    def y_values(page):
+        points = re.search(r'<polyline class="line" points="([^"]+)"', page)
+        return [float(pair.split(",")[1]) for pair in points.group(1).split()]
+
+    linear_ys = y_values(linear)
+    log_ys = y_values(logged)
+
+    # On the linear chart the last four readings all land within five pixels of
+    # the bottom, because 20 torr and 0.0009 torr are the same place once the
+    # top of the axis is 750. The chart is 180 pixels tall inside its margins,
+    # so that is under three percent of it for four decades of pumping.
+    assert max(linear_ys[1:]) - min(linear_ys[1:]) < 5.0
+    # On the log chart the same four readings are spread over most of the
+    # height, which is the whole point.
+    assert max(log_ys) - min(log_ys) > 100.0
+
+
+def test_a_log_axis_labels_whole_decades(tmp_path):
+    make_history(tmp_path, [1.0e-6, 1.0e-3], column="p_torr")
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["p_torr"], "Gauge", scales={"p_torr": "log"})
+    assert "1E-06" in page
+    assert "1E-03" in page
+    assert "Log scale" in page
+
+
+def test_a_gap_still_breaks_the_line_on_a_log_axis(tmp_path):
+    # The gap rule does not bend for a different axis.
+    make_history(tmp_path, [1.0e-3, 2.0e-4, None, 5.0e-6, 1.0e-6],
+                 column="p_torr")
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["p_torr"], "Gauge", scales={"p_torr": "log"})
+    assert page.count("<polyline") == 2
+
+
+def test_a_zero_reading_becomes_a_gap_on_a_log_axis_and_is_counted(tmp_path):
+    # A gauge that is switched off may report exactly zero, and there is no
+    # place on a log axis to put it. Dropping it silently would be the same
+    # mistake as trending it. So it becomes a gap and the page says how many.
+    make_history(tmp_path, [1.0e-3, 9.0e-4, 0.0, 5.0e-4, 4.0e-4],
+                 column="p_torr")
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["p_torr"], "Gauge", scales={"p_torr": "log"})
+    assert "1 reading was zero or negative" in page
+    # And it broke the line, rather than being joined across.
+    assert page.count("<polyline") == 2
+
+
+def test_a_column_of_nothing_but_zeroes_says_so_on_a_log_axis(tmp_path):
+    make_history(tmp_path, [0.0, 0.0], column="p_torr")
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["p_torr"], "Gauge", scales={"p_torr": "log"})
+    assert "No readings in this window that a log axis can show" in page
+
+
+def test_a_single_reading_on_a_log_axis_gets_a_decade_of_room(tmp_path):
+    # One reading sitting exactly on a power of ten would otherwise divide by
+    # zero when the axis top and bottom came out the same.
+    make_history(tmp_path, [1.0e-5], column="p_torr")
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["p_torr"], "Gauge", scales={"p_torr": "log"})
+    assert "<circle" in page
+
+
+def test_a_misspelled_column_in_the_scales_is_caught(tmp_path):
+    # Otherwise the chart quietly stays linear and nothing says why.
+    make_history(tmp_path, [1.0e-3], column="p_torr")
+    rows = read_history(tmp_path, "testdev", days=1,
+                        today=datetime.date(2026, 9, 2))
+    with pytest.raises(ValueError) as problem:
+        render_trend_page(rows, ["p_torr"], "Gauge", scales={"p_tor": "log"})
+    assert "p_tor" in str(problem.value)
+
+
+def test_an_unknown_scale_is_refused(tmp_path):
+    make_history(tmp_path, [1.0e-3], column="p_torr")
+    rows = read_history(tmp_path, "testdev", days=1,
+                        today=datetime.date(2026, 9, 2))
+    with pytest.raises(ValueError):
+        render_trend_page(rows, ["p_torr"], "Gauge",
+                          scales={"p_torr": "logarithmic"})
+
+
+def test_a_tiny_number_is_summarised_in_scientific_notation(tmp_path):
+    # 1e-9 torr printed as 0.00 was the old behaviour, and it made the summary
+    # table useless for every gauge in the plan.
+    make_history(tmp_path, [4.2e-9], column="p_torr")
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["p_torr"], "Gauge", scales={"p_torr": "log"})
+    assert "4.20E-09" in page
+    assert "<td>0.00</td>" not in page
+
+
+def test_ordinary_numbers_are_still_shown_plainly(tmp_path):
+    # The change to the summary must not turn a temperature into 7.73E+01.
+    make_history(tmp_path, [77.35, 4.2])
+    page = render_trend_page(
+        read_history(tmp_path, "testdev", days=1,
+                     today=datetime.date(2026, 9, 2)),
+        ["temp_k"], "Monitor")
+    assert "77.35" in page
+    assert "E+" not in page

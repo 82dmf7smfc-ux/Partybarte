@@ -271,6 +271,123 @@ left free for actual working instructions if we ever want them.
   these, and it is why the reason is written next to the ban rather than left to
   be worked out.
 
+- **2026-09-02. A trend page column can be drawn on a log axis, and the choice
+  lives in the shared generator.** Pressure runs from atmosphere down to 1e-9
+  torr. On a linear axis every reading below about 1 torr sits on the bottom
+  pixel of the chart, so the whole of a pumpdown after the first few seconds is
+  a flat line along the bottom edge. Measured on a real sample: five decades of
+  pumping landed inside five pixels of a 180 pixel chart. The Lakeshore driver
+  never met this, because temperature spans one decade and not nine.
+
+  `render_trend_page` and `write_trend_page` now take a `scales` dictionary of
+  column name to `"linear"` or `"log"`. A column nobody mentions stays linear.
+  It went in the shared generator rather than in this driver because three of
+  the ten planned drivers read pressure, and because `CLAUDE.md` says directly
+  that a device needing something the generator cannot do is a reason to improve
+  the generator.
+
+  A misspelled column name in `scales` raises rather than being ignored.
+  Ignoring it would leave the chart linear with nothing on the page saying so,
+  which is the exact silent wrongness this library exists to avoid.
+
+- **2026-09-02. A zero or negative reading on a log axis becomes a gap, and the
+  page says how many.** There is no logarithm of zero, and a gauge that is
+  switched off may well report exactly zero. Three things were possible: drop
+  the reading silently, clamp it to the bottom of the axis, or turn it into a
+  gap. Clamping invents a pressure that was never measured. Dropping it silently
+  loses the fact that a reading came back at all. So it becomes a gap, which
+  breaks the line under the existing gap rule, and the count is printed under
+  the chart. The number is the part that matters: a chart with forty gaps in it
+  is telling you something about the gauge, not about the logger.
+
+- **2026-09-02. The summary table switches to scientific notation outside a
+  band.** `_tidy_number` printed `%.2f`, so 1e-9 torr showed as `0.00` and every
+  pressure column in the summary was useless. Below 0.01 or at or above 100000
+  it now prints `%.2E`. Temperatures and flows are untouched, which is what
+  keeps the Lakeshore page reading the way it did.
+
+- **2026-09-02. The gauge address is a `CommandPolicy` target, and the gauge
+  selector is not.** These instruments put a two character hexadecimal address
+  in every frame, right after the `#`. That is the bus address, and it is what
+  `targets` is for, so it is checked separately from the command and never
+  folded into the command string.
+
+  A Series 350 controller then has four gauges behind that one address, chosen
+  by a modifier: `RD 1`, `RD 2`, `RD A`, `RD B`. Those modifiers stay part of
+  the command, and the reason is that the manual's own description of the frame
+  treats them as one. Its words are "a start character, an address, a command,
+  and a command modifier". The address says which box on the pair is being
+  spoken to. The modifier says what is being asked of it. Two levels, and only
+  the outer one is an address.
+
+  The list stays small either way. A 350 needs six allowed entries and thirty
+  two addresses, not one hundred and ninety two combinations.
+
+- **2026-09-02. The driver checks the address the instrument echoed back.**
+  Every reply carries the address it came from. The driver compares it with the
+  address it sent and raises if they differ. This costs nothing and it catches
+  the RS-485 failure that has no other symptom: on a shared pair every module
+  hears every frame, so a second module answering hands you a perfectly
+  plausible pressure belonging to the wrong gauge. Silence you notice. A wrong
+  number attached to the right column you do not.
+
+- **2026-09-02. Version 1 talks to one gauge at a time, not to a multi-drop
+  bus.** RS-485 can carry several modules on one pair. This driver does not
+  support that, and saying so plainly is better than leaving it to be
+  discovered. One `GranvillePhillipsGauge` instance holds one address, and the
+  core owns one device per transport.
+
+  Two reasons. The core's `SerialTransport` guarantees one exchange at a time on
+  one port, but nothing in it knows about the turnaround delay a shared pair
+  needs between one module releasing the line and the next one driving it, and
+  no source found here says what that delay is. And nothing in this project has
+  ever driven a real RS-485 pair, so the first multi-drop bus would be debugged
+  with untested code on live equipment.
+
+  The address check above is what makes this safe rather than merely limited. If
+  somebody does wire two gauges to one pair and points two drivers at them, a
+  crossed reply raises instead of being trended.
+
+- **2026-09-02. `units` has no default, because these instruments will not say
+  what they are set to.** They can report torr, mbar or pascal, the setting
+  lives in the instrument, and the reply carries a bare number. A read-units
+  query was searched for specifically and none was found in any source. Set-unit
+  commands exist and are banned.
+
+  So the caller has to state the unit, and it goes into the trend column name.
+  A default of torr would have been convenient and would have produced exactly
+  the failure the session brief warns about: a file whose units change halfway
+  through, where the numbers stay plausible on both sides of the change.
+
+  This does not fix the problem. Somebody who changes the units on the front
+  panel and not in the code still gets a wrongly labelled file. It only makes
+  the assumption visible at the point it is made. The real fix needs a query
+  that appears not to exist, and that is written up in `REVIEW.md`.
+
+- **2026-09-02. A reading of 9.99E+09 is a hole, not a pressure.** The manuals,
+  relayed, say `RD` returns `9.99E+09` for the first three to five seconds after
+  power up, and by every account it is also what a gauge that is off reports.
+  The driver treats anything at or above 1e9 as no reading.
+
+  This is the Lakeshore lesson from the other side. There, a dead sensor
+  answered with a plausible number and only a second query said it was
+  meaningless. Here the instrument does say so, but it says so in the shape of a
+  number, and a driver that does not know the convention will plot 9.99e9 torr
+  next to 1e-6 torr and flatten the chart. The threshold is safe with a wide
+  margin: atmosphere is about 760 torr, so nothing real comes within six decades
+  of it.
+
+- **2026-09-02. The Series 375 is shipped with its channel handling marked
+  unsourced, rather than left out or guessed at.** It is a multi-channel
+  controller and nothing found here says how to ask it for one channel. Leaving
+  it out would have dropped a device the session asked for. Inventing a selector
+  would have produced exactly the plausible-looking syntax the brief forbids.
+
+  So the 375 sends the bare `RD` the single gauge modules use, and
+  `ModelProfile` carries a `sourced` flag that `describe_sources()` prints. A
+  warning that only lives in a markdown file is one nobody reads at the bench.
+  Whoever holds the 375 manual should settle this in ten minutes.
+
 ## Open questions
 1. **Which machine runs the poller long term?** The existing heat exchanger
    Raspberry Pi logger is mentioned for the chiller. If that becomes the home for

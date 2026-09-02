@@ -24,6 +24,7 @@ mistake as writing the last value into the CSV, one layer further on.
 import csv
 import datetime
 import html
+import math
 from pathlib import Path
 
 # The chart is drawn as an SVG with these proportions. The page scales it to
@@ -91,42 +92,141 @@ def _segments(points):
     return runs
 
 
-def _chart_svg(points, colour="#1f6feb"):
+LINEAR = "linear"
+LOG = "log"
+
+# The scales a column may be drawn on. A driver names one per column.
+SCALES = (LINEAR, LOG)
+
+
+def _positive_only(points):
+    """Turn every value that a log axis cannot show into a gap.
+
+    A log axis has no place to put zero or a negative number, because neither
+    has a logarithm. This matters here rather than in theory: a pressure gauge
+    that is switched off, or unplugged, may well report exactly zero.
+
+    Returns the cleaned points and how many readings were dropped. The count is
+    printed under the chart. A reading that quietly disappears is the thing this
+    library is trying hardest not to do.
+    """
+    cleaned = []
+    dropped = 0
+    for x, value in points:
+        if value is not None and value <= 0:
+            cleaned.append((x, None))
+            dropped += 1
+        else:
+            cleaned.append((x, value))
+    return cleaned, dropped
+
+
+def _decade_bounds(low, high):
+    """The whole decades that just contain low and high.
+
+    Snapping the axis to whole decades is what makes a log chart readable. Every
+    gridline is then a power of ten, and the eye counts decades instead of
+    reading numbers.
+    """
+    bottom = math.floor(math.log10(low))
+    top = math.ceil(math.log10(high))
+    if top == bottom:
+        # A reading sitting exactly on a power of ten, or a flat line. Give it a
+        # decade of room so it is not drawn along the edge of the chart.
+        bottom, top = bottom - 1, top + 1
+    return bottom, top
+
+
+def _decade_label(exponent):
+    """Label one gridline on a log axis, as 1E-06 rather than 0.000001."""
+    return "1E%+03d" % exponent
+
+
+def _chart_svg(points, scale=LINEAR):
     """Draw one column as an SVG line chart.
 
     points is a list of (index, value_or_None), already in time order.
+
+    scale is LINEAR or LOG. Pressure needs LOG, because it runs from atmosphere
+    down to 1e-9 torr, and on a linear axis every reading below about 1 torr
+    sits flat on the bottom of the chart. The pumpdown that matters is then
+    invisible.
     """
+    if scale not in SCALES:
+        raise ValueError("a column is drawn on one of %s, not %r"
+                         % (", ".join(SCALES), scale))
+
+    dropped = 0
+    if scale == LOG:
+        points, dropped = _positive_only(points)
+
     values = [v for _, v in points if v is not None]
     if not values:
-        return ('<p class="nodata">No readings in this window.</p>')
+        if dropped:
+            return ('<p class="nodata">No readings in this window that a log '
+                    'axis can show. %d were zero or negative.</p>' % dropped)
+        return '<p class="nodata">No readings in this window.</p>'
 
     low, high = min(values), max(values)
-    if low == high:
-        # A flat line would otherwise divide by zero. Give it room above and
-        # below so it sits in the middle of the chart rather than on an edge.
-        low, high = low - 1.0, high + 1.0
+
+    if scale == LOG:
+        bottom, top = _decade_bounds(low, high)
+        axis_low, axis_high = float(bottom), float(top)
+    else:
+        if low == high:
+            # A flat line would otherwise divide by zero. Give it room above and
+            # below so it sits in the middle of the chart rather than on an edge.
+            low, high = low - 1.0, high + 1.0
+        axis_low, axis_high = low, high
 
     plot_width = CHART_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
     plot_height = CHART_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
     last_index = max(len(points) - 1, 1)
 
+    def place(value):
+        """Where a value sits on the axis. 0 is the bottom, 1 is the top."""
+        if scale == LOG:
+            value = math.log10(value)
+        return (value - axis_low) / (axis_high - axis_low)
+
     def sx(index):
         return MARGIN_LEFT + (index / last_index) * plot_width
 
     def sy(value):
-        share = (value - low) / (high - low)
-        return MARGIN_TOP + (1.0 - share) * plot_height
+        return MARGIN_TOP + (1.0 - place(value)) * plot_height
 
     parts = []
 
-    # Three gridlines with their values, so the eye has something to measure by.
-    for share in (0.0, 0.5, 1.0):
-        value = low + share * (high - low)
-        y = sy(value)
-        parts.append('<line class="grid" x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"/>'
-                     % (MARGIN_LEFT, y, CHART_WIDTH - MARGIN_RIGHT, y))
-        parts.append('<text class="ylabel" x="%.1f" y="%.1f">%s</text>'
-                     % (MARGIN_LEFT - 8, y + 4, _tidy_number(value)))
+    if scale == LOG:
+        # One gridline per decade. Nine decades of pressure would give nine
+        # labels stacked on each other, so the labels are thinned out when there
+        # are many. The line still goes at every decade.
+        decades = list(range(int(axis_low), int(axis_high) + 1))
+        step = 1 + len(decades) // 8
+        for exponent in decades:
+            y = sy(10.0 ** exponent)
+            parts.append('<line class="grid" x1="%.1f" y1="%.1f" x2="%.1f" '
+                         'y2="%.1f"/>'
+                         % (MARGIN_LEFT, y, CHART_WIDTH - MARGIN_RIGHT, y))
+            # Counted down from the top decade, so the labels come out evenly
+            # spaced and the top of the axis always has one. Counting up from
+            # the bottom instead leaves the top line bare, or puts two labels
+            # next to each other at the top, which reads as a mistake.
+            if (decades[-1] - exponent) % step == 0:
+                parts.append('<text class="ylabel" x="%.1f" y="%.1f">%s</text>'
+                             % (MARGIN_LEFT - 8, y + 4,
+                                _decade_label(exponent)))
+    else:
+        # Three gridlines with their values, so the eye has something to
+        # measure by.
+        for share in (0.0, 0.5, 1.0):
+            value = axis_low + share * (axis_high - axis_low)
+            y = sy(value)
+            parts.append('<line class="grid" x1="%.1f" y1="%.1f" x2="%.1f" '
+                         'y2="%.1f"/>'
+                         % (MARGIN_LEFT, y, CHART_WIDTH - MARGIN_RIGHT, y))
+            parts.append('<text class="ylabel" x="%.1f" y="%.1f">%s</text>'
+                         % (MARGIN_LEFT - 8, y + 4, _tidy_number(value)))
 
     for run in _segments(points):
         if len(run) == 1:
@@ -143,8 +243,38 @@ def _chart_svg(points, colour="#1f6feb"):
             'role="img">%s</svg>' % (CHART_WIDTH, CHART_HEIGHT, "".join(parts)))
 
 
+def _count_non_positive(points):
+    """How many readings a log axis has to drop."""
+    return sum(1 for _, value in points if value is not None and value <= 0)
+
+
+def _chart_note(scale, dropped, has_readings):
+    """The line printed under one chart, or "" when there is nothing to say."""
+    notes = []
+    if scale == LOG and has_readings:
+        # A column with nothing in it has no axis, so saying it is logarithmic
+        # is noise on the page.
+        notes.append("Log scale. One gridline per decade.")
+    if dropped:
+        notes.append("%d reading%s zero or negative, shown as gaps, because a "
+                     "log axis cannot place them."
+                     % (dropped, " was" if dropped == 1 else "s were"))
+    return " ".join(notes)
+
+
+# Outside this band a plain decimal is either all zeroes or all digits, so the
+# summary table switches to scientific notation. A reading of 1e-9 torr must not
+# print as 0.00, and it did until three of these drivers started reading
+# pressure.
+SMALL_NUMBER = 0.01
+LARGE_NUMBER = 100000.0
+
+
 def _tidy_number(value):
     """Show a number without a tail of meaningless decimal places."""
+    size = abs(value)
+    if size != 0 and (size < SMALL_NUMBER or size >= LARGE_NUMBER):
+        return "%.2E" % value
     if value == int(value):
         return "%d" % int(value)
     return "%.2f" % value
@@ -214,14 +344,31 @@ reading that failed, not a reading of zero.
 """
 
 
-def render_trend_page(rows, columns, title, built_at=None):
+def render_trend_page(rows, columns, title, built_at=None, scales=None):
     """Return the HTML for one device's trend page.
 
     rows:    the reading rows, oldest first, as read_history returns them.
     columns: which columns to plot, in the order they should appear.
     title:   the heading, usually the device name.
+    scales:  an optional dictionary of column name to LINEAR or LOG. A column
+             that is not named is drawn on a linear axis, which is what a
+             temperature or a flow rate wants. Pressure wants LOG, because it
+             runs over nine decades and a linear axis hides all of it below
+             about 1 torr. The choice belongs to the driver, because only the
+             driver knows what the column holds.
     """
     built_at = built_at or datetime.datetime.now()
+    scales = dict(scales or {})
+
+    unknown = set(scales) - set(columns)
+    if unknown:
+        # A misspelled column name would otherwise leave the chart on a linear
+        # axis with nothing saying so, which is exactly the silent wrongness
+        # this whole library is built to avoid.
+        raise ValueError(
+            "these columns were given a scale but are not being plotted: %s. "
+            "The columns are: %s"
+            % (", ".join(sorted(unknown)), ", ".join(columns)))
 
     series = {}
     for column in columns:
@@ -241,8 +388,16 @@ def render_trend_page(rows, columns, title, built_at=None):
 
     charts = []
     for column in columns:
-        charts.append('<section><h2>%s</h2>%s</section>'
-                      % (html.escape(column), _chart_svg(series[column])))
+        scale = scales.get(column, LINEAR)
+        dropped = _count_non_positive(series[column]) if scale == LOG else 0
+        plotted = [value for _, value in series[column]
+                   if value is not None and (scale == LINEAR or value > 0)]
+        note = _chart_note(scale, dropped, bool(plotted))
+        charts.append(
+            '<section><h2>%s</h2>%s%s</section>'
+            % (html.escape(column),
+               _chart_svg(series[column], scale=scale),
+               ('<p class="span">%s</p>' % html.escape(note)) if note else ""))
 
     if rows:
         first = rows[0].get("timestamp", "")
@@ -262,10 +417,15 @@ def render_trend_page(rows, columns, title, built_at=None):
 
 
 def write_trend_page(history_folder, name, columns, out_path, title=None,
-                     days=7, today=None, built_at=None):
-    """Read a device's history and write its trend page. Returns the path."""
+                     days=7, today=None, built_at=None, scales=None):
+    """Read a device's history and write its trend page. Returns the path.
+
+    scales is passed straight through to render_trend_page. See it for what a
+    scale is and when a column needs one.
+    """
     rows = read_history(history_folder, name, days=days, today=today)
-    page = render_trend_page(rows, columns, title or name, built_at=built_at)
+    page = render_trend_page(rows, columns, title or name, built_at=built_at,
+                             scales=scales)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(page, encoding="utf-8")

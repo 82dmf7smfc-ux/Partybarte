@@ -11,7 +11,8 @@ too.
 If the network refuses a download, which is what happens on these machines for
 most manufacturer sites, say so plainly and write a fetch prompt.
 `FETCH_PROMPT.md` is the worked example of one. It goes to somebody with better
-access and comes back as a zip that gets unpacked here.
+access and comes back as a zip that gets unpacked here. Two are outstanding, one
+for Lake Shore and one for Granville-Phillips.
 
 ## The part that does not bend
 
@@ -35,8 +36,11 @@ check first.
 
 ## The shape of a fetch prompt
 
-`FETCH_PROMPT.md` is the current outstanding request, and it is the worked
-example of this shape. A new one covers:
+There are two outstanding requests. `FETCH_PROMPT.md` asks for the Lake Shore
+temperature monitor manuals and the later devices in the plan.
+`FETCH_PROMPT_GRANVILLE_PHILLIPS.md` asks for the Granville-Phillips gauge
+manuals and carries thirteen numbered questions the driver needs answered.
+`FETCH_PROMPT.md` is the worked example of this shape. A new one covers:
 
 - **What it is for.** The prompt goes to a session starting from nothing, so it
   says why the documents are wanted and what they feed.
@@ -82,7 +86,8 @@ One folder per manufacturer, named the way `FETCH_PROMPT.md` describes.
 ```
 manuals/
   README.md
-  FETCH_PROMPT.md      the current outstanding request
+  FETCH_PROMPT.md      outstanding request, Lake Shore and the later devices
+  FETCH_PROMPT_GRANVILLE_PHILLIPS.md   outstanding request, the gauges
   MANIFEST.md          arrives with the zip
   hashes.txt           arrives with the zip
   lakeshore/

@@ -46,13 +46,21 @@ this version.
 
 ## What is here now
 
-The shared core, and one driver of the ten.
+The shared core, and two drivers of the ten.
 
 The Lakeshore driver reads a 218, 224 or 336 temperature monitor. It was written
 without a Lake Shore manual, from a research file the owner supplied, because
-this machine cannot reach `lakeshore.com`. **Read the Lakeshore section of
-`REVIEW.md` before trusting it on a tool.** It lists what is backed by a worked
-example, what is assumed, and what to check first on a bench.
+this machine cannot reach `lakeshore.com`.
+
+The Granville-Phillips driver reads a 275, 375, 350 or 356 pressure gauge. It
+was written without a Granville-Phillips manual either, from one worked exchange
+relayed through a web search tool and from the EPICS `epics-modules/vac` device
+support read directly from GitHub. Every site hosting one of these manuals is
+refused by this machine's network egress policy.
+
+**Read both driver sections of `REVIEW.md` before trusting either one on a
+tool.** Each lists what is backed by a worked example, what is assumed, and what
+to check first on a bench.
 
 | File | Job |
 |---|---|
@@ -65,6 +73,7 @@ example, what is assumed, and what to check first on a bench.
 | `fab_drivers/core/poller.py` | Read a set of values on a gentle repeating loop. |
 | `fab_drivers/core/trend_page.py` | Build one self-contained trend page for one device. |
 | `fab_drivers/devices/lakeshore/` | Lakeshore 218, 224 and 336 temperature monitors. |
+| `fab_drivers/devices/granville_phillips/` | Granville-Phillips 275, 375, 350 and 356 pressure gauges. |
 | `manuals/` | The manufacturers' documents. Supplied by the owner, never fetched. |
 
 ## The standards every driver follows

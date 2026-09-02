@@ -7,5 +7,6 @@
     transport.py    owns the one real serial port and does one exchange at a time
     device.py       the base class a driver builds on, with retries and staleness
     poller.py       reads a set of values on a gentle repeating loop
-    trend_page.py   builds one self-contained trend page for one device
+    trend_page.py   builds one self-contained trend page for one device,
+                    with each column on a linear or a log axis
 """
