@@ -79,6 +79,10 @@ first real driver drops into a tested template instead of inventing one.
 
 ## Writing a new driver
 
+`CLAUDE.md` is the standing brief for a driver session: the build order for all
+ten devices, the rules that do not bend, and what to check before finishing.
+Read it first. What follows is the short version.
+
 Make a folder under `fab_drivers/devices/`. Put four things in it.
 
 1. `PROTOCOL.md`. The frame format, the checksum if there is one, the result

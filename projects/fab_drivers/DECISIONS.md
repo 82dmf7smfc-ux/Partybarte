@@ -98,15 +98,29 @@ left free for actual working instructions if we ever want them.
   waits for the SECS/GEM monitor. Nobody should be asked to approve a wheel that
   nothing imports.
 
-## Open questions
+- **2026-09-02. A release of this library is one zip of the whole project.**
+  The code, the tests, and the documents. It is not a tool a person
+  double-clicks. It is a folder you put on a bench machine and leave running, so
+  the tests and the safety documents travel with it. This shape is provisional.
+  It was chosen so the release workflow could be finished, and it should be
+  revisited once something actually runs on a bench.
 
-1. **What does a release of this library contain?** The alarm_pareto project
-   ships as a zip of a tool a person runs. A driver library is closer to
-   something you deploy on a bench machine and leave running. That shape needs
-   deciding before the first release tag.
-2. **One trend page for all devices, or one per device?** The prompt asks for one
+- **2026-09-02. Releases are tagged per project.** `fab-drivers-v0.1.0` and
+  `alarm-pareto-v1.5.0`. The repository already had five releases, v1.0.0 to
+  v1.4.0, all of them alarm_pareto from before the split. Its numbering carries
+  on unbroken, so only the tag name changed and nothing published was disturbed.
+
+- **2026-09-02. `CLAUDE.md` now exists, and holds working instructions.** The
+  ten drivers are built one per session, and a session starts with no memory of
+  the ones before it. Claude Code reads `CLAUDE.md` automatically, so the
+  standing brief lives there: the build order, the rules that do not bend, what
+  a driver session produces, and what to check before finishing. The decisions
+  log stayed in this file, which is why the two are separate.
+
+## Open questions
+1. **One trend page for all devices, or one per device?** The prompt asks for one
    combined page. That is a service layer and UI decision, still to be made.
-3. **Which machine runs the poller long term?** The existing heat exchanger
+2. **Which machine runs the poller long term?** The existing heat exchanger
    Raspberry Pi logger is mentioned for the chiller. If that becomes the home for
    all of it, the CSV location and the port naming should match what is already
    there.

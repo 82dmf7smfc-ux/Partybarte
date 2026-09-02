@@ -85,6 +85,9 @@ To run one project's tests only, name its folder:
 
 ## Downloads
 
-Packaged versions are published on the GitHub Releases page. To build them
-yourself, run `python tools/build_zips.py` from the repository root. The
-packages land in `dist`.
+Packaged versions are published on the GitHub Releases page. Releases are per
+project, and the tag says which one, for example `alarm-pareto-v1.5.0` or
+`fab-drivers-v0.1.0`.
+
+To build them yourself, run `python tools/build_zips.py` from the repository
+root, or name one project to build only that. The packages land in `dist`.

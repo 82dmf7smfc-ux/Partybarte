@@ -107,11 +107,28 @@ both against the sample log.
 
 ## Cut a release
 
-Releases are built and published by GitHub Actions. To make one:
+Releases are per project. This repository holds more than one tool, and they
+ship to different people on different days, so one version number across the
+whole repository would be misleading. The tag says which project is being
+released.
 
-    git tag v1.2.0
-    git push origin v1.2.0
+    git tag alarm-pareto-v1.5.0
+    git push origin alarm-pareto-v1.5.0
 
-The release workflow runs the tests, builds the two zip packages, and attaches
-them to a new GitHub Release. It uses `tools/build_zips.py`, so the packages are
-the same every time.
+    git tag fab-drivers-v0.1.0
+    git push origin fab-drivers-v0.1.0
+
+The release workflow reads the project name off the tag, runs every project's
+tests, builds only that project's packages, and attaches them to a new GitHub
+Release. It uses `tools/build_zips.py`, so the packages are the same every time.
+A tag that does not name a project is refused, with a message saying the two
+forms that work.
+
+Releases v1.0.0 through v1.4.0 were cut before the repository held more than one
+project. They were all alarm_pareto. Its version numbers carry on where they left
+off, so the next one is `alarm-pareto-v1.5.0`. Only the tag name changed.
+
+To build the packages by hand:
+
+    python tools/build_zips.py                  every project
+    python tools/build_zips.py alarm_pareto     one project

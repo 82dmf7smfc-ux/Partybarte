@@ -1,17 +1,23 @@
-"""Build the two distributable zip packages.
+"""Build the distributable zip packages.
 
-This script makes the same two zip files every time, from the current source. It
-uses only the Python standard library, so it runs anywhere with no extra
-packages. The GitHub release workflow calls this script, and you can run it by
-hand too.
+This script makes the same zip files every time, from the current source. It uses
+only the Python standard library, so it runs anywhere with no extra packages. The
+GitHub release workflow calls this script, and you can run it by hand too.
 
-    python tools/build_zips.py
+    python tools/build_zips.py                  build every project
+    python tools/build_zips.py alarm_pareto     build one project only
+    python tools/build_zips.py fab_drivers
 
 Output goes to the dist folder:
     dist/alarm_pareto_browser.zip   the single-file browser tool
     dist/alarm_pareto_python.zip    the Python package and tests
+    dist/fab_drivers.zip            the driver library, for a bench machine
 
-Both packages leave out caches, the virtual environment, and generated output.
+Every package leaves out caches, the virtual environment, and generated output.
+
+Releases are per project, so the release workflow builds one project at a time,
+picked from the tag name. Building everything is still the right thing to do in
+CI, because that proves each package can be built.
 """
 
 import shutil
@@ -25,6 +31,7 @@ from pathlib import Path
 # function for it below and call it from main.
 ROOT = Path(__file__).resolve().parents[1]
 PARETO = ROOT / "projects" / "alarm_pareto"
+DRIVERS = ROOT / "projects" / "fab_drivers"
 DIST = ROOT / "dist"
 
 # Folders and files we never want inside a package.
@@ -85,17 +92,56 @@ def build_python_zip():
     return target
 
 
-def main():
+def build_fab_drivers_zip():
+    """Build the driver library package.
+
+    This one is not a tool a person double-clicks. It is a folder you put on a
+    bench machine and leave running, so the package is the code, the tests, and
+    the documents that explain how to use it safely.
+    """
+    target = DIST / "fab_drivers.zip"
+    top = "fab_drivers"
+    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
+        _add_tree(zf, DRIVERS / "fab_drivers", f"{top}/fab_drivers")
+        _add_tree(zf, DRIVERS / "tests", f"{top}/tests")
+        _add_file(zf, ROOT / "setup_venv.bat", f"{top}/setup_venv.bat")
+        for name in ["requirements.txt", "conftest.py", "README.md",
+                     "DECISIONS.md", "REVIEW.md"]:
+            _add_file(zf, DRIVERS / name, f"{top}/{name}")
+    return target
+
+
+# Which builders belong to which project. The release workflow reads a project
+# name off the tag, so the names here are the names used in tags.
+PROJECTS = {
+    "alarm_pareto": [build_browser_zip, build_python_zip],
+    "fab_drivers": [build_fab_drivers_zip],
+}
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+
+    if not argv:
+        wanted = list(PROJECTS)
+    elif len(argv) == 1 and argv[0] in PROJECTS:
+        wanted = [argv[0]]
+    else:
+        print("usage: python tools/build_zips.py [%s]" % " | ".join(PROJECTS))
+        return 2
+
     if DIST.exists():
         # Start clean so old files never linger in a package.
         shutil.rmtree(DIST)
     DIST.mkdir(parents=True)
 
-    browser = build_browser_zip()
-    python = build_python_zip()
+    built = []
+    for project in wanted:
+        for builder in PROJECTS[project]:
+            built.append(builder())
 
     print("Built:")
-    for path in (browser, python):
+    for path in built:
         size_kb = path.stat().st_size / 1024
         print(f"  {path.relative_to(ROOT)}  ({size_kb:.0f} KB)")
     return 0

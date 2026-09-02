@@ -19,6 +19,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - Split the pinned package list. Each project now pins what it imports, in its
   own folder, and the file at the root gathers them. A download package no
   longer asks people to approve packages the tool never imports.
+- Releases are now per project, tagged `alarm-pareto-vX.Y.Z` or
+  `fab-drivers-vX.Y.Z`. The workflow reads the project off the tag and builds
+  only that project's packages. A tag that names no project is refused. The five
+  existing releases, v1.0.0 to v1.4.0, were all alarm_pareto and are untouched;
+  its numbering carries on at `alarm-pareto-v1.5.0`.
+- `tools/build_zips.py` takes an optional project name, and builds everything
+  when given none, which is what CI does.
 - Reworded the offline rule. It always meant that nothing reaches the internet.
   Read literally it also banned talking to equipment over a local socket, which
   is what the driver library exists to do.
@@ -35,6 +42,10 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 - `projects/fab_drivers/REVIEW.md`, the handover for a critical second pass. It
   records what was actually verified, what was only assumed, the known weak
   points, and the one place the read-only gate can be bypassed.
+- `projects/fab_drivers/CLAUDE.md`, the standing brief for a driver session. The
+  ten drivers are built one per session, and each session starts with no memory
+  of the last, so the build order and the rules live in the repository rather
+  than in anyone's head.
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,
   across Python 3.11 and 3.12.

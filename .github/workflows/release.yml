@@ -1,26 +1,37 @@
 name: Release
 
-# Builds the two zip packages and publishes them as a GitHub Release.
+# Builds one project's zip packages and publishes them as a GitHub Release.
+#
+# Releases are per project. This repository holds more than one tool, and they
+# ship to different people on different days, so one version number across the
+# whole repository would be misleading. The tag says which project is being
+# released.
+#
+#   alarm-pareto-v1.5.0   releases projects/alarm_pareto
+#   fab-drivers-v0.1.0    releases projects/fab_drivers
+#
+# Releases v1.0.0 through v1.4.0 were made before this split. They were all
+# alarm_pareto. Its version numbers carry on where they left off, so the next
+# one is alarm-pareto-v1.5.0. Only the tag name changed.
 #
 # Two ways to start it:
-#   1. Push a version tag like v1.0.0.
-#   2. Run it by hand from the Actions tab (workflow_dispatch) and type the
-#      version. This is handy when you cannot push a tag from your machine.
+#   1. Push a tag in one of the forms above.
+#   2. Run it by hand from the Actions tab and type the tag.
 #
 # To cut a release by tag:
-#   git tag v1.0.0
-#   git push origin v1.0.0
+#   git tag alarm-pareto-v1.5.0
+#   git push origin alarm-pareto-v1.5.0
 
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "alarm-pareto-v*.*.*"
+      - "fab-drivers-v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag to create, for example v1.0.0"
+        description: "Tag to create, for example alarm-pareto-v1.5.0"
         required: true
-        default: "v1.0.0"
 
 permissions:
   # The job needs to create a release and attach files to it.
@@ -33,30 +44,56 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v4
 
+      - name: Work out which project this tag releases
+        id: which
+        env:
+          # When started by a tag push, github.ref_name is the tag. When started
+          # by hand, it is the tag typed into the form.
+          TAG: ${{ github.event.inputs.version || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            alarm-pareto-v*)
+              echo "project=alarm_pareto" >> "$GITHUB_OUTPUT"
+              echo "files=dist/alarm_pareto_browser.zip dist/alarm_pareto_python.zip" >> "$GITHUB_OUTPUT"
+              ;;
+            fab-drivers-v*)
+              echo "project=fab_drivers" >> "$GITHUB_OUTPUT"
+              echo "files=dist/fab_drivers.zip" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Tag '$TAG' does not name a project."
+              echo "Use alarm-pareto-vX.Y.Z or fab-drivers-vX.Y.Z."
+              exit 1
+              ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Run the tests before releasing
+        # Every project's tests, not just the one being released. A release is a
+        # promise that the repository is in a good state.
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pytest -q
 
-      - name: Build the zips
-        run: python tools/build_zips.py
+      - name: Build the zips for this project
+        run: python tools/build_zips.py "${{ steps.which.outputs.project }}"
 
       - name: Publish the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          # When started by a tag push, github.ref_name is the tag. When started
-          # by hand, we use the version typed into the form.
-          VERSION: ${{ github.event.inputs.version || github.ref_name }}
+          TAG: ${{ steps.which.outputs.tag }}
+          FILES: ${{ steps.which.outputs.files }}
         run: |
-          gh release create "${VERSION}" \
+          set -euo pipefail
+          gh release create "$TAG" \
             --target main \
-            dist/alarm_pareto_browser.zip \
-            dist/alarm_pareto_python.zip \
-            --title "${VERSION}" \
+            $FILES \
+            --title "$TAG" \
             --generate-notes
