@@ -34,14 +34,25 @@ class CommandPolicy:
                  'allowed' is refused too. This list exists so the reason is
                  recorded next to the command, where the next person will read
                  it.
+    targets:     which sub-units this command may be aimed at, or None if the
+                 device has none. Many devices are really a box with several
+                 things behind it. A cryopump terminal has up to twenty pumps. A
+                 gauge controller has several sensors. The address is not part
+                 of the command, and mixing the two makes the allowed list
+                 explode: twenty addresses and eight commands would be one
+                 hundred and sixty entries to keep correct, which nobody will.
+                 So the command is checked against the allowed list, and the
+                 address is checked against this, separately.
     """
 
-    def __init__(self, device_name, allowed, banned=None):
+    def __init__(self, device_name, allowed, banned=None, targets=None):
         self.device_name = device_name
         # A set makes the check fast and makes duplicates harmless.
         self.allowed = set(allowed)
         # Banned entries map a command to the reason it must never be sent.
         self.banned = dict(banned or {})
+        # None means this device has no sub-units to address.
+        self.targets = None if targets is None else set(targets)
 
         # A command in both lists is a mistake in the driver, not a runtime
         # problem. Catch it as early as possible, when the policy is built.
@@ -72,6 +83,31 @@ class CommandPolicy:
                 % (self.device_name, command)
             )
         return command
+
+    def check_target(self, target):
+        """Let the sub-unit address through, or raise CommandRefused.
+
+        A typo in an address is not a safety problem the way a control command
+        is. It is still worth catching here, because the alternative is a frame
+        going out to a pump that does not exist and a confusing reply coming
+        back that someone has to work out.
+        """
+        if self.targets is None:
+            if target is not None:
+                raise CommandRefused(
+                    "%s: this device has no sub-units, so there is nothing to "
+                    "address, but a target of %r was given"
+                    % (self.device_name, target)
+                )
+            return target
+
+        if target not in self.targets:
+            raise CommandRefused(
+                "%s: %r is not one of this device's sub-units. The ones it has "
+                "are: %s" % (self.device_name, target,
+                             ", ".join(str(t) for t in sorted(self.targets)))
+            )
+        return target
 
     def is_allowed(self, command):
         """Answer the same question without raising. Useful in tests and menus."""

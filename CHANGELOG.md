@@ -30,8 +30,11 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   history, a mock serial port for working with no hardware, the serial
   transport, the driver base class with the one second timeout and two retries,
   and a gentle poller that marks readings stale instead of guessing. No device
-  driver yet, so the first one lands in a tested template. 50 tests, none of
+  driver yet, so the first one lands in a tested template. 56 tests, none of
   which need hardware.
+- `projects/fab_drivers/REVIEW.md`, the handover for a critical second pass. It
+  records what was actually verified, what was only assumed, the known weak
+  points, and the one place the read-only gate can be bypassed.
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,
   across Python 3.11 and 3.12.

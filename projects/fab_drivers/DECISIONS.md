@@ -33,6 +33,23 @@ left free for actual working instructions if we ever want them.
   the rule down did not hold the line. Making the wrong command impossible to
   send does.
 
+- **2026-09-02. The command and the sub-unit address are checked separately.**
+  The first version of the policy matched whole command strings. A CTI-style
+  terminal addresses pumps as `P` plus two digits plus the command, so twenty
+  addresses and eight read commands would have needed one hundred and sixty
+  entries in the allowed list, maintained by hand. Nobody maintains that, and a
+  safety gate nobody maintains is not one. Now the command is checked against
+  the allowed list and the address against a separate list of sub-units, so the
+  same device needs eight entries and a range.
+
+- **2026-09-02. The safety gate can be bypassed, and that is written down rather
+  than engineered away.** A driver that calls `transport.exchange` directly
+  skips the policy. Closing it structurally meant either a transport that only
+  talks to a Device, which is hard to test, or a token passed between them, which
+  is machinery a beginner has to learn before writing a driver. The chosen answer
+  is that every driver sends through `Device.query`, this is stated in the read
+  me, and it is the first item in `REVIEW.md` for the critical pass to check.
+
 - **2026-09-02. Banned commands carry their reason in the code.** A refusal that
   says why is worth more than one that just fails. The `g` lockout command on the
   CTI terminal is the example: refusing it is useless if the next person does not
@@ -83,18 +100,13 @@ left free for actual working instructions if we ever want them.
 
 ## Open questions
 
-1. **The CTI checksum is verified. The rest of the reference is not fully built.**
-   The supplied project has the transport and device layers, but no mock class,
-   no service layer, and no UI, though its own `CLAUDE.md` describes all three.
-   Does the CTI driver get ported into `devices/cti_cryo` as the first real
-   driver, using this core, or does it stay a separate program?
-2. **What does a release of this library contain?** The alarm_pareto project
+1. **What does a release of this library contain?** The alarm_pareto project
    ships as a zip of a tool a person runs. A driver library is closer to
    something you deploy on a bench machine and leave running. That shape needs
    deciding before the first release tag.
-3. **One trend page for all devices, or one per device?** The prompt asks for one
+2. **One trend page for all devices, or one per device?** The prompt asks for one
    combined page. That is a service layer and UI decision, still to be made.
-4. **Which machine runs the poller long term?** The existing heat exchanger
+3. **Which machine runs the poller long term?** The existing heat exchanger
    Raspberry Pi logger is mentioned for the chiller. If that becomes the home for
    all of it, the CSV location and the port naming should match what is already
    there.

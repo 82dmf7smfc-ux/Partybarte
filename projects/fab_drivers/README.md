@@ -33,6 +33,12 @@ banned command never becomes bytes on a wire. Commands known to be dangerous are
 listed separately with the reason, so the next person reads why and not just
 that it failed.
 
+A command and a sub-unit address are checked separately. A cryopump terminal
+with twenty pumps and eight read commands needs eight allowed entries, not one
+hundred and sixty. An allowed list that has to be maintained by hand for every
+address would stop being maintained, and a safety gate nobody maintains is not
+one.
+
 That means adding a command is a deliberate act. If a command only reads a
 value, add it to the driver's allowed list and record the decision in
 `DECISIONS.md`. If it changes what the machine is doing, it does not belong in
@@ -80,7 +86,9 @@ Make a folder under `fab_drivers/devices/`. Put four things in it.
    Write it from the manual, and name the manual and its part number.
 2. `driver.py`. A class that inherits from `core.device.Device` and writes two
    methods, `build_frame` and `parse_reply`. Build its `CommandPolicy` here, with
-   the read-only command list and the banned list with reasons.
+   the read-only command list and the banned list with reasons. Always send
+   through `self.query`. Calling `self.transport.exchange` directly goes around
+   the safety gate, and then nothing is stopping a control command.
 3. `mock.py`. A responder function for `MockSerial` that answers like the real
    device, including the failure cases. Silence and a bad checksum are as
    important to fake as a good reading.
@@ -102,6 +110,17 @@ To run only this project's tests:
 ```
 
 Every test here runs against the mock serial port. None of them need hardware.
+
+## Before you review this
+
+`REVIEW.md` is the handover for a critical read of this project. It says what was
+actually verified, what was only assumed, and the known weak points, including
+the one place the safety gate can be bypassed. Read it before trusting anything
+here. `DECISIONS.md` has the reasoning behind each design choice.
+
+Nothing in this project has ever talked to real hardware. Every test runs against
+a mock serial port. That is the largest open risk and no amount of further
+testing of the same kind reduces it.
 
 ## Rolling a driver out
 

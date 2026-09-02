@@ -19,6 +19,13 @@ from .policy import CommandPolicy
 from .transport import TransportError
 
 
+def _describe(command, target):
+    """Name a command in a message, including its sub-unit if it has one."""
+    if target is None:
+        return repr(command)
+    return "%r on %r" % (command, target)
+
+
 class DeviceError(IOError):
     """The device answered, but the answer was not usable."""
 
@@ -54,12 +61,16 @@ class Device:
 
     # ---- the two methods a driver must write ----
 
-    def build_frame(self, command):
-        """Turn a command string into the exact bytes to put on the wire.
+    def build_frame(self, command, target=None):
+        """Turn a command into the exact bytes to put on the wire.
 
         Every vendor does this differently. The CTI terminal wraps the command in
         a dollar sign, a checksum character and a carriage return. A Lakeshore
         monitor just adds a line ending. Write that here.
+
+        target is the sub-unit this command is aimed at, or None if the device
+        has none. A cryopump terminal uses it for the pump address. A driver
+        with no sub-units can ignore it.
         """
         raise NotImplementedError("each driver builds its own frames")
 
@@ -75,7 +86,7 @@ class Device:
 
     # ---- what every driver gets for free ----
 
-    def query(self, command):
+    def query(self, command, target=None):
         """Send one command and return the parsed reply.
 
         Raises CommandRefused if the command is not on the allowed list. Raises
@@ -89,10 +100,13 @@ class Device:
         log with the same failure.
         """
         # This is the gate. It runs before the frame exists, so a banned command
-        # never becomes bytes.
+        # never becomes bytes. The command and the address are checked
+        # separately, so addressing twenty pumps does not mean listing every
+        # command twenty times.
         self.policy.check(command)
+        self.policy.check_target(target)
 
-        frame = self.build_frame(command)
+        frame = self.build_frame(command, target)
         attempts = 1 + self.retries
         audit = getattr(self.transport, "audit", None)
 
@@ -103,20 +117,20 @@ class Device:
 
             if attempt < attempts:
                 if audit:
-                    audit.note("no reply to %r, attempt %d of %d, trying again"
-                               % (command, attempt, attempts))
+                    audit.note("no reply to %s, attempt %d of %d, trying again"
+                               % (_describe(command, target), attempt, attempts))
                 time.sleep(self.retry_pause_s)
 
         if audit:
-            audit.note("no reply to %r after %d attempts, marking stale"
-                       % (command, attempts))
+            audit.note("no reply to %s after %d attempts, marking stale"
+                       % (_describe(command, target), attempts))
         raise NoReply(
-            "%s did not answer %r after %d attempts. Check the cable, the port "
+            "%s did not answer %s after %d attempts. Check the cable, the port "
             "settings, and that nothing else has the port open."
-            % (self.name, command, attempts)
+            % (self.name, _describe(command, target), attempts)
         )
 
-    def try_query(self, command):
+    def try_query(self, command, target=None):
         """Like query, but return None instead of raising when it fails.
 
         Use this in a polling loop, where one unreadable value should not stop
@@ -125,6 +139,6 @@ class Device:
         away here. It is still written to the audit log.
         """
         try:
-            return self.query(command)
+            return self.query(command, target)
         except (DeviceError, TransportError):
             return None

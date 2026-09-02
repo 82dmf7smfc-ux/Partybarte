@@ -48,3 +48,48 @@ def test_is_allowed_answers_without_raising():
     assert policy.is_allowed("J") is True
     assert policy.is_allowed("g") is False
     assert policy.is_allowed("A1") is False
+
+
+# ---- addressing sub-units ----
+#
+# Many devices are a box with several things behind it. The address is checked
+# separately from the command, so a terminal with twenty pumps and eight read
+# commands needs eight allowed entries, not one hundred and sixty.
+
+
+def make_addressed_policy():
+    return CommandPolicy(
+        "cryo terminal",
+        allowed=["J", "K"],
+        targets=range(0, 20),
+    )
+
+
+def test_a_known_sub_unit_passes():
+    policy = make_addressed_policy()
+    assert policy.check_target(3) == 3
+
+
+def test_an_unknown_sub_unit_is_refused():
+    policy = make_addressed_policy()
+    with pytest.raises(CommandRefused) as caught:
+        policy.check_target(44)
+    assert "not one of this device's sub-units" in str(caught.value)
+
+
+def test_the_allowed_list_stays_small_when_a_device_has_many_sub_units():
+    # This is the whole point of separating the two. An allowed list that has to
+    # be maintained by hand for every address would stop being maintained.
+    policy = make_addressed_policy()
+    assert len(policy.allowed) == 2
+    assert len(policy.targets) == 20
+
+
+def test_a_device_with_no_sub_units_refuses_a_target():
+    # Passing an address to a device that has none means the driver is confused
+    # about what it is talking to.
+    policy = make_policy()
+    assert policy.check_target(None) is None
+    with pytest.raises(CommandRefused) as caught:
+        policy.check_target(2)
+    assert "no sub-units" in str(caught.value)
