@@ -32,6 +32,28 @@ alarm_pareto.html      The tool. This is the only file you need.
 sample_alarm_log.csv   A small example elog you can import to test it.
 screenshot.png         What the tool looks like when it has run.
 
+How much data it can handle
+---------------------------
+There is no row limit. What limits you is the memory in your browser tab.
+Measured on generated logs:
+
+  100,000 rows   (8 MB)     about 1 second
+  500,000 rows   (40 MB)    about 3 seconds
+  1,000,000 rows (81 MB)    about 10 seconds
+  2,000,000 rows (162 MB)   about 21 seconds
+  4,000,000 rows (324 MB)   runs out of memory, the tab crashes
+
+Two to three million rows is the practical ceiling. One single file also
+cannot be larger than 512 MB, though splitting the same data into several
+files gets around that.
+
+While the page is reading or analyzing it will not respond. That is normal,
+not a crash. It tells you before it starts and warns you when an import is
+large enough to be slow.
+
+If you regularly have more than about two million rows, split the import by
+date range, or use the Python tool.
+
 Note
 ----
 Because it runs in the browser, it does not create native Excel chart files.

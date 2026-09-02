@@ -7,6 +7,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 ## [Unreleased]
 
 ### Added
+- Import feedback in the browser tool. It now says how much it is reading
+  before it starts, and warns when an import is large enough to be slow or to
+  risk running the tab out of memory. Reading and analysis block the page, so
+  the message is painted before the work starts rather than after it.
+- Measured limits for both tools, written up in the README and the browser
+  read-me. Neither tool caps the number of rows. The browser tool tops out at
+  two to three million rows, and a single file cannot exceed 512 MB.
 - Time-of-day filter. `--start-time` and `--end-time` on the Python tool, and a
   matching pair of boxes with shift presets in the browser tool, narrow the
   report to a range of clock hours so it can cover one shift. The range is half
@@ -14,6 +21,18 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   later than the end wraps past midnight for the night shift. Alarms are picked
   by the time they started, the same rule the trailing window uses. The chosen
   hours are printed on the workbook, the deck, the page, and the CSV export.
+
+### Changed
+- Expanded the explanation of the night shift in both tools, since a shift
+  whose start is later than its end is the one part of the filter that is not
+  obvious from reading the code.
+
+### Tests
+- `tests/test_night_shift.py`, an exhaustive check of the wrapping case. Every
+  one of the 1440 minutes in a day is checked, for every start hour and six
+  range lengths, that a range and its complement between them keep every minute
+  exactly once. Plus the boundary minutes, month ends, year ends, and a leap
+  day.
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,
   across Python 3.11 and 3.12.

@@ -280,15 +280,41 @@ document.getElementById("loadSample").addEventListener("click", function () {
   setMsg("importMsg", "ok", "Loaded the built-in sample (15 rows).");
 });
 
+// Rough row counts where a browser tab starts to struggle. These come from
+// measuring the real code on generated logs: about 800 MB of memory per
+// million rows, and roughly ten seconds of work per million rows. A tab has
+// somewhere around two to four gigabytes to play with, so a few million rows
+// is the ceiling. Past BIG_ROWS the page still works but feels slow. Past
+// HUGE_ROWS the tab is at real risk of running out of memory.
+var BIG_ROWS = 750000;
+var HUGE_ROWS = 2000000;
+var BIG_BYTES = 60 * 1024 * 1024;
+
 function readFiles(files) {
   var texts = [];
   var pending = files.length;
+
+  // Say something before the reading starts. Everything after this point is
+  // synchronous, so without this the page would just sit there looking frozen
+  // on a large import with no clue that it is working.
+  var totalBytes = 0;
+  for (var f = 0; f < files.length; f++) totalBytes += files[f].size || 0;
+  var sizeMb = Math.round(totalBytes / 1048576);
+  var note = "Reading " + files.length + " file(s), " + (sizeMb >= 1 ? sizeMb + " MB" : "under 1 MB") + "...";
+  if (totalBytes > BIG_BYTES) {
+    note += " This is a large import. The page will not respond until it finishes, which is normal. Please wait.";
+  }
+  setMsg("importMsg", totalBytes > BIG_BYTES ? "warn" : "ok", note);
+
   files.forEach(function (file) {
     var reader = new FileReader();
     reader.onload = function () {
       texts.push(String(reader.result));
       pending -= 1;
-      if (pending === 0) parseAllTexts(texts, files.length);
+      // setTimeout hands control back to the browser for one tick so the
+      // "Reading..." message above actually gets painted before the parsing
+      // blocks the page. Without it the message is queued but never shown.
+      if (pending === 0) setTimeout(function () { parseAllTexts(texts, files.length); }, 0);
     };
     reader.onerror = function () {
       setMsg("importMsg", "err", "Could not read file: " + file.name);
@@ -326,9 +352,20 @@ function parseAllTexts(texts, fileCount) {
   STATE.rows = all.rows;
   STATE.fileCount = fileCount;
 
+  // Tell the user how big this is, and be honest when it is big enough that
+  // the page is going to be slow or may run out of memory.
+  if (all.rows.length >= HUGE_ROWS) {
+    warnings.push("That is a very large import. The browser tool may run out of memory. " +
+      "If the tab crashes, split the files into smaller date ranges, or use the Python tool, " +
+      "which streams to disk and has no such limit.");
+  } else if (all.rows.length >= BIG_ROWS) {
+    warnings.push("That is a large import. Analysis may take several seconds and the page " +
+      "will not respond while it runs. This is normal.");
+  }
+
   var extra = warnings.length ? " " + warnings.join(" ") : "";
   setMsg("importMsg", warnings.length ? "warn" : "ok",
-    "Loaded " + all.rows.length + " rows from " + fileCount + " file(s)." + extra);
+    "Loaded " + all.rows.length.toLocaleString() + " rows from " + fileCount + " file(s)." + extra);
 
   buildMappingUI();
 }
@@ -604,7 +641,9 @@ function formatTimeOfDay(minutes) {
   return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
 }
 
-// A range only filters when both bounds are set and they are not the whole day.
+// A range only filters when both bounds are set and they are not the whole
+// day. A "from" later than a "to" is NOT caught here: that is the night shift,
+// a real filter, handled by the wrap in applyTimeOfDay.
 function isTimeOfDayFiltered(start, end) {
   if (start === null || end === null) return false;
   if (start === end) return false;
@@ -619,11 +658,39 @@ function timeOfDayLabel(start, end) {
   return label;
 }
 
-// Keep occurrences that started inside the given hours of the day. Half open,
-// and a start later than the end wraps past midnight.
+// Keep occurrences that started inside the given hours of the day.
+//
+// Three rules govern this.
+//
+// 1. The range is half open. The "from" minute is kept, the "to" minute is
+//    not. So 06:00 to 18:00 keeps an alarm at exactly 06:00 and drops one at
+//    exactly 18:00. That is what makes a day shift and a night shift add up to
+//    a whole day with no row counted twice and no row lost.
+//
+// 2. A "from" later than a "to" wraps past midnight. This is the night shift,
+//    18:00 on one day to 06:00 on the next. The kept clock time is in two
+//    pieces, so the test is an "or", not an "and":
+//
+//      00:00      06:00                        18:00      24:00
+//        |----------|----------------------------|----------|
+//         <-- keep -->                            <-- keep -->
+//         morning head                            evening tail
+//
+//    An "and" would keep nothing, because no minute is both at or after 18:00
+//    and before 06:00. Because each row is judged on its clock time alone, the
+//    filter never has to know which date a shift began on. Rows from Feb 20 at
+//    22:00 and Feb 21 at 03:00 are both night-shift rows and both survive.
+//    Across a 30 day window this picks up every night shift in the window.
+//
+// 3. Rows are chosen on the time the alarm started, the same rule the trailing
+//    window uses. An alarm that starts at 17:50 and runs four hours counts all
+//    four hours against the day shift.
 function applyTimeOfDay(occ, start, end) {
   if (!isTimeOfDayFiltered(start, end)) return occ;
   return occ.filter(function (o) {
+    // Minutes since midnight for this row. getHours and getMinutes read local
+    // time, which is the same clock the timestamps were parsed in, so no time
+    // zone conversion happens anywhere here.
     var m = o.start.getHours() * 60 + o.start.getMinutes();
     return (start < end) ? (m >= start && m < end) : (m >= start || m < end);
   });
@@ -705,7 +772,18 @@ function collapse(sorted, topN, sortField) {
 // ---------------------------------------------------------------------------
 // Run the whole analysis.
 // ---------------------------------------------------------------------------
-document.getElementById("runBtn").addEventListener("click", runAnalysis);
+document.getElementById("runBtn").addEventListener("click", function () {
+  // Same reason as the import: runAnalysis blocks the page, so paint a note
+  // first on anything big enough to take noticeable time.
+  if (STATE.rows && STATE.rows.length >= BIG_ROWS) {
+    setMsg("summaryMsg", "warn", "Analyzing " + STATE.rows.length.toLocaleString() +
+      " rows. The page will not respond until this finishes.");
+    document.getElementById("results").style.display = "";
+    setTimeout(runAnalysis, 0);
+  } else {
+    runAnalysis();
+  }
+});
 
 // The preset dropdown just fills the two time boxes. Typing in the boxes then
 // clears the dropdown, so it never claims a shift that is no longer selected.

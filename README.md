@@ -143,6 +143,63 @@ Three things to know.
 The time-of-day filter runs after the trailing window, so the window start and
 end printed on the report still describe the file, not the shift.
 
+## How much data can it handle
+
+Neither tool caps the number of rows. There is no row limit, no file count
+limit, and no truncation anywhere in the code. What limits you is memory and
+patience, and the two tools have very different ceilings.
+
+### Browser tool
+
+Everything happens inside the browser tab, in memory, on one thread. Measured
+on generated logs with five columns, running the tool's own parsing and
+aggregation code:
+
+| Rows | File size | Time to analyze | Memory used |
+|---|---|---|---|
+| 100,000 | 8 MB | about 1 second | about 140 MB |
+| 500,000 | 40 MB | about 3 seconds | about 400 MB |
+| 1,000,000 | 81 MB | about 10 seconds | about 800 MB |
+| 2,000,000 | 162 MB | about 21 seconds | about 1.5 GB |
+| 4,000,000 | 324 MB | out of memory | tab crashes |
+
+Roughly 800 MB of memory and ten seconds of work per million rows, scaling
+linearly. A browser tab has somewhere between two and four gigabytes to work
+with, so the practical ceiling is **two to three million rows**. Past that the
+tab crashes with no useful message.
+
+Two other hard limits worth knowing:
+
+- A single file cannot exceed **512 MB**, because the page reads it into one
+  JavaScript string and that is the largest string the browser engine allows.
+  Splitting the same data across several files gets around this, since each
+  file is read into its own string.
+- Every file is held in memory at once before parsing starts, so total size
+  across all files still counts against the memory ceiling above.
+
+The page now tells you what it is doing. It shows how much it is reading before
+it starts, warns above 750,000 rows that analysis will take a few seconds, and
+warns above 2,000,000 rows that the tab may run out of memory. While it works
+the page does not respond. That is normal and not a crash.
+
+If you routinely have more than about two million rows, split the import by
+date range, or use the Python tool.
+
+### Python tool
+
+No cap either, and a much higher ceiling, because it is limited by the memory
+of the machine rather than a browser tab. It reads the whole file into a pandas
+table with every column as text, which costs roughly one to two gigabytes per
+million rows of a typical five column log. On an ordinary workstation with
+16 GB that is comfortably several million rows.
+
+Note that this is an estimate from the shape of the code, not a measurement.
+The measured numbers in the table above are for the browser tool only.
+
+If you ever do exceed what the machine can hold, the fix is to narrow the input
+before the tool sees it, not to change the tool: split the log by date range and
+run once per range.
+
 ## Adding a new tool vendor
 
 You do not need to touch any Python file. Open
