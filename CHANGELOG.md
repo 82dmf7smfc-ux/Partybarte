@@ -6,6 +6,17 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+- Reorganised the repository to hold more than one project. The alarm_pareto
+  tool moved from the root into `projects/alarm_pareto`, with its code, tests,
+  sample data, packaging read me, screenshot, and read me all inside that
+  folder. The pinned package list, the environment setup script, the packaging
+  script, and the project documents stayed at the root and are now shared. The
+  contents of the two download packages did not change.
+- Added `pytest.ini`, so `pytest -q` from the repository root runs every
+  project's tests, and two projects can each have a `tests` folder without
+  their test files colliding.
+
 ### Added
 - Project scaffolding for continuous build and clear history.
 - GitHub Actions CI that runs the test suite on every push and pull request,

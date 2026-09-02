@@ -1,10 +1,30 @@
 # Contributing
 
-This guide explains how to work on the project. It is written for a smart reader
-who may not be a full-time Python programmer.
+This guide explains how to work on the code here. It is written for a smart
+reader who may not be a full-time Python programmer.
+
+## How the repository is organised
+
+This repository holds more than one project. Each project lives in its own
+folder under `projects` and owns its code, its tests, its sample data, and its
+read me. Anything shared by every project stays at the root: the pinned package
+list, the environment setup script, the pytest settings, the packaging script,
+and these documents.
+
+When you add a project, make a new folder under `projects`. Give it a read me,
+a `tests` folder, and a `conftest.py` that puts the project folder on the import
+path, the way `projects/alarm_pareto/conftest.py` does. Then add a row to the
+project table in the root read me. You do not have to touch the CI workflow.
+It runs `pytest -q` from the root, and `pytest.ini` points that at every project
+folder.
+
+Keep projects independent. Do not import one project's code from another. If two
+projects genuinely need the same code, say so in the pull request and we will
+decide where shared code should live before it is written.
 
 ## Ground rules
 
+- These rules apply to every project in the repository, not just one.
 - The tools must run fully offline. Never add a runtime network call.
 - Use only these Python packages: pandas, numpy, openpyxl, python-pptx,
   matplotlib, pytest. Every new package is an IT approval request, so ask first.
@@ -15,7 +35,9 @@ who may not be a full-time Python programmer.
 
 ## Set up a development environment
 
-You need Python and the pinned packages. On a machine with internet:
+You need Python and the pinned packages. There is one environment for the whole
+repository, built at the root and shared by every project. On a machine with
+internet, run this from the repository root:
 
     python -m venv .venv
     .venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -23,14 +45,27 @@ You need Python and the pinned packages. On a machine with internet:
 On an offline machine, get the wheel files from IT and run `setup_venv.bat`
 with the wheel folder. See the README for details.
 
+Adding a package means adding a pinned line to `requirements.txt`, and it means
+someone has to get that wheel approved. Ask before you do it.
+
 ## Run the tests
+
+From the repository root, this runs every project's tests:
 
     .venv\Scripts\python.exe -m pytest -q
 
-The tests use a small hand-built sample log. The correct answers were worked out
-by hand and stored in `tests/data/expected_summary.json`. If a change makes a
-test fail, the change altered the analysis. Confirm the new numbers are right
-before you update the golden file.
+To run one project's tests while you work on it, name its folder:
+
+    .venv\Scripts\python.exe -m pytest -q projects\alarm_pareto
+
+Naming the folder is the only way to narrow it down. Moving into a project
+folder first does not, because pytest looks upward for `pytest.ini`, finds the
+one at the root, and runs everything it points at.
+
+The alarm_pareto tests use a small hand-built sample log. The correct answers
+were worked out by hand and stored in `tests/data/expected_summary.json`, inside
+that project. If a change makes a test fail, the change altered the analysis.
+Confirm the new numbers are right before you update the golden file.
 
 ## Branch and pull request workflow
 
@@ -41,15 +76,18 @@ before you update the golden file.
 
 ## Add support for a new tool vendor
 
-You do not need to change any Python file. Open
-`alarm_pareto/config/vendor_columns.json`. Copy a block. Rename it. Change the
-column names on the right to match the new file headers. The internal names on
-the left stay the same. The README explains what each internal name means.
+This section is about the alarm_pareto project.
+
+You do not need to change any Python file. Open the vendor config at
+`projects/alarm_pareto/alarm_pareto/config/vendor_columns.json`. Copy a block.
+Rename it. Change the column names on the right to match the new file headers.
+The internal names on the left stay the same. That project's read me explains
+what each internal name means.
 
 The browser tool does not use this file. It guesses columns and lets the user
 fix them in the page.
 
-## Keep the two tools in agreement
+## Keep the two alarm_pareto tools in agreement
 
 The browser tool and the Python tool must produce the same numbers for the same
 input. When you change the analysis in one, change it in the other, and check

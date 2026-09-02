@@ -19,8 +19,12 @@ import sys
 import zipfile
 from pathlib import Path
 
-# The project root is the folder above this script's "tools" folder.
+# The repository root is the folder above this script's "tools" folder. Each
+# project lives in its own folder under "projects". This script packages the
+# alarm_pareto project. When another project needs packaging, add a build
+# function for it below and call it from main.
 ROOT = Path(__file__).resolve().parents[1]
+PARETO = ROOT / "projects" / "alarm_pareto"
 DIST = ROOT / "dist"
 
 # Folders and files we never want inside a package.
@@ -52,11 +56,11 @@ def build_browser_zip():
     target = DIST / "alarm_pareto_browser.zip"
     top = "alarm_pareto_browser"
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
-        _add_file(zf, ROOT / "alarm_pareto.html", f"{top}/alarm_pareto.html")
-        _add_file(zf, ROOT / "tests" / "data" / "sample_alarm_log.csv", f"{top}/sample_alarm_log.csv")
-        _add_file(zf, ROOT / "packaging" / "browser_READ_ME_FIRST.txt", f"{top}/READ_ME_FIRST.txt")
+        _add_file(zf, PARETO / "alarm_pareto.html", f"{top}/alarm_pareto.html")
+        _add_file(zf, PARETO / "tests" / "data" / "sample_alarm_log.csv", f"{top}/sample_alarm_log.csv")
+        _add_file(zf, PARETO / "packaging" / "browser_READ_ME_FIRST.txt", f"{top}/READ_ME_FIRST.txt")
         # The screenshot is a nice-to-have. Include it only if it exists.
-        shot = ROOT / "docs" / "screenshot.png"
+        shot = PARETO / "docs" / "screenshot.png"
         if shot.exists():
             _add_file(zf, shot, f"{top}/screenshot.png")
     return target
@@ -67,10 +71,17 @@ def build_python_zip():
     target = DIST / "alarm_pareto_python.zip"
     top = "alarm_pareto_python"
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
-        _add_tree(zf, ROOT / "alarm_pareto", f"{top}/alarm_pareto")
-        _add_tree(zf, ROOT / "tests", f"{top}/tests")
-        for name in ["requirements.txt", "setup_venv.bat", "conftest.py", "README.md"]:
+        _add_tree(zf, PARETO / "alarm_pareto", f"{top}/alarm_pareto")
+        _add_tree(zf, PARETO / "tests", f"{top}/tests")
+        # The pinned package list and the environment setup script are shared by
+        # the whole repository, so they come from the root. The conftest and the
+        # read me belong to this project. Inside the zip they all sit together at
+        # the top level, which is the flat layout the person downloading it
+        # expects.
+        for name in ["requirements.txt", "setup_venv.bat"]:
             _add_file(zf, ROOT / name, f"{top}/{name}")
+        for name in ["conftest.py", "README.md"]:
+            _add_file(zf, PARETO / name, f"{top}/{name}")
     return target
 
 

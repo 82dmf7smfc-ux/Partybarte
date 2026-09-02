@@ -1,6 +1,7 @@
 @echo off
 REM ---------------------------------------------------------------------------
-REM Build the project-local virtual environment on this Windows machine.
+REM Build the virtual environment for this repository on this Windows machine.
+REM Run it from the repository root. One environment serves every project here.
 REM
 REM A virtual environment is a private copy of Python and its packages. Keeping
 REM it inside the solution folder keeps these packages away from anything you
@@ -39,8 +40,11 @@ if errorlevel 1 goto :error
 
 echo.
 echo Done. The environment is ready in the .venv folder.
-echo To run the tool, use:
-echo   .venv\Scripts\python.exe -m alarm_pareto.main --input tests\data\sample_alarm_log.csv --vendor amat
+echo To run all the tests, use:
+echo   .venv\Scripts\python.exe -m pytest -q
+echo To run the alarm pareto tool on its sample log, use:
+echo   cd projects\alarm_pareto
+echo   ..\..\.venv\Scripts\python.exe -m alarm_pareto.main --input tests\data\sample_alarm_log.csv --vendor amat
 goto :eof
 
 :error
