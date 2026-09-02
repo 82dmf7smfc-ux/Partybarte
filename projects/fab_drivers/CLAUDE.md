@@ -37,12 +37,16 @@ reviewer will catch them, and do not gold-plate either.
    the command syntax against worked examples in the manufacturer's own manual
    before writing code that sends anything.
 
-   **You do not fetch the manual. The project owner supplies it.** This is a
-   standing decision and it holds at every stage of every project here, not just
-   the driver sessions. Do not try to download a document. Do not work around a
-   blocked download. Do not substitute a summary, a search result, a forum post,
-   a third party library, or your own memory. See the next section for what to
-   do instead.
+   **Research the web directly.** Search for the manual, download it, read it.
+   The owner may also hand over a PDF or a research file, and that counts as a
+   source too. If the network refuses a download, say so and use what you can
+   reach.
+
+   Whatever the source turns out to be, name it in `PROTOCOL.md` and say how
+   much weight it carries. A manual read directly is the strongest. A research
+   file compiled by someone else is weaker, and anything in it that no manual
+   confirmed goes in `REVIEW.md` as unverified. Never write from memory of a
+   protocol alone.
 
    A stage blocked on a document is an honest outcome. Plausible looking command
    syntax that was never verified is worse than no driver, because it looks
@@ -78,41 +82,30 @@ This applies to any stage of any project here, and to any external document: a
 programming manual, a register map, a protocol specification, a standard, a
 vendor application note.
 
-The order is always the same.
+1. **Look in `manuals/` first.** The owner may already have put it there.
+   `manuals/` has one folder per manufacturer and a `MANIFEST.md` saying what
+   arrived and from where.
 
-1. **Look in `manuals/` first.** The document may already be there. `manuals/`
-   has one folder per manufacturer and a `MANIFEST.md` saying what arrived, from
-   where, with its part number and its SHA-256.
+2. **Otherwise go and get it.** Search for it, download it, read it. Prefer the
+   manufacturer's own site, then a university or national lab mirror.
 
-2. **If it is not there, stop the work that needs it.** Do the parts of the
-   session that do not depend on the missing document, and only those.
+3. **If the network refuses, say so and write a fetch prompt.**
+   `manuals/README.md` has the shape one takes. Hand it over as a file. The
+   owner can run it somewhere with better access.
 
-3. **Write a fetch prompt and hand it over as a file.** `manuals/README.md` has
-   the procedure and the shape a fetch prompt takes. Hand over the file itself.
-   Do not paste it into the chat as text, and do not describe it instead of
-   producing it.
+4. **Record what the source actually was.** This is the part that matters.
+   `PROTOCOL.md` names it. Anything taken from a weaker source than a manual, or
+   from no source at all, goes in `REVIEW.md` as unverified, item by item. The
+   next reader has to be able to tell a checked fact from a plausible one.
 
-4. **Say plainly what is blocked and why.** Record it in `REVIEW.md` so the next
-   session does not repeat the search, and mark the row in `sessions/README.md`.
+A search snippet is a lead, not a worked example. Chase it to the document it
+came from where you can, and where you cannot, label what rests on it.
 
-5. **Stop there.** The owner runs the fetch prompt and puts the documents in
-   `manuals/`. The session runs again with them in hand.
-
-Searching for candidate links is allowed, and it is worth doing, because a fetch
-prompt carrying exact URLs saves the owner a hunt. Fetching is not, and neither
-is any attempt to get around a refused fetch.
-
-There is a trap in that distinction. A search result shows you snippets, and a
-snippet can look like it answers a protocol question. It does not. A snippet is
-not a worked example and it is not a manual. Put the link in the fetch prompt
-and write nothing from what the snippet said.
-
-A vendor's own source code is the same trap wearing better clothes. Several of
-these manufacturers publish drivers on GitHub, which is often reachable when
-their own website is not. That code is worth reading once the manual is in hand,
-as a cross-check, and disagreement between the two is worth writing down. It is
-not a source to write from. It carries no worked examples and does not say which
-models or firmware revisions its choices apply to.
+A vendor's own source code is a useful cross-check and is not a manual. Several
+of these manufacturers publish drivers on GitHub. Read them, and note where they
+disagree with the manual. On its own that code carries no worked examples and
+does not say which models or firmware revisions its choices apply to, so
+anything resting only on it is unverified.
 
 ## What a driver session produces
 
@@ -194,10 +187,9 @@ runs next.
 
 - `pytest -q projects/fab_drivers` passes, and so does `pytest -q` from the root.
 - The new tests pass with no hardware.
-- `PROTOCOL.md` names its source manual, its part number and its SHA-256, and
-  that manual is a real document in `manuals/`, not one you were told about.
-- Nothing was written from memory, from a search result, or from a vendor's
-  source code.
+- `PROTOCOL.md` names every source it was written from, and says how strong each
+  one is.
+- Anything not confirmed by a manual is listed in `REVIEW.md` as unverified.
 - Nothing state-changing is on an allowed list.
 - `DECISIONS.md` has a dated entry.
 - The trend page is generated and opened once, to check it actually shows what

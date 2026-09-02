@@ -27,19 +27,19 @@ a SCPI style ASCII, for example `KRDG? A` to read a temperature.
 
 ## Do this in order
 
-1. **Research first.** The manuals are in `manuals/lakeshore/`, supplied by the
-   project owner. Verify the exact command syntax, the serial settings, the line
-   terminator, and the reply format against worked examples in them.
+1. **Research first.** Find the official Lakeshore user or programming manual for
+   these models. Search for it, download it, read it. Verify the exact command
+   syntax, the serial settings, the line terminator and the reply format against
+   worked examples in it. Anything the owner has already put in
+   `manuals/lakeshore/` counts as a source too.
 
-   Write nothing from memory of SCPI. Do not fetch anything yourself, and do not
-   substitute a search result or a vendor's own source code for the manual.
-   `manuals/README.md` has the rule and the reason.
+   Write nothing from memory of SCPI. Name every source you did use in
+   `PROTOCOL.md` and say how strong it is, and put anything a manual did not
+   confirm in `REVIEW.md` as unverified. `manuals/README.md` has the reasoning.
 
-   If `manuals/lakeshore/` is empty or is missing one of the three models, the
-   session is blocked. Update `manuals/FETCH_PROMPT.md` with what is still
-   wanted, hand it over as a file, and stop. A driver blocked on a document is an
-   honest outcome. Plausible command syntax that was never verified is worse than
-   no driver, because it looks finished.
+   If the network refuses every manual, say so and use what you can reach, with
+   the gap written down. `manuals/FETCH_PROMPT.md` is the request that gets the
+   documents to somebody with better access.
 
 2. **Write `devices/lakeshore/PROTOCOL.md`** from the manual, before the code.
    Serial settings, terminator, command format, reply format, error handling, the

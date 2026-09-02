@@ -2,40 +2,36 @@
 
 Where the manufacturers' documents live, and how they get here.
 
-## The standing rule
+## How documents are got
 
-**A session does not fetch documents. The project owner supplies them.**
+Research the web directly. Search for the manual, download it, read it. The
+owner may also hand over a PDF or a compiled research file, and those land here
+too.
 
-This is the owner's decision and it holds at every stage of every project in
-this repository. It is not a workaround for one blocked session. A session that
-needs a document it does not have writes a fetch prompt, hands it over, and
-stops.
+If the network refuses a download, which is what happens on these machines for
+most manufacturer sites, say so plainly and write a fetch prompt.
+`FETCH_PROMPT.md` is the worked example of one. It goes to somebody with better
+access and comes back as a zip that gets unpacked here.
 
-Two reasons it is worth being firm about.
+## The part that does not bend
 
-The practical one. The machines these sessions run on cannot reach the
-manufacturers' websites. The network policy allows source and package hosts and
-refuses the rest. Time spent discovering that again is time wasted, and every
-session would rediscover it.
+Say what each fact was taken from.
 
-The real one. When fetching a document is hard, the tempting substitutes are all
-close to hand: a search snippet, a summary site, a forum answer, a vendor's own
-source code on GitHub, or plain memory of a protocol that looks like this one.
-Every one of those produces code that looks finished and was never checked. The
-rule removes the temptation by removing the choice.
+`PROTOCOL.md` names its sources and ranks them. A manual read directly is the
+strongest. A research file compiled by someone else, a search result, a forum
+thread, or a vendor's own driver source is weaker. Anything resting on a weaker
+source, or on nothing, goes in `../REVIEW.md` as unverified, item by item.
 
-## What a session does when a document is missing
+That is the whole safeguard, and it is worth understanding why it is the one
+that stayed. A driver built on a weak source is often the only thing available
+in the time there is, and it is genuinely useful. A driver built on a weak
+source that reads as though it came from the manual is not, because nobody goes
+back to check it.
 
-1. Look here first. It may already have arrived.
-2. Stop the work that depends on it. Carry on with anything that does not.
-3. Write a fetch prompt, using the shape below, and hand over the file itself.
-4. Record what is blocked in `../REVIEW.md`, and mark the row in
-   `../sessions/README.md`.
-5. Stop. The owner runs the prompt and unpacks the answer here.
-
-Searching for candidate links is allowed, and worth doing. A fetch prompt that
-carries exact URLs saves the owner a hunt. Reading what a search result says
-about a protocol is not allowed. A snippet is not a worked example.
+`../fab_drivers/devices/lakeshore/PROTOCOL.md` is the worked example. It opens
+by saying no Lake Shore manual was read, names what was read instead, and ranks
+it. `../REVIEW.md` then lists the nine specific things a bench visit should
+check first.
 
 ## The shape of a fetch prompt
 

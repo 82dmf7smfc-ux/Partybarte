@@ -46,12 +46,13 @@ this version.
 
 ## What is here now
 
-The shared core, and no device drivers yet. The core was built first so that the
-first real driver drops into a tested template instead of inventing one.
+The shared core, and one driver of the ten.
 
-The Lakeshore driver, which is first in the build order, is blocked on its
-manual. `manuals/FETCH_PROMPT.md` is the request that unblocks it. `REVIEW.md`
-says what was found and what was deliberately not used.
+The Lakeshore driver reads a 218, 224 or 336 temperature monitor. It was written
+without a Lake Shore manual, from a research file the owner supplied, because
+this machine cannot reach `lakeshore.com`. **Read the Lakeshore section of
+`REVIEW.md` before trusting it on a tool.** It lists what is backed by a worked
+example, what is assumed, and what to check first on a bench.
 
 | File | Job |
 |---|---|
@@ -63,7 +64,7 @@ says what was found and what was deliberately not used.
 | `fab_drivers/core/device.py` | The base class a driver builds on. Retries and staleness. |
 | `fab_drivers/core/poller.py` | Read a set of values on a gentle repeating loop. |
 | `fab_drivers/core/trend_page.py` | Build one self-contained trend page for one device. |
-| `fab_drivers/devices/` | One folder per piece of equipment. Empty for now. |
+| `fab_drivers/devices/lakeshore/` | Lakeshore 218, 224 and 336 temperature monitors. |
 | `manuals/` | The manufacturers' documents. Supplied by the owner, never fetched. |
 
 ## The standards every driver follows
@@ -71,11 +72,10 @@ says what was found and what was deliberately not used.
 - **Research first.** Verify the command syntax against worked examples in the
   manufacturer's own manual before writing any code. Do not write a driver from
   memory of a protocol.
-- **The manual is supplied, not fetched.** The project owner provides the
-  documents and they live in `manuals/`. A session that needs one it does not
-  have writes a fetch prompt, hands it over, and stops. It does not go looking
-  for a substitute. `manuals/README.md` has the procedure. A driver blocked on a
-  document is the honest answer.
+- **Say what the source was.** `PROTOCOL.md` names every source it was written
+  from and ranks it. Anything not confirmed by a manual goes in `REVIEW.md` as
+  unverified, item by item. Documents the owner supplies live in `manuals/`.
+  `manuals/README.md` has the reasoning.
 - **Read-only version 1.** Setpoint writes and control actions are excluded
   until someone asks for them explicitly.
 - **Python and pyserial.** Standard library everywhere else. `pymodbus` and

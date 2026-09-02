@@ -104,7 +104,7 @@ class Device:
         # separately, so addressing twenty pumps does not mean listing every
         # command twenty times.
         self.policy.check(command)
-        self.policy.check_target(target)
+        self.policy.check_target(target, command)
 
         frame = self.build_frame(command, target)
         attempts = 1 + self.retries

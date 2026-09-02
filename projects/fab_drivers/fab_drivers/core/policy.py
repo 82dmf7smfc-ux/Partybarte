@@ -45,7 +45,8 @@ class CommandPolicy:
                  address is checked against this, separately.
     """
 
-    def __init__(self, device_name, allowed, banned=None, targets=None):
+    def __init__(self, device_name, allowed, banned=None, targets=None,
+                 untargeted=None):
         self.device_name = device_name
         # A set makes the check fast and makes duplicates harmless.
         self.allowed = set(allowed)
@@ -53,6 +54,14 @@ class CommandPolicy:
         self.banned = dict(banned or {})
         # None means this device has no sub-units to address.
         self.targets = None if targets is None else set(targets)
+        # Commands that are aimed at the box itself rather than at one of its
+        # sub-units, even though the device has sub-units. A Lakeshore monitor
+        # is the example: KRDG? asks one sensor input, but *IDN? asks the
+        # instrument who it is, and there is no input to name. Without this the
+        # only ways out were to invent an address meaning "the box", or to let
+        # every command be sent with no address, which would stop the check
+        # catching a missing one.
+        self.untargeted = set(untargeted or ())
 
         # A command in both lists is a mistake in the driver, not a runtime
         # problem. Catch it as early as possible, when the policy is built.
@@ -61,6 +70,15 @@ class CommandPolicy:
             raise ValueError(
                 "%s: these commands are both allowed and banned: %s"
                 % (device_name, ", ".join(sorted(overlap)))
+            )
+
+        # An untargeted command that is not allowed at all is a typo in the
+        # driver. Catching it here beats finding it when a sweep fails.
+        unknown = self.untargeted - self.allowed
+        if unknown:
+            raise ValueError(
+                "%s: these are listed as untargeted but are not on the allowed "
+                "list: %s" % (device_name, ", ".join(sorted(unknown)))
             )
 
     def check(self, command):
@@ -84,14 +102,26 @@ class CommandPolicy:
             )
         return command
 
-    def check_target(self, target):
+    def check_target(self, target, command=None):
         """Let the sub-unit address through, or raise CommandRefused.
 
         A typo in an address is not a safety problem the way a control command
         is. It is still worth catching here, because the alternative is a frame
         going out to a pump that does not exist and a confusing reply coming
         back that someone has to work out.
+
+        command is optional, and is only used to spot the commands that are
+        aimed at the box itself rather than at one of its sub-units.
         """
+        if command is not None and command in self.untargeted:
+            if target is not None:
+                raise CommandRefused(
+                    "%s: command %r is aimed at the instrument itself, not at "
+                    "one of its sub-units, but a target of %r was given"
+                    % (self.device_name, command, target)
+                )
+            return target
+
         if self.targets is None:
             if target is not None:
                 raise CommandRefused(

@@ -139,11 +139,31 @@ left free for actual working instructions if we ever want them.
   Chosen by the owner. The notice line carries a placeholder until the exact
   name is supplied.
 
-- **2026-09-02. Outside documents are supplied by the owner, never fetched by
-  the session doing the work.** Decided by the project owner, and it holds at
-  every stage of every project here, not only the driver sessions. A session
-  that needs a manual, a register map, a specification or a standard it does not
-  have writes a fetch prompt, hands it over as a file, and stops.
+- **2026-09-02, later the same day. Reversed: research the web directly.**
+  Decided by the project owner. The rule below, that documents are only ever
+  supplied, lasted a few hours and was withdrawn because it stopped work dead
+  when the owner needed a driver for a demo. Sessions now search for manuals,
+  download them and read them. The owner may also hand over a PDF or a compiled
+  research file, and those count as sources too.
+
+  What survived the reversal is the part that was actually doing the work.
+  **Say what each fact was taken from, and how strong that source is.**
+  `PROTOCOL.md` names its sources and ranks them. Anything resting on something
+  weaker than a manual goes in `REVIEW.md` as unverified, item by item.
+
+  That is the real safeguard, and it is worth separating from the rule it was
+  bundled with. A driver built on a weak source is often the only thing
+  available in the time there is, and it is useful. A driver built on a weak
+  source that reads as though it came from the manual is not, because nobody
+  goes back to check it. Blocking the work was never what made the difference.
+  Labelling it is.
+
+- **2026-09-02. Superseded. Outside documents are supplied by the owner, never
+  fetched by the session doing the work.** Kept here because a reversed decision
+  is worth reading next to the one that replaced it. Decided by the project
+  owner, and it held at every stage of every project. A session that needed a
+  manual, a register map, a specification or a standard it did not have wrote a
+  fetch prompt, handed it over as a file, and stopped.
 
   The practical reason is that these machines cannot reach the manufacturers'
   websites, and rediscovering that every session is waste.
@@ -181,6 +201,75 @@ left free for actual working instructions if we ever want them.
   that shows a command next to its real answer, and source code is not that.
   It stays useful as a cross-check once the manual is in hand, and disagreement
   between the two is worth writing down.
+
+- **2026-09-02. One Lakeshore driver for all three models, not three drivers.**
+  The 218, 224 and 336 send the same ASCII commands with the same carriage
+  return and line feed terminator, and the same reply format. What differs is
+  the port speed and what the sensor inputs are called. That is a table, not
+  three classes. `LakeshoreMonitor` takes a model name and looks the differences
+  up in `MODELS`. Three classes would have shared everything except two
+  constants and would have drifted apart the first time one was fixed.
+
+  The model has to be given, not guessed. `identify()` reads `*IDN?` so a caller
+  can check the instrument matches, and that check is the caller's to make. A
+  218 driver pointed at a 336 addresses inputs 1 to 8, which do not exist there.
+
+- **2026-09-02. Ethernet is out of scope for version 1.** The 224 and the 336
+  both have it, on TCP port 7777, speaking the same ASCII as the serial port. It
+  was still left out, and no socket was bolted into the driver.
+
+  The reason is that it turned out not to be needed. Neither model has a DE-9
+  socket at all. Their USB ports enumerate as virtual COM ports, so
+  `SerialTransport` already reaches every one of the three instruments. Adding a
+  socket transport would have been a change to shared code that all ten drivers
+  inherit, to reach hardware that is already reachable.
+
+  When Ethernet is wanted it belongs in the core, as a second transport with the
+  same `exchange` method, not in this driver. `PROTOCOL.md` carries the two
+  facts that work will need: a 336 accepts at most two simultaneous sockets, so
+  a stuck connection can lock out reconnects, and the VISA resource form
+  `TCPIP::<address>::7777::SOCKET` is reported to work.
+
+- **2026-09-02. `CommandPolicy` grew an `untargeted` list.** The first driver
+  found a gap in the core on its first day. A Lakeshore has sub-units, its
+  sensor inputs, so `targets` is set. But `*IDN?` asks the box who it is and
+  there is no input to name. `check_target` refused it, because with `targets`
+  set it required every command to carry one.
+
+  The two ways round it without touching the core were both bad. Inventing an
+  address that means "the instrument itself" puts a fake sensor in the allowed
+  list. Letting any command go untargeted stops the check catching a missing
+  address, which is most of its value. So the policy now takes the small list of
+  commands that are aimed at the box rather than at a sub-unit, and checks them
+  accordingly. Every later driver gets it, and most of the ten will need it,
+  because an identity query is nearly universal.
+
+- **2026-09-02. Every temperature is read with its status, or not at all.**
+  This is the one thing about these instruments most likely to catch somebody
+  out. A sensor that is unplugged, shorted or off the end of its curve does not
+  go silent. It answers `KRDG?` with a number. Only `RDGST?` says the number
+  means nothing.
+
+  So `read_checked_kelvin` asks `RDGST?` first and returns None when it is
+  nonzero, and `read_all_kelvin` does the same for every input. It costs a
+  second query per reading. That is the right trade at a ten second polling
+  floor. The alternative is a trend that shows a cold head sitting at exactly
+  zero kelvin for a week, which is both obviously wrong and easy to miss,
+  because a flat line at the bottom of a chart looks like a stable cold head to
+  anybody glancing at it.
+
+- **2026-09-02. `*CLS` is banned along with `*RST`.** `*RST` is obvious: it
+  throws away the sensor configuration. `*CLS` is the interesting one. It only
+  clears the status registers, it is not a machine control action, and it is
+  widely suggested as a harmless way to wake an instrument that is not
+  answering. It was banned anyway. It destroys state the tool's own software may
+  be waiting to read, and version 1 reads. An instrument that will not answer is
+  a port settings problem or a power cycle, not something to clear.
+
+  The research file records a forum case where a 218 only answered `*IDN?` after
+  an `*RST`. That is exactly the situation where somebody reaches for one of
+  these, and it is why the reason is written next to the ban rather than left to
+  be worked out.
 
 ## Open questions
 1. **Which machine runs the poller long term?** The existing heat exchanger

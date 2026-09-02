@@ -43,39 +43,35 @@ decide where shared code should live before it is written.
   no content delivery networks, no fonts fetched from the web.
 - Match the writing style of the existing comments. Short sentences. Plain
   words. No em dashes.
-- **Outside documents are supplied, not fetched.** See the next section.
+- **Outside documents get researched, and their sources get recorded.** See the
+  next section.
 
-## Outside documents are supplied, not fetched
+## Outside documents
 
 This applies to every project here and to every stage of one.
 
-When a piece of work needs a document nobody in the repository wrote, a
-manufacturer's programming manual, a register map, a protocol specification, a
-standard, or a vendor application note, **the project owner supplies it. The
-person or session doing the work does not go and get it.**
+Work that needs a document nobody in the repository wrote, a manufacturer's
+manual, a register map, a protocol specification, a standard, goes and gets it.
+Search the web, download it, read it. The owner may also supply one directly,
+and that counts.
 
-If the document is not to hand, the work that depends on it stops. Write a fetch
-prompt saying exactly which documents are wanted and which questions each one
-has to answer, hand it over as a file, and say plainly what is blocked. Carry on
-with any part of the job that does not depend on the missing document. Then
-stop.
+If the network refuses, say so plainly and write a fetch prompt the owner can
+run somewhere with better access.
+`projects/fab_drivers/manuals/README.md` has the shape one takes.
 
-`projects/fab_drivers/manuals/README.md` holds the procedure and the shape a
-fetch prompt takes. `projects/fab_drivers/manuals/FETCH_PROMPT.md` is a worked
-example of one.
+What does not bend is the record. Say in writing what each fact was taken from
+and how strong that source is. A manual read directly is the strongest. A
+research file, a search result, a forum post or a vendor's own source code is
+weaker, and anything resting on one of those is written down as unverified where
+a reviewer will see it.
 
-The reason is not only that these machines cannot reach most of the internet,
-though they cannot. It is that when a document is hard to get, the substitutes
-are all within easy reach: a search snippet, a summary site, a forum answer, a
-vendor's own source code, or memory of a protocol that resembles this one. Every
-one of them produces work that looks finished and was never checked against
-anything. Unverified detail that looks verified is worse than an admitted gap,
-because nobody goes back to it.
-
-So: searching for candidate links is useful and welcome, because a fetch prompt
-carrying exact URLs saves the owner a hunt. Reading a search result for the
-answer is not. A snippet is not a worked example, and a vendor's source code is
-not a manual.
+The reason is not that weak sources are unusable. Often they are the only thing
+available in the time there is, and work built on them is still worth having.
+The reason is that unverified detail which reads as verified is worse than an
+admitted gap, because nobody goes back to it. Labelling it is what makes it
+safe. `projects/fab_drivers/fab_drivers/devices/lakeshore/PROTOCOL.md` is the
+worked example: a driver built from a research file, saying so in its first
+section.
 
 ## Set up a development environment
 
