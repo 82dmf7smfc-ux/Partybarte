@@ -86,6 +86,13 @@ things in it.
    retry and staleness logic is tested against.
 4. **Tests** under `tests/`, named `test_<device>.py`, running against the mock.
    They must pass with no hardware attached, because that is what CI runs.
+5. **A trend page.** Every driver gets its own. Build it with
+   `core.trend_page.write_trend_page`, saying which columns to plot and what to
+   call the device. Do not write a page from scratch. Ten drivers each inventing
+   one gives ten pages that look and behave differently, and nine of them get
+   copied from whichever was written first, mistakes included. If the shared
+   generator cannot do something a device genuinely needs, improve the generator
+   so every driver gets it.
 
 Then add a dated entry to `DECISIONS.md` saying what was decided and why,
 especially anything the manual made you do that looks odd.
@@ -120,6 +127,8 @@ Python. A comment saying why is worth more than one saying what.
 - `PROTOCOL.md` names its source manual and part number.
 - Nothing state-changing is on an allowed list.
 - `DECISIONS.md` has a dated entry.
+- The trend page is generated and opened once, to check it actually shows what
+  you meant.
 - Anything you could not verify is written down as unverified, in `REVIEW.md`,
   not left implied. The review pass depends on knowing what was checked and what
   was assumed.

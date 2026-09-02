@@ -58,6 +58,7 @@ first real driver drops into a tested template instead of inventing one.
 | `fab_drivers/core/transport.py` | Own the one real port. One exchange at a time. |
 | `fab_drivers/core/device.py` | The base class a driver builds on. Retries and staleness. |
 | `fab_drivers/core/poller.py` | Read a set of values on a gentle repeating loop. |
+| `fab_drivers/core/trend_page.py` | Build one self-contained trend page for one device. |
 | `fab_drivers/devices/` | One folder per piece of equipment. Empty for now. |
 
 ## The standards every driver follows
@@ -74,8 +75,12 @@ first real driver drops into a tested template instead of inventing one.
   twice. Then mark the reading stale rather than pretending.
 - **Log every raw frame with timestamps.** When something looks wrong, the first
   question is always what we actually sent and what came back.
-- **Each driver ships four things.** A `PROTOCOL.md` written from the manual, a
-  driver module, a mock device class, and an entry in `DECISIONS.md`.
+- **Each driver ships five things.** A `PROTOCOL.md` written from the manual, a
+  driver module, a mock device class, its own trend page, and an entry in
+  `DECISIONS.md`.
+- **A trend page holds its own data and fetches nothing.** These machines have no
+  internet, and a page opened from disk cannot read a file next to it anyway. One
+  file also means you can email it and it still works.
 
 ## Writing a new driver
 
@@ -98,6 +103,10 @@ Make a folder under `fab_drivers/devices/`. Put four things in it.
    important to fake as a good reading.
 4. Tests under `tests/`, using the mock. They must pass with no hardware
    attached, because that is what runs on GitHub.
+5. A trend page. Every driver gets its own, built with
+   `core.trend_page.write_trend_page`. Say which columns to plot and what to
+   call it. Do not write a new page from scratch, or ten drivers end up with ten
+   pages that behave differently.
 
 ## Running the tests
 

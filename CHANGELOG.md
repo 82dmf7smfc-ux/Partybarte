@@ -31,6 +31,13 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   is what the driver library exists to do.
 
 ### Added
+- `LICENSE`, BSD 3-Clause. The copyright holder line carries a placeholder until
+  the exact name is supplied.
+- `fab_drivers/core/trend_page.py`, the shared trend page generator. Each driver
+  gets its own page, built from one design rather than ten. The page carries its
+  own data and fetches nothing, because these machines have no internet and a
+  page opened from disk cannot read a neighbouring file anyway. A gap in the
+  readings is drawn as a break in the line, never joined across.
 - `projects/fab_drivers`, a new project. A library of small, read-only
   monitoring drivers for fab equipment. This change adds the shared core only:
   the command policy that enforces read-only, raw frame audit logging, daily CSV

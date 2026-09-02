@@ -66,6 +66,7 @@ def build_browser_zip():
         _add_file(zf, PARETO / "alarm_pareto.html", f"{top}/alarm_pareto.html")
         _add_file(zf, PARETO / "tests" / "data" / "sample_alarm_log.csv", f"{top}/sample_alarm_log.csv")
         _add_file(zf, PARETO / "packaging" / "browser_READ_ME_FIRST.txt", f"{top}/READ_ME_FIRST.txt")
+        _add_file(zf, ROOT / "LICENSE", f"{top}/LICENSE")
         # The screenshot is a nice-to-have. Include it only if it exists.
         shot = PARETO / "docs" / "screenshot.png"
         if shot.exists():
@@ -87,6 +88,7 @@ def build_python_zip():
         # zip they all sit together at the top level, which is the flat layout
         # the person downloading it expects.
         _add_file(zf, ROOT / "setup_venv.bat", f"{top}/setup_venv.bat")
+        _add_file(zf, ROOT / "LICENSE", f"{top}/LICENSE")
         for name in ["requirements.txt", "conftest.py", "README.md"]:
             _add_file(zf, PARETO / name, f"{top}/{name}")
     return target
@@ -105,8 +107,9 @@ def build_fab_drivers_zip():
         _add_tree(zf, DRIVERS / "fab_drivers", f"{top}/fab_drivers")
         _add_tree(zf, DRIVERS / "tests", f"{top}/tests")
         _add_file(zf, ROOT / "setup_venv.bat", f"{top}/setup_venv.bat")
+        _add_file(zf, ROOT / "LICENSE", f"{top}/LICENSE")
         for name in ["requirements.txt", "conftest.py", "README.md",
-                     "DECISIONS.md", "REVIEW.md"]:
+                     "DECISIONS.md", "REVIEW.md", "CLAUDE.md"]:
             _add_file(zf, DRIVERS / name, f"{top}/{name}")
     return target
 

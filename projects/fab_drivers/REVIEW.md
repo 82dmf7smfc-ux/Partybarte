@@ -109,6 +109,18 @@ every driver actually goes through it. Grep each new driver for `exchange(` and
     holds a lock so a future threaded poller cannot interleave two exchanges. No
     test exercises it concurrently, because the poller is currently a plain loop.
 
+11. **The trend page has only ever been viewed by its own tests.** They assert
+    it fetches nothing external, that a gap breaks the line, and that a device
+    name is escaped rather than injected. They do not assert it looks right. One
+    sample page was generated and eyeballed during the build. It has not been
+    opened in Edge on a bench machine, which is where it will actually be read.
+
+12. **The trend page holds every reading inside the file.** A week of one minute
+    polling is around ten thousand rows. Nobody has checked what that does to
+    the file size or to how long the page takes to open. If it becomes a
+    problem, the fix is to thin the data when building the page, and that
+    changes what the chart means, so it is a decision rather than a tweak.
+
 ## Design choices worth arguing with
 
 These are not defects. They are decisions that went one way and could reasonably

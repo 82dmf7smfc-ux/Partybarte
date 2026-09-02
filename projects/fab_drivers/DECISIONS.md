@@ -117,10 +117,30 @@ left free for actual working instructions if we ever want them.
   a driver session produces, and what to check before finishing. The decisions
   log stayed in this file, which is why the two are separate.
 
+- **2026-09-02. Each driver gets its own trend page, not one combined page.**
+  Decided by the project owner. The shared generator lives in
+  `core/trend_page.py` so the ten pages are one design rather than ten, and a
+  driver only says what to plot.
+
+- **2026-09-02. A trend page carries its own data and fetches nothing.** The
+  readings are written into the file when it is built. Two reasons. These
+  machines have no internet, and a browser opening a file from disk will not
+  load a neighbouring file anyway, so a page that read the CSV at view time
+  would show nothing at all. A test asserts the page has no external
+  references, so this cannot rot quietly.
+
+- **2026-09-02. A gap in the data is drawn as a break in the line.** Joining
+  across a gap invents readings that were never taken. It is the same mistake as
+  writing the last value into the CSV, one layer further on. A single reading
+  between two gaps is drawn as a dot, because a one point line is invisible and
+  the reading would silently vanish.
+
+- **2026-09-02. The repository is licensed BSD 3-Clause, held personally.**
+  Chosen by the owner. The notice line carries a placeholder until the exact
+  name is supplied.
+
 ## Open questions
-1. **One trend page for all devices, or one per device?** The prompt asks for one
-   combined page. That is a service layer and UI decision, still to be made.
-2. **Which machine runs the poller long term?** The existing heat exchanger
+1. **Which machine runs the poller long term?** The existing heat exchanger
    Raspberry Pi logger is mentioned for the chiller. If that becomes the home for
    all of it, the CSV location and the port naming should match what is already
    there.
