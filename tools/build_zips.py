@@ -109,9 +109,9 @@ def build_fab_drivers_zip():
         _add_file(zf, ROOT / "setup_venv.bat", f"{top}/setup_venv.bat")
         _add_file(zf, ROOT / "LICENSE", f"{top}/LICENSE")
         for name in ["requirements.txt", "conftest.py", "README.md",
-                     "DECISIONS.md", "REVIEW.md", "CLAUDE.md",
-                     "NEXT_SESSION.md"]:
+                     "DECISIONS.md", "REVIEW.md", "CLAUDE.md"]:
             _add_file(zf, DRIVERS / name, f"{top}/{name}")
+        _add_tree(zf, DRIVERS / "sessions", f"{top}/sessions")
     return target
 
 

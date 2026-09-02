@@ -1,14 +1,3 @@
-# Prompt for the next session
-
-This file always holds the starting prompt for the session that comes next. The
-session that finishes rewrites it. Copy the block below into a new session.
-
-It lives in the repository rather than in a chat window because a session starts
-with no memory of the one before it, and a prompt that exists only in a chat log
-is one closed tab away from being lost.
-
----
-
 # Session 1 of 10: Lakeshore temperature monitor driver
 
 Work in the Partybarte repository, in the project `projects/fab_drivers`.
@@ -77,9 +66,11 @@ a SCPI style ASCII, for example `KRDG? A` to read a temperature.
 
 8. **Run `pytest -q` from the repository root**, commit, and push.
 
-9. **Rewrite `NEXT_SESSION.md`** with the prompt for session 2, the
-   Granville-Phillips gauge controllers, and print that prompt in the chat so it
-   can be copied straight into a new session.
+9. **Write the next session's prompt** as
+   `sessions/session_02_granville_phillips.md`, covering the Granville-Phillips
+   gauge controllers, and hand that file over. Hand over the file itself rather
+   than pasting the prompt into the chat as text. Update the table in
+   `sessions/README.md` at the same time.
 
 ## Three decisions this device forces, which the core has not met yet
 

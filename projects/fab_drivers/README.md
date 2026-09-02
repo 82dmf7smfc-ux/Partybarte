@@ -84,9 +84,9 @@ first real driver drops into a tested template instead of inventing one.
 
 ## Writing a new driver
 
-`NEXT_SESSION.md` holds the starting prompt for whichever driver comes next.
-Each session rewrites it before finishing, so the work can be picked up on a
-different day or a different machine.
+`sessions/` holds one starting prompt per driver session, in build order. Each
+session writes the next one's file before finishing, so the work can be picked up
+on a different day or a different machine.
 
 `CLAUDE.md` is the standing brief for a driver session: the build order for all
 ten devices, the rules that do not bend, and what to check before finishing.

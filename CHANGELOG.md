@@ -38,10 +38,12 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   own data and fetches nothing, because these machines have no internet and a
   page opened from disk cannot read a neighbouring file anyway. A gap in the
   readings is drawn as a break in the line, never joined across.
-- `projects/fab_drivers/NEXT_SESSION.md`, which always holds the starting prompt
-  for the next driver session. The ten drivers are built one per session and each
-  session starts with no memory of the last, so writing that prompt is now the
-  last step of every session rather than something reconstructed afterwards.
+- `projects/fab_drivers/sessions/`, one starting prompt per driver session in
+  build order. The ten drivers are built one per session and each session starts
+  with no memory of the last, so writing the next prompt is the last step of
+  every session rather than something reconstructed afterwards. Each file holds
+  the prompt and nothing else, and is handed over as a file rather than pasted
+  into a chat as text.
 - `projects/fab_drivers`, a new project. A library of small, read-only
   monitoring drivers for fab equipment. This change adds the shared core only:
   the command policy that enforces read-only, raw frame audit logging, daily CSV

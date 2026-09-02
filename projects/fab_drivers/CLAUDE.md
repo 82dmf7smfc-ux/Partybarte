@@ -123,9 +123,13 @@ Python. A comment saying why is worth more than one saying what.
 ## Ending a session, and starting the next one
 
 A session starts with no memory of the one before it. So the last act of every
-session is to write the next one's starting prompt into `NEXT_SESSION.md`, and to
-print that prompt in the chat as well so it can be copied straight into a new
-session.
+session is to write the next one's starting prompt as a file in `sessions/`,
+named `session_<number>_<device>.md`, and to hand that file over. Hand over the
+file itself. Do not print the prompt into the chat as text. It is something to be
+opened and used, not read in a transcript.
+
+The file holds the prompt and nothing else, so it can go straight to a new
+session with nothing to trim.
 
 The prompt is not a reminder of what device comes next. It has to carry a session
 that begins from nothing. It says where things stand, what to build, the order to
@@ -133,8 +137,10 @@ do it in, and the decisions that device forces which the core has not met yet.
 That last part is the valuable one. It is written while the design is fresh, by
 the session that just saw the gap.
 
-The file lives in the repository rather than in a chat window because a prompt
-that exists only in a chat log is one closed tab away from being lost.
+These live in the repository rather than in a chat window because a prompt that
+exists only in a chat log is one closed tab away from being lost. Update the
+table in `sessions/README.md` at the same time, so it stays obvious which session
+runs next.
 
 ## Before finishing a session
 
@@ -148,8 +154,9 @@ that exists only in a chat log is one closed tab away from being lost.
 - Anything you could not verify is written down as unverified, in `REVIEW.md`,
   not left implied. The review pass depends on knowing what was checked and what
   was assumed.
-- `NEXT_SESSION.md` has been rewritten for the session that follows, and the
-  same prompt has been printed in the chat.
+- The next session's prompt has been written as a file in `sessions/` and handed
+  over as a file, not pasted into the chat as text. The table in
+  `sessions/README.md` is up to date.
 - The work is committed and pushed. A session that ends with work only on disk
   has produced nothing, because the next session is a different machine.
 
