@@ -1,0 +1,22 @@
+session,query,where_run,outcome,note
+1,Applied Materials Mirra CMP Titan head Titan Profiler carrier head zones,web-search,hit,gave the 3-zone Titan and 4-zone Profiler split via an IEEE conference paper
+1,Mirra Mesa cleaner brush scrubber stations dry-in dry-out post-CMP clean Applied Materials,web-search,hit,gave the up to four module cleaner description and vertical wafer handling
+1,Mirra CMP endpoint detection ISRM in-situ rate monitor motor current endpoint platen,web-search,hit,ISRM described as optical interference based
+1,Mirra CMP three platen four carrier head carousel 200mm architecture description,web-search,thin,architecture only from trade press and used-tool listings
+1,Preston equation CMP removal rate origin 1927 glass polishing,web-search,hit,standard form and empirical origin confirmed
+1,Steigerwald Murarka Gutmann Chemical Mechanical Planarization of Microelectronic Materials 1997 Wiley,web-search,hit,book exists and is paywalled
+1,Zantye Kumar Sikder CMP for microelectronics applications Materials Science and Engineering R 2004 review,web-search,hit,free author copy of the review found at usf.edu
+1,CMP Stribeck curve lubrication regime hydrodynamic boundary contact Sommerfeld number,web-search,hit,Sommerfeld number definition with effective gap term
+1,Applied Materials patent Zuniga carrier head flexible membrane multiple chambers,web-search,hit,several AMAT membrane patents but none names the Mirra product
+1,Applied Materials patent Birang in-situ optical monitoring polishing pad window endpoint,web-search,hit,US6537133 named in an AMAT release as covering Mirra and Reflexion
+1,Applied Materials patent retaining ring carrier head loading independent of wafer pressure,web-search,hit,US6540594 gives the ring load as a pressure difference
+1,pad conditioning diamond disk asperity regeneration glazing removal rate stability,web-search,hit,glazing and asperity regeneration mechanism
+1,planarization length pad bending stiffness step height reduction pattern density model,web-search,hit,planarization length definition as an elliptic weighting radius
+1,copper CMP dishing erosion oxide loss pattern density overpolish barrier step,web-search,hit,dishing is feature size driven and erosion density driven
+1,tungsten CMP slurry chemistry ferric nitrate hydrogen peroxide passivation Kaufman model,web-search,hit,passivation and abrasion model attributed to Kaufman
+1,post-CMP PVA brush scrub megasonic clean particle removal chemistry mechanism,web-search,hit,brush plus megasonic split of contact and non-contact cleaning
+1,Titan Profiler head Mirra zones edge profile control Applied Materials 150mm,web-search,thin,Profiler tied to 150 mm in one paper only
+1,CMP pad grooving slurry transport mean residence time flow rate effect removal rate,web-search,hit,groove width raises mean residence time and rate rises with flow
+1,STI oxide CMP ceria slurry selectivity nitride stop layer mechanism,web-search,hit,Ce-O-Si bonding and additive suppression of nitride rate
+1,Mirra CMP 150mm configuration difference 200mm platen size retrofit polisher,web-search,empty,no public source states what changes between the two configurations
+1,fetch of appliedmaterials.com patents.google.com uspto.gov freepatentsonline pmc,direct-fetch,empty,all blocked by the session network policy so only search summaries were available

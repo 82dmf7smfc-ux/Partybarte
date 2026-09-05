@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mirra Knowledge Base Reader</title>
+<style>
+:root{
+  --paper:#e9ecec; --panel:#fff; --panel-2:#f4f6f6;
+  --ink:#131a19; --ink-2:#4d5a57; --ink-3:#7c8785;
+  --rule:#ccd4d2; --rule-2:#dde3e1;
+  --steel:#2c5f6b; --steel-lt:#e0eaec;
+  --ok:#1f6f5c; --mid:#8a6516; --low:#8c2f27;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --serif:Georgia,"Iowan Old Style","Times New Roman",serif;
+  --mono:"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:var(--steel)}
+#app{display:flex;flex-direction:column;height:100vh}
+
+header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--rule)}
+header h1{margin:0;font-size:16px;font-weight:600;letter-spacing:-0.01em}
+header h1 span{color:var(--ink-3);font-weight:400}
+#mode{font:11px var(--mono);border:1px solid var(--rule);border-radius:2px;padding:1px 6px;color:var(--ink-2);background:var(--panel-2)}
+#counts{font-size:12.5px;color:var(--ink-3);font-family:var(--mono)}
+nav{margin-left:auto;display:flex;gap:2px;align-items:center}
+nav button{background:none;border:1px solid transparent;border-radius:3px;padding:5px 11px;font-size:13.5px;color:var(--ink-2)}
+nav button:hover{background:var(--panel-2)}
+nav button[aria-current="true"]{background:var(--steel-lt);border-color:#bcd2d6;color:var(--steel);font-weight:600}
+#save{margin-left:10px;border:1px solid var(--rule);border-radius:3px;padding:5px 11px;font-size:13px;background:var(--panel-2)}
+#save.dirty{background:#f6e6c8;border-color:#d9bb79;color:#6b5316;font-weight:600}
+
+main{flex:1;min-height:0;display:flex}
+#side{width:310px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-right:1px solid var(--rule)}
+#searchwrap{padding:12px 14px 8px;border-bottom:1px solid var(--rule-2)}
+#search{width:100%;padding:7px 10px;border:1px solid var(--rule);border-radius:3px;background:var(--panel-2);font:14px var(--sans)}
+#search:focus{outline:2px solid var(--steel);outline-offset:-1px;background:#fff}
+#filters{padding:8px 14px 10px;border-bottom:1px solid var(--rule-2)}
+.frow{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.frow:last-child{margin-bottom:0}
+.chip{border:1px solid var(--rule);background:var(--panel-2);border-radius:2px;padding:2px 7px;font-size:11.5px;color:var(--ink-2)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+#listmeta{padding:6px 14px;font-size:11.5px;color:var(--ink-3);font-family:var(--mono);border-bottom:1px solid var(--rule-2)}
+#list{flex:1;overflow-y:auto}
+.item{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--rule-2);padding:9px 14px 9px 11px;border-left:3px solid transparent}
+.item:hover{background:var(--panel-2)}
+.item[aria-current="true"]{background:var(--steel-lt);border-left-color:var(--steel)}
+.item b{display:block;font-size:14px;font-weight:600;margin-bottom:2px}
+.item small{display:block;font-size:11.5px;color:var(--ink-3);line-height:1.4}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.c-established{background:var(--ok)}.c-probable{background:var(--mid)}.c-uncertain{background:var(--low)}
+
+#content{flex:1;min-width:0;overflow-y:auto;padding:26px 34px 80px}
+.wrap{max-width:820px}
+.empty{max-width:620px;margin:5vh auto 0}
+.empty h2{font:400 27px/1.25 var(--serif);margin:0 0 10px}
+.empty p{color:var(--ink-2);max-width:62ch;margin:0 0 18px}
+.load{background:var(--panel);border:1px solid var(--rule);border-radius:4px;margin-bottom:12px}
+.load h3{margin:0;padding:11px 16px;font-size:13.5px;border-bottom:1px solid var(--rule-2)}
+.load > div{padding:14px 16px;font-size:13.5px;color:var(--ink-2)}
+code{font:12.5px var(--mono);background:var(--panel-2);border:1px solid var(--rule-2);border-radius:2px;padding:1px 5px}
+.btn{border:1px solid var(--steel);background:var(--steel);color:#fff;border-radius:3px;padding:7px 14px;font-size:13.5px;font-weight:500}
+.btn:hover{background:#23505b}
+.btn.ghost{background:none;color:var(--steel)}
+.btn.ghost:hover{background:var(--steel-lt)}
+#banner{padding:9px 20px;font-size:13px;background:#fbf3e0;border-bottom:1px solid #e6d6ae;color:#6b5316}
+#banner.bad{background:#f9ebe9;border-color:#d9b0aa;color:var(--low)}
+#banner button{background:none;border:0;text-decoration:underline;padding:0;margin-left:8px}
+#drop{position:fixed;inset:0;background:rgba(19,26,25,.82);color:#fff;display:none;align-items:center;justify-content:center;font:400 22px var(--serif);z-index:50;text-align:center;padding:20px}
+#drop.on{display:flex}
+
+.head{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:20px}
+.head h2{margin:0 0 6px;font:600 27px/1.15 var(--sans);letter-spacing:-0.02em}
+.meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--ink-2)}
+.alias{font-size:13px;color:var(--ink-3);margin:4px 0 8px;font-style:italic}
+section.blk{margin-bottom:26px}
+section.blk > h3{font-size:12.5px;font-weight:600;color:var(--ink-3);margin:0 0 8px;padding-bottom:5px;border-bottom:1px solid var(--rule-2)}
+
+.prose{font:16px/1.62 var(--serif);color:#1b2321;max-width:68ch}
+.prose p{margin:0 0 .85em}
+.prose h4{font:600 15px/1.4 var(--sans);margin:1.4em 0 .5em;color:var(--ink)}
+.prose h5{font:600 13.5px/1.4 var(--sans);margin:1.2em 0 .4em;color:var(--ink-2)}
+.prose ul,.prose ol{margin:0 0 .85em;padding-left:1.4em}
+.prose li{margin-bottom:.3em}
+.prose li > ul,.prose li > ol{margin:.3em 0 0}
+.prose code{font:13.5px var(--mono);background:var(--panel-2);padding:1px 4px;border-radius:2px}
+.prose pre{background:var(--panel);border:1px solid var(--rule-2);border-left:3px solid var(--rule);padding:11px 14px;margin:.9em 0;overflow-x:auto;font:13px/1.5 var(--mono)}
+.prose pre code{background:none;padding:0;font-size:inherit}
+.prose blockquote{margin:.9em 0;padding:2px 0 2px 14px;border-left:3px solid var(--rule);color:var(--ink-2)}
+.prose blockquote p:last-child{margin:0}
+.prose hr{border:0;border-top:1px solid var(--rule);margin:1.4em 0}
+.prose table{border-collapse:collapse;margin:.9em 0;font:14px var(--sans);width:auto}
+.prose th{text-align:left;font-size:12px;font-weight:600;color:var(--ink-3);border-bottom:1px solid var(--rule);padding:4px 16px 5px 0}
+.prose td{padding:5px 16px 5px 0;border-bottom:1px solid var(--rule-2);vertical-align:top}
+.prose .eq{display:block;background:var(--panel);border-left:3px solid var(--steel);padding:11px 14px;margin:.9em 0;font:15px/1.7 var(--mono);white-space:pre-wrap;overflow-x:auto}
+.prose dl.vars{margin:.6em 0 1.1em;display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font:14px/1.5 var(--sans);align-items:baseline}
+.prose dl.vars dt{font:14px var(--mono);color:var(--steel);white-space:nowrap}
+.prose dl.vars dd{margin:0;color:var(--ink-2)}
+
+.rels{display:flex;flex-direction:column;gap:9px}
+.rel{display:flex;gap:11px;align-items:baseline;font-size:14px}
+.rel span{flex:none;width:132px;text-align:right;font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
+.rel button{background:none;border:0;border-bottom:1px solid var(--rule);padding:0 0 1px;color:var(--steel);text-align:left}
+.rel button:hover{border-bottom-color:var(--steel)}
+.rel em{color:var(--ink-3);font-size:12.5px;font-style:normal}
+.src{border-top:1px solid var(--rule-2);padding:9px 0;font-size:13.5px}
+.src:first-of-type{border-top:0}
+.src small{display:block;color:var(--ink-3);font-size:12px;margin-top:2px}
+.tier{display:inline-block;font:11px var(--mono);border-radius:2px;padding:1px 5px;margin-right:7px;border:1px solid}
+.t0{color:#463a86;border-color:#b7aedb;background:#f1effa;font-weight:600}
+.t1,.t2{color:var(--ok);border-color:#a8ccc2;background:#eaf4f1}
+.t3{color:var(--mid);border-color:#dcc78e;background:#faf3e3}
+.t4,.t5{color:var(--low);border-color:#d9b0aa;background:#f9ebe9}
+.tag{display:inline-block;font-size:11.5px;border:1px solid var(--rule);border-radius:2px;padding:1px 6px;background:var(--panel-2);color:var(--ink-2)}
+.tag.spec-mirra{background:#e6f0f2;border-color:#a9c7cd;color:var(--steel);font-weight:600}
+.tag.spec-cmp{background:var(--panel-2)}
+.tag.spec-general{background:#fff;border-style:dashed;color:var(--ink-3)}
+.warn{color:var(--low)}
+.cit{font:11px var(--mono);background:var(--steel-lt);border:1px solid #bcd2d6;color:var(--steel);
+  border-radius:2px;padding:0 4px;margin:0 1px;vertical-align:1px;white-space:nowrap;cursor:default}
+.cit.missing{background:#f9ebe9;border-color:#d9b0aa;color:var(--low)}
+.badge{font:10.5px var(--sans);font-weight:600;border-radius:2px;padding:1px 5px;margin-left:8px;
+  border:1px solid;text-transform:none;letter-spacing:0}
+.badge.b-established{color:var(--ok);border-color:#a8ccc2;background:#eaf4f1}
+.badge.b-probable{color:var(--mid);border-color:#dcc78e;background:#faf3e3}
+.badge.b-uncertain{color:var(--low);border-color:#d9b0aa;background:#f9ebe9}
+.contested{background:#faf3e3;border:1px solid #dcc78e;border-left:3px solid var(--mid);
+  padding:10px 14px;margin:0 0 20px;font-size:13.5px;color:#6b5316;border-radius:2px}
+.contested b{display:block;font-size:11.5px;margin-bottom:3px}
+#map{width:100%;height:290px;display:block}
+#map text{font:11.5px var(--sans);fill:var(--ink-2)}
+#map text.self{font-weight:600;fill:var(--ink);font-size:13px}
+#map line{stroke:var(--rule);stroke-width:1.5}
+#map .hit{cursor:pointer}
+#map .hit:hover text{fill:var(--steel)}
+
+table.grid{border-collapse:collapse;width:100%;font-size:13.5px}
+.grid th{text-align:left;font-size:11.5px;color:var(--ink-3);font-weight:600;padding:0 12px 6px 0;border-bottom:1px solid var(--rule)}
+.grid td{padding:7px 12px 7px 0;border-bottom:1px solid var(--rule-2);vertical-align:top}
+.grid td button{background:none;border:0;padding:0;color:var(--steel);text-align:left}
+.grid td button:hover{text-decoration:underline}
+.bar{height:7px;background:var(--rule-2);border-radius:1px;overflow:hidden;min-width:110px}
+.bar i{display:block;height:100%;background:var(--steel)}
+h2.view{font:600 21px var(--sans);margin:0 0 4px;letter-spacing:-0.01em}
+p.lede{color:var(--ink-2);margin:0 0 22px;max-width:64ch;font-size:14px}
+.stat{display:flex;gap:30px;flex-wrap:wrap;margin-bottom:26px}
+.stat div b{display:block;font:600 25px var(--mono);line-height:1.1}
+.stat div span{font-size:12px;color:var(--ink-3)}
+
+#sql{width:100%;min-height:132px;font:13.5px/1.55 var(--mono);padding:12px 14px;border:1px solid var(--rule);border-radius:3px;background:var(--panel);resize:vertical}
+#sql:focus{outline:2px solid var(--steel);outline-offset:-1px}
+.qbar{display:flex;gap:8px;align-items:center;margin:10px 0 20px;flex-wrap:wrap}
+.qbar small{color:var(--ink-3);font-size:12.5px;margin-left:auto;font-family:var(--mono)}
+.presets{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.presets button{border:1px solid var(--rule);background:var(--panel);border-radius:2px;padding:3px 9px;font-size:12.5px;color:var(--ink-2)}
+.presets button:hover{border-color:var(--steel);color:var(--steel)}
+.res{overflow-x:auto;background:var(--panel);border:1px solid var(--rule);border-radius:3px}
+.res table{font:13px var(--mono);width:auto;min-width:100%;border-collapse:collapse}
+.res th{padding:8px 14px;background:var(--panel-2);white-space:nowrap;text-align:left;font-size:11.5px;color:var(--ink-3)}
+.res td{padding:6px 14px;white-space:nowrap;max-width:520px;overflow:hidden;text-overflow:ellipsis;border-top:1px solid var(--rule-2)}
+.err{background:#f9ebe9;border:1px solid #d9b0aa;color:var(--low);padding:12px 14px;border-radius:3px;font:13px var(--mono);white-space:pre-wrap}
+
+:focus-visible{outline:2px solid var(--steel);outline-offset:2px}
+@media (max-width:820px){
+  main{flex-direction:column}
+  #side{width:auto;max-height:44vh;border-right:0;border-bottom:1px solid var(--rule)}
+  #content{padding:20px 18px 60px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Mirra Knowledge Base <span>/ reader v3.3.1</span></h1>
+    <span id="mode" hidden></span>
+    <div id="counts"></div>
+    <nav>
+      <button data-view="browse" aria-current="true">Browse</button>
+      <button data-view="query" hidden>Query</button>
+      <button data-view="health">Health</button>
+      <button data-view="sources">Sources</button>
+      <button data-view="gaps">Gaps</button>
+      <button id="save" hidden>Save a copy</button>
+    </nav>
+  </header>
+  <div id="banner" hidden></div>
+  <main>
+    <aside id="side">
+      <div id="searchwrap"><input id="search" type="search" placeholder="Search terms, press /" autocomplete="off"></div>
+      <div id="filters"></div>
+      <div id="listmeta"></div>
+      <div id="list"></div>
+    </aside>
+    <div id="content"><div class="wrap" id="cw"></div></div>
+  </main>
+</div>
+<div id="drop">Drop a .db file, or a folder of CSVs</div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   1. Markdown. Deliberately tolerant. Nothing is ever dropped.
+   ===================================================================== */
+function esc(s){return String(s??"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
+
+function inline(s){
+  let t = esc(s);
+  const code=[];
+  t = t.replace(/`([^`]+)`/g,(m,c)=>{code.push(c);return "\u0000"+(code.length-1)+"\u0000";});
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  t = t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  // inline claim-level citations: [stg-1997], [pat-us5738574 spec] or [pat-us5738574 claims; zan-2004]
+  t = t.replace(/\[([a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s+[a-z]+)?(?:\s*[;,]\s*[a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s+[a-z]+)?)*)\]/gi,
+    (m,ids)=>ids.split(/\s*[;,]\s*/).map(tok=>{
+      const id = tok.split(/\s+/)[0];
+      const qual = tok.slice(id.length).trim();
+      const miss = DB.srcById && Object.keys(DB.srcById).length && !DB.srcById[id];
+      return '<span class="cit'+(miss?" missing":"")+'" title="'+
+        (miss?"not in the source table":(DB.srcById[id]?DB.srcById[id].title:id))+'">'+id+(qual?" "+qual:"")+"</span>";
+    }).join(""));
+  t = t.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+  t = t.replace(/__([^_]+)__/g,"<strong>$1</strong>");
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*/g,"$1<em>$2</em>");
+  t = t.replace(/\u0000(\d+)\u0000/g,(m,i)=>"<code>"+code[+i]+"</code>");
+  return t;
+}
+
+function assignment(line){
+  const m = line.match(/^\s*([^\s=]{1,24})\s*=\s*(.+?)\s*$/);
+  if(!m) return null;
+  const lhs = m[1];
+  if(!/^[A-Za-z\u0370-\u03FF\u2202\u0394\u03A3]/.test(lhs)) return null;
+  if(!/^[A-Za-z0-9_,.()\u0370-\u03FF\u2080-\u209F\u2202\u0394\u03A3]+$/.test(lhs)) return null;
+  return {lhs, rhs:m[2]};
+}
+function looksLikeProse(rhs){
+  return (rhs.match(/[A-Za-z]{4,}/g)||[]).length >= 2;
+}
+
+const BLOCK_START = l =>
+  /^\s*(#{1,6}\s|[-*+]\s|\d+[.)]\s|>\s?|```|~~~|\$\$|(-{3,}|\*{3,}|_{3,})\s*$)/.test(l);
+
+function renderMD(md){
+  const lines = String(md??"").replace(/\r\n?/g,"\n").split("\n");
+  const out=[]; let i=0;
+
+  const listBlock=(ordered)=>{
+    const items=[]; const tag=ordered?"ol":"ul";
+    const re = ordered ? /^(\s*)\d+[.)]\s+(.*)$/ : /^(\s*)[-*+]\s+(.*)$/;
+    while(i<lines.length){
+      const m=lines[i].match(re);
+      if(!m){
+        if(items.length && lines[i].trim() && !BLOCK_START(lines[i])){
+          items[items.length-1]+=" "+lines[i].trim(); i++; continue;
+        }
+        break;
+      }
+      items.push(m[2]); i++;
+    }
+    out.push("<"+tag+">"+items.map(x=>"<li>"+inline(x)+"</li>").join("")+"</"+tag+">");
+  };
+
+  const tableBlock=()=>{
+    const rows=[];
+    while(i<lines.length && lines[i].includes("|") && lines[i].trim()){ rows.push(lines[i]); i++; }
+    const cells = r => r.replace(/^\s*\|/,"").replace(/\|\s*$/,"").split("|").map(c=>c.trim());
+    const head = cells(rows[0]);
+    const body = rows.slice(2).map(cells);
+    out.push("<table><thead><tr>"+head.map(h=>"<th>"+inline(h)+"</th>").join("")+"</tr></thead><tbody>"
+      + body.map(r=>"<tr>"+r.map(c=>"<td>"+inline(c)+"</td>").join("")+"</tr>").join("")
+      + "</tbody></table>");
+  };
+
+  while(i<lines.length){
+    const line = lines[i];
+    if(!line.trim()){ i++; continue; }
+
+    let f = line.match(/^\s*(```|~~~)\s*(\w*)/);
+    if(f){
+      const fence=f[1], lang=(f[2]||"").toLowerCase(); i++;
+      const buf=[];
+      while(i<lines.length && !lines[i].trim().startsWith(fence)){ buf.push(lines[i]); i++; }
+      i++;
+      out.push(/^(eq|math|equation|latex)$/.test(lang)
+        ? '<span class="eq">'+esc(buf.join("\n"))+"</span>"
+        : "<pre><code>"+esc(buf.join("\n"))+"</code></pre>");
+      continue;
+    }
+    if(/^\s*\$\$/.test(line)){
+      i++; const buf=[];
+      while(i<lines.length && !/\$\$/.test(lines[i])){ buf.push(lines[i]); i++; }
+      i++;
+      out.push('<span class="eq">'+esc(buf.join("\n"))+"</span>"); continue;
+    }
+    if(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){ out.push("<hr>"); i++; continue; }
+    let h = line.match(/^\s*(#{1,6})\s+(.*)$/);
+    if(h){ const lv=h[1].length<=2?4:5;
+      out.push("<h"+lv+">"+inline(h[2].replace(/#+\s*$/,""))+"</h"+lv+">"); i++; continue; }
+    if(/^\s*>\s?/.test(line)){
+      const buf=[];
+      while(i<lines.length && /^\s*>\s?/.test(lines[i])){ buf.push(lines[i].replace(/^\s*>\s?/,"")); i++; }
+      out.push("<blockquote>"+renderMD(buf.join("\n"))+"</blockquote>"); continue;
+    }
+    if(line.includes("|") && lines[i+1] && /^[\s|:\-]+$/.test(lines[i+1]) && lines[i+1].includes("-")){
+      tableBlock(); continue;
+    }
+    if(/^\s*\d+[.)]\s/.test(line)){ listBlock(true); continue; }
+    if(/^\s*[-*+]\s/.test(line)){ listBlock(false); continue; }
+
+    const a = assignment(line);
+    if(a){
+      if(!looksLikeProse(a.rhs)){
+        const buf=[];
+        while(i<lines.length){
+          const b=assignment(lines[i]);
+          if(b && !looksLikeProse(b.rhs)){ buf.push(lines[i].trim()); i++; }
+          else break;
+        }
+        out.push('<span class="eq">'+esc(buf.join("\n"))+"</span>"); continue;
+      }
+      const defs=[];
+      while(i<lines.length){
+        const b=assignment(lines[i]);
+        if(b && looksLikeProse(b.rhs)){ defs.push(b); i++; }
+        else break;
+      }
+      out.push('<dl class="vars">'+defs.map(d=>
+        "<dt>"+esc(d.lhs)+"</dt><dd>"+inline(d.rhs)+"</dd>").join("")+"</dl>");
+      continue;
+    }
+
+    const buf=[];
+    while(i<lines.length && lines[i].trim() && !BLOCK_START(lines[i]) && !assignment(lines[i])){
+      buf.push(lines[i].trim()); i++;
+    }
+    if(buf.length) out.push("<p>"+inline(buf.join(" "))+"</p>");
+    else { out.push("<p>"+inline(lines[i])+"</p>"); i++; }
+  }
+  return out.join("");
+}
+
+/* =====================================================================
+   2. Section mapping. Unknown headings are kept, never dropped.
+   ===================================================================== */
+const SLOTS = [
+  ["definition",       ["definition","what it is","summary","overview","meaning"]],
+  ["mirra_application",["mirra application","on the mirra","application","tool application",
+                        "mirra specifics","in practice","on the tool"]],
+  ["physics",          ["physics","physics and math","theory","governing physics","math",
+                        "mechanism","how it works"]],
+  ["typical_values",   ["typical values","values","numbers","ranges","specifications","specs"]],
+  ["open_questions",   ["open questions","questions","unknowns","gaps","to verify"]],
+  ["contested",        ["contested","disagreement","sources disagree","dispute","conflicting"]],
+];
+const SKIP = ["relations","connections","links","sources","references","citations"];
+
+function normHead(h){ return h.toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim(); }
+function slotFor(h){
+  const n = normHead(h);
+  for(const [slot,names] of SLOTS){
+    if(names.includes(n)) return slot;
+    if(names.some(x=>n.startsWith(x)||x.startsWith(n))) return slot;
+  }
+  if(SKIP.some(s=>n.startsWith(s))) return "_skip";
+  return null;
+}
+function parseNodeFile(md){
+  let text = String(md||"").replace(/\r\n?/g,"\n");
+  text = text.replace(/^---\n[\s\S]*?\n---\n?/,"");
+  const slots={extra:[]};
+  let cur=null, buf=[], curHead=null;
+  const flush=()=>{
+    const body=buf.join("\n").trim(); buf=[];
+    if(!body) return;
+    if(cur===null){ if(!slots.definition) slots.definition=body; else slots.extra.push([null,body]); }
+    else if(cur==="_skip"){ /* relations and sources come from the tables */ }
+    else if(cur==="_extra") slots.extra.push([curHead,body]);
+    else slots[cur]=(slots[cur]?slots[cur]+"\n\n":"")+body;
+  };
+  for(const line of text.split("\n")){
+    const m=line.match(/^\s*#{1,6}\s+(.*)$/);
+    if(m){ flush(); const s=slotFor(m[1]); curHead=m[1].trim(); cur = s===null?"_extra":s; }
+    else buf.push(line);
+  }
+  flush();
+  return slots;
+}
+
+/* =====================================================================
+   3. State
+   ===================================================================== */
+const DB={nodes:[],edges:[],sources:[],citations:[],byId:{},srcById:{},loaded:false};
+let MODE=null;
+let SQL=null, sqldb=null, DIRTY=false, DEMO=false, FILENAME="mirra_kb.db";
+const APPS=["oxide-sti","tungsten","copper","silicon-poly"];
+const APP_LABEL={"oxide-sti":"Oxide / STI",tungsten:"Tungsten",copper:"Copper",
+  "silicon-poly":"Si / poly"};
+const appList=n=>String(n.applications||"").split(/[;,|]/).map(x=>x.trim()).filter(Boolean);
+const UI={view:"browse",sel:null,q:"",
+          f:{domain:new Set(),applies_to:new Set(),specificity:new Set(),
+             applications:new Set(),confidence:new Set()},
+          sql:"",res:null,err:null};
+
+const REL_LABEL={part_of:"part of",governed_by:"governed by",measured_by:"measured by",
+  controlled_by:"controlled by",causes:"causes",mitigates:"mitigates",
+  trades_off_with:"trades off with",prerequisite_for:"prerequisite for",
+  alias_of:"alias of",contrasted_with:"contrasted with"};
+const REL_INVERSE={part_of:"contains",governed_by:"governs",measured_by:"measures",
+  controlled_by:"controls",causes:"caused by",mitigates:"mitigated by",
+  trades_off_with:"trades off with",prerequisite_for:"requires",
+  alias_of:"alias of",contrasted_with:"contrasted with"};
+
+const $=s=>document.querySelector(s);
+const el=(t,a={},...kids)=>{
+  const e=document.createElement(t);
+  for(const [k,v] of Object.entries(a)){
+    if(k==="html") e.innerHTML=v;
+    else if(k.startsWith("on")) e.addEventListener(k.slice(2),v);
+    else if(v!==null&&v!==false&&v!==undefined) e.setAttribute(k,v);
+  }
+  kids.flat().forEach(k=>k!=null&&e.append(k));
+  return e;
+};
+function setBanner(msg,bad){
+  const b=$("#banner");
+  if(!msg){b.hidden=true;b.innerHTML="";return;}
+  b.hidden=false;b.innerHTML="";b.className=bad?"bad":"";
+  b.append(msg); b.append(el("button",{onclick:()=>b.hidden=true},"Dismiss"));
+}
+
+/* =====================================================================
+   4. CSV parsing, tolerant of quotes, newlines and separators
+   ===================================================================== */
+function sniffDelim(text){
+  const line=text.split("\n").find(l=>l.trim())||"";
+  const t=(line.match(/\t/g)||[]).length, s=(line.match(/;/g)||[]).length,
+        c=(line.match(/,/g)||[]).length;
+  return t>c?"\t":(s>c?";":",");
+}
+function parseCSV(text){
+  if(!text||!text.trim()) return [];
+  text=text.replace(/^\uFEFF/,"").replace(/\r\n?/g,"\n");
+  const D=sniffDelim(text);
+  const rows=[]; let row=[],cell="",q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=c; }
+    else if(c==='"'){q=true;}
+    else if(c===D){row.push(cell);cell="";}
+    else if(c==='\n'){row.push(cell);rows.push(row);row=[];cell="";}
+    else cell+=c;
+  }
+  if(cell.length||row.length){row.push(cell);rows.push(row);}
+  if(!rows.length) return [];
+  const head=rows.shift().map(h=>h.trim().toLowerCase());
+  return rows.filter(r=>r.some(v=>v.trim()!==""))
+    .map(r=>{const o={};head.forEach((h,i)=>o[h]=(r[i]??"").trim());return o;});
+}
+
+const pick=(o,...names)=>{ for(const n of names) if(o[n]!==undefined&&o[n]!=="") return o[n]; return ""; };
+function normNode(r){
+  return {
+    id: pick(r,"id","node_id","slug"),
+    term: pick(r,"term","name","title")||pick(r,"id"),
+    aliases: pick(r,"aliases","alias","also"),
+    type: pick(r,"type","node_type")||"concept",
+    domain: pick(r,"domain","area","category")||"process",
+    gloss: pick(r,"gloss","summary","one_liner","short"),
+    value_status: pick(r,"value_status","values","status")||"unknown",
+    confidence: pick(r,"confidence","certainty")||"uncertain",
+    confidence_mirra: pick(r,"confidence_mirra","mirra_confidence")||"",
+    specificity: pick(r,"specificity","scope")||"cmp",
+    applies_to: pick(r,"applies_to","subsystem_scope","platform")||"polisher",
+    head_gen: pick(r,"head_gen","head_generation","head"),
+    applications: pick(r,"applications","application","apps"),
+    verify: pick(r,"verify","verify_by","next_step"),
+    contested: pick(r,"contested","dispute"),
+    wafer_note: pick(r,"wafer_note","wafer_size_note","wafer"),
+    definition: pick(r,"definition"),
+    mirra_application: pick(r,"mirra_application"),
+    physics: pick(r,"physics"),
+    typical_values: pick(r,"typical_values"),
+    open_questions: pick(r,"open_questions"),
+    extra: []
+  };
+}
+function normSource(r){
+  let title = pick(r,"title","title_slug","name");
+  if(title && !/\s/.test(title) && title.includes("-")) title=title.replace(/-/g," ");
+  return {id:pick(r,"id","source_id"), title:title||pick(r,"id"),
+    author_or_assignee:pick(r,"author_or_assignee","author","assignee"),
+    year:pick(r,"year"), source_type:pick(r,"source_type","type"),
+    url:pick(r,"url","link"), access:pick(r,"access")||"open",
+    observed_on:pick(r,"observed_on","observed","when"),
+    tier:String(pick(r,"tier")??"5")};
+}
+function splitAliases(s){ return String(s||"").split(/[;|,]/).map(x=>x.trim()).filter(Boolean); }
+
+function indexAll(){
+  DB.byId={};DB.nodes.forEach(n=>DB.byId[n.id]=n);
+  DB.srcById={};DB.sources.forEach(s=>DB.srcById[s.id]=s);
+  DB.loaded=DB.nodes.length>0;
+}
+
+/* =====================================================================
+   5. Loaders
+   ===================================================================== */
+async function loadCSVSet(get){
+  const nodesText = await get("nodes.csv");
+  if(nodesText===null) return false;
+  DB.nodes = parseCSV(nodesText).map(normNode).filter(n=>n.id);
+  if(!DB.nodes.length) return false;
+  DB.edges = parseCSV(await get("edges.csv")||"").map(r=>({
+    from_id:pick(r,"from_id","from","source_node"),
+    to_id:pick(r,"to_id","to","target_node"),
+    relation:pick(r,"relation","rel","type"),
+    note:pick(r,"note","notes"), source_id:pick(r,"source_id")}))
+    .filter(e=>e.from_id&&e.to_id);
+  DB.sources = parseCSV(await get("sources.csv")||"").map(normSource).filter(s=>s.id);
+  DB.citations = parseCSV(await get("citations.csv")||"").map(r=>({
+    node_id:pick(r,"node_id","node","id"), source_id:pick(r,"source_id","source"),
+    field:pick(r,"field")||"general"})).filter(c=>c.node_id&&c.source_id);
+  // parallel, in chunks, so 500 nodes does not serialize into 500 round trips
+  for(let i=0;i<DB.nodes.length;i+=25){
+    await Promise.all(DB.nodes.slice(i,i+25).map(async n=>{
+      const md = await get("nodes/"+n.id+".md");
+      if(md===null) return;
+      const s=parseNodeFile(md);
+      for(const k of ["definition","mirra_application","physics","typical_values",
+                      "open_questions","contested"])
+        if(s[k]) n[k]=s[k];
+      n.extra=s.extra||[];
+    }));
+  }
+  MODE="csv"; indexAll(); return true;
+}
+
+async function initSql(){
+  if(SQL) return;
+  const CDNS=["https://cdn.jsdelivr.net/npm/sql.js@1.14.1/dist/",
+              "https://cdn.jsdelivr.net/npm/sql.js@1/dist/",
+              "https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/","./"];
+  for(const base of CDNS){
+    try{
+      await new Promise((res,rej)=>{const s=document.createElement("script");
+        s.src=base+"sql-wasm.js";s.onload=res;s.onerror=()=>rej();document.head.append(s);});
+      SQL=await initSqlJs({locateFile:f=>base+f});
+      return;
+    }catch(e){}
+  }
+  throw new Error("sql.js unavailable");
+}
+function sq(sql,params){
+  const st=sqldb.prepare(sql); if(params) st.bind(params);
+  const rows=[]; while(st.step()) rows.push(st.getAsObject());
+  st.free(); return rows;
+}
+function reloadSqlite(){
+  DB.nodes=sq("SELECT * FROM node").map(r=>{const n=normNode(r);
+    n.definition=r.definition||"";n.mirra_application=r.mirra_application||"";
+    n.physics=r.physics||"";n.typical_values=r.typical_values||"";
+    n.open_questions=r.open_questions||"";n.extra=[];
+    if(r.notes) n.extra.push(["Notes",r.notes]);
+    return n;});
+  DB.nodes.sort((a,b)=>a.term.localeCompare(b.term));
+  DB.edges=sq("SELECT * FROM edge");
+  DB.sources=sq("SELECT * FROM source").map(normSource);
+  DB.citations=sq("SELECT * FROM citation");
+  indexAll();
+}
+async function openSqliteBuffer(buf,name){
+  await initSql();
+  sqldb=new SQL.Database(new Uint8Array(buf));
+  sqldb.run("PRAGMA foreign_keys = ON;");
+  sq("SELECT count(*) FROM node");
+  MODE="sqlite"; FILENAME=name||"mirra_kb.db"; DIRTY=false;
+  reloadSqlite();
+}
+function markDirty(){ DIRTY=true; const s=$("#save");
+  s.hidden=false;s.classList.add("dirty");s.textContent="Save changes"; }
+function download(){
+  const blob=new Blob([sqldb.export()],{type:"application/octet-stream"});
+  const a=el("a",{href:URL.createObjectURL(blob),download:FILENAME});
+  document.body.append(a);a.click();a.remove();
+  DIRTY=false;const s=$("#save");s.classList.remove("dirty");s.textContent="Save a copy";
+}
+
+async function ingest(fileList){
+  const files=[...fileList];
+  const dbFile = files.find(f=>/\.(db|sqlite3?|kb)$/i.test(f.name));
+  if(dbFile){
+    try{
+      await openSqliteBuffer(await dbFile.arrayBuffer(), dbFile.name);
+      $("#save").hidden=false; setBanner(""); UI.sel=DB.nodes[0]?.id||null; render();
+    }catch(e){ setBanner("That file did not open as a knowledge base. "+e.message,true); }
+    return;
+  }
+  const byName={};
+  for(const f of files) byName[(f.webkitRelativePath||f.name).replace(/^[^/]*\//,"")]=f;
+  const get = async path => {
+    const f = byName[path] || files.find(x=>(x.webkitRelativePath||x.name).endsWith(path));
+    return f ? await f.text() : null;
+  };
+  if(await loadCSVSet(get)){ setBanner(""); UI.sel=DB.nodes[0]?.id||null; render(); }
+  else setBanner("No nodes.csv and no .db file in that selection. Pick the folder that holds them.",true);
+}
+
+/* =====================================================================
+   6. Views
+   ===================================================================== */
+function filtered(){
+  const s=UI.q.toLowerCase();
+  return DB.nodes.filter(n=>{
+    for(const k of ["domain","applies_to","specificity","confidence"])
+      if(UI.f[k].size&&!UI.f[k].has(n[k])) return false;
+    if(UI.f.applications.size){
+      const own=appList(n);
+      if(!own.includes("all") && !own.some(a=>UI.f.applications.has(a))) return false;
+    }
+    if(!s) return true;
+    return (n.term+" "+n.id+" "+n.aliases+" "+n.gloss).toLowerCase().includes(s);
+  }).sort((a,b)=>a.term.localeCompare(b.term));
+}
+function neighbours(id){
+  const out=[],inc=[];
+  for(const e of DB.edges){
+    if(e.from_id===id&&DB.byId[e.to_id]) out.push({id:e.to_id,rel:e.relation,note:e.note});
+    if(e.to_id===id&&DB.byId[e.from_id]) inc.push({id:e.from_id,rel:e.relation,note:e.note,inv:true});
+  }
+  return {out,inc};
+}
+const written = n => (n.definition||n.mirra_application||n.physics||"").trim().length>40;
+
+function renderFilters(){
+  const box=$("#filters"); box.innerHTML="";
+  const doms=[...new Set(DB.nodes.map(n=>n.domain))].sort();
+  const rows=[["domain",doms]];
+  if(DB.nodes.some(n=>n.applies_to!=="polisher"))
+    rows.push(["applies_to",["polisher","mesa","both"]]);
+  rows.push(["specificity",["mirra","cmp","general"]]);
+  if(DB.nodes.some(n=>appList(n).length)) rows.push(["applications",APPS]);
+  rows.push(["confidence",["established","probable","uncertain"]]);
+  for(const [key,vals] of rows){
+    const row=el("div",{class:"frow"});
+    for(const v of vals){
+      const on=UI.f[key].has(v);
+      row.append(el("button",{class:"chip","aria-pressed":String(on),
+        onclick:()=>{on?UI.f[key].delete(v):UI.f[key].add(v);render();}},
+        key==="applications"?(APP_LABEL[v]||v):v));
+    }
+    box.append(row);
+  }
+}
+function renderList(){
+  const list=$("#list"); list.innerHTML="";
+  const rows=filtered();
+  $("#listmeta").textContent=rows.length+" of "+DB.nodes.length+" terms";
+  if(!rows.length){ list.append(el("div",{style:"padding:18px 14px;color:var(--ink-3);font-size:13.5px"},
+    "Nothing matches. Clear a filter or change the search.")); return; }
+  for(const n of rows)
+    list.append(el("button",{class:"item","aria-current":String(n.id===UI.sel),
+      onclick:()=>{UI.sel=n.id;UI.view="browse";render();$("#content").scrollTop=0;}},
+      el("b",{},el("i",{class:"dot c-"+n.confidence}),n.term),
+      el("small",{},n.gloss||"No gloss yet"),
+      el("small",{style:"margin-top:3px"},n.domain+" · "+n.type)));
+}
+function drawMap(id){
+  const {out,inc}=neighbours(id); const all=[...out,...inc].slice(0,12);
+  if(!all.length) return null;
+  const W=700,H=290,cx=W/2,cy=H/2,R=Math.min(112,40+all.length*8),NS="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H); svg.id="map";
+  const mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+  all.forEach((nb,i)=>{
+    const ang=(i/all.length)*Math.PI*2-Math.PI/2;
+    const x=cx+Math.cos(ang)*R,y=cy+Math.sin(ang)*R*0.82;
+    svg.append(mk("line",{x1:cx,y1:cy,x2:x,y2:y}));
+    const g=mk("g",{class:"hit"});
+    g.append(mk("circle",{cx:x,cy:y,r:5,fill:"var(--steel)"}));
+    const t=mk("text",{x,y:y-11,"text-anchor":x<cx-20?"end":(x>cx+20?"start":"middle")});
+    t.textContent=DB.byId[nb.id].term; g.append(t);
+    g.addEventListener("click",()=>{UI.sel=nb.id;render();$("#content").scrollTop=0;});
+    svg.append(g);
+  });
+  svg.append(mk("circle",{cx,cy,r:7,fill:"var(--ink)"}));
+  const t=mk("text",{x:cx,y:cy+26,"text-anchor":"middle",class:"self"});
+  t.textContent=DB.byId[id].term; svg.append(t);
+  return svg;
+}
+
+function renderNode(){
+  const cw=$("#cw"); cw.innerHTML="";
+  const n=DB.byId[UI.sel];
+  if(!n){cw.append(el("p",{class:"lede"},"Pick a term from the list."));return;}
+  const head=el("div",{class:"head"},el("h2",{},n.term));
+  const al=splitAliases(n.aliases);
+  if(al.length) head.append(el("div",{class:"alias"},"Also: "+al.join(", ")));
+  const SPEC_LABEL={mirra:"Mirra specific",cmp:"CMP general",general:"General principle"};
+  const HEAD_LABEL={titan:"Titan head",'titan-profiler':"Titan Profiler",
+    either:"Both head types",custom:"Custom head",unknown:"Head unknown"};
+  const meta=el("div",{class:"meta"},
+    el("span",{class:"tag"},n.type),el("span",{class:"tag"},n.domain),
+    el("span",{class:"tag spec-"+n.specificity},SPEC_LABEL[n.specificity]||n.specificity));
+  if(n.applies_to&&n.applies_to!=="polisher")
+    meta.append(el("span",{class:"tag spec-mirra"},n.applies_to==="mesa"?"Mesa cleaner":"Polisher and Mesa"));
+  if(n.head_gen)
+    meta.append(el("span",{class:"tag"+(n.head_gen==="custom"?" spec-general":"")},
+      HEAD_LABEL[n.head_gen]||n.head_gen));
+  for(const a of appList(n))
+    meta.append(el("span",{class:"tag"},APP_LABEL[a]||a));
+  meta.append(el("span",{},el("i",{class:"dot c-"+n.confidence}),n.confidence),
+    el("span",{},"values: "+n.value_status),
+    el("code",{},n.id));
+  head.append(meta);
+  cw.append(head);
+  if(n.gloss) cw.append(el("div",{class:"prose",style:"margin-bottom:24px;font-size:17px;color:var(--ink-2)"},
+    el("p",{},n.gloss)));
+  if(n.contested&&String(n.contested).trim())
+    cw.append(el("div",{class:"contested"},el("b",{},"Sources disagree"),
+      el("div",{class:"prose",style:"font:inherit;color:inherit",html:renderMD(n.contested)})));
+
+  let any=false;
+  for(const [title,val,conf] of [["Definition",n.definition,null],
+                                 ["On the Mirra",n.mirra_application,n.confidence_mirra],
+                                 ["Physics",n.physics,null],
+                                 ["Typical values",n.typical_values,null]]){
+    if(!val||!String(val).trim()) continue; any=true;
+    const h=el("h3",{},title);
+    if(conf) h.append(el("span",{class:"badge b-"+conf},conf));
+    cw.append(el("section",{class:"blk"},h,el("div",{class:"prose",html:renderMD(val)})));
+  }
+  for(const [heading,body] of (n.extra||[])){
+    any=true;
+    cw.append(el("section",{class:"blk"},el("h3",{},heading||"Notes"),
+      el("div",{class:"prose",html:renderMD(body)})));
+  }
+  if(!any) cw.append(el("section",{class:"blk"},el("div",{class:"prose",style:"color:var(--ink-3)"},
+    el("p",{}, MODE==="csv" ? "No write-up yet. Create nodes/"+n.id+".md."
+                            : "No write-up yet. Fill the definition and physics columns."))));
+
+  if(n.wafer_note && n.wafer_note!=="na")
+    cw.append(el("section",{class:"blk"},el("h3",{},"150 mm vs 200 mm"),
+      el("div",{class:"prose",html:renderMD(n.wafer_note)})));
+
+  const {out,inc}=neighbours(n.id), rels=[...out,...inc];
+  const rsec=el("section",{class:"blk"},el("h3",{},"Connections ("+rels.length+")"));
+  if(!rels.length) rsec.append(el("div",{class:"prose",style:"color:var(--low)"},
+    el("p",{},"Orphan node. Nothing links here. Add an edge.")));
+  else{
+    const box=el("div",{class:"rels"});
+    for(const r of rels) box.append(el("div",{class:"rel"},
+      el("span",{},r.inv?(REL_INVERSE[r.rel]||r.rel):(REL_LABEL[r.rel]||r.rel)),
+      el("div",{},el("button",{onclick:()=>{UI.sel=r.id;render();$("#content").scrollTop=0;}},DB.byId[r.id].term),
+        r.note?el("em",{}," "+r.note):null)));
+    rsec.append(box); const m=drawMap(n.id); if(m) rsec.append(m);
+  }
+  cw.append(rsec);
+
+  const cites=DB.citations.filter(c=>c.node_id===n.id);
+  const ssec=el("section",{class:"blk"},el("h3",{},"Sources ("+cites.length+")"));
+  if(!cites.length) ssec.append(el("div",{class:"prose",style:"color:var(--low)"},
+    el("p",{},"Uncited. Nothing in this entry is backed by a logged source.")));
+  else for(const c of cites){
+    const s=DB.srcById[c.source_id];
+    ssec.append(el("div",{class:"src"},
+      el("span",{class:"tier t"+(s?s.tier:5)},"T"+(s?s.tier:"?")),
+      el("b",{},s?s.title:c.source_id),
+      el("small",{},(s?[s.author_or_assignee,s.year,s.source_type,
+                        s.observed_on?"observed "+s.observed_on:s.access]
+                        .filter(Boolean).join(" · ")
+                      :"missing from the source table")+(c.field?" — supports: "+c.field:""))));
+  }
+  cw.append(ssec);
+
+  if(n.open_questions&&String(n.open_questions).trim())
+    cw.append(el("section",{class:"blk"},el("h3",{},"Open questions"),
+      el("div",{class:"prose",html:renderMD(n.open_questions)})));
+}
+
+function renderHealth(){
+  const cw=$("#cw"); cw.innerHTML="";
+  cw.append(el("h2",{class:"view"},"Health"),
+    el("p",{class:"lede"},"Run this before you wrap up a session. Every number here should be shrinking."));
+  const cited=new Set(DB.citations.map(c=>c.node_id));
+  const linked=new Set(); DB.edges.forEach(e=>{linked.add(e.from_id);linked.add(e.to_id);});
+  const uncited=DB.nodes.filter(n=>!cited.has(n.id));
+  const orphans=DB.nodes.filter(n=>!linked.has(n.id));
+  const broken=DB.edges.filter(e=>!DB.byId[e.from_id]||!DB.byId[e.to_id]);
+  const badRel=DB.edges.filter(e=>!REL_LABEL[e.relation]);
+  const tier=new Map();
+  DB.citations.forEach(c=>{const s=DB.srcById[c.source_id]; if(!s)return;
+    tier.set(c.node_id, Math.min(tier.get(c.node_id)??9, +s.tier));});
+  const weak=DB.nodes.filter(n=>cited.has(n.id)&&(tier.get(n.id)??9)>=4);
+
+  const stat=el("div",{class:"stat"});
+  [["Terms",DB.nodes.length],["Connections",DB.edges.length],["Sources",DB.sources.length],
+   ["Written up",DB.nodes.filter(written).length],["Uncited",uncited.length],
+   ["Orphans",orphans.length],["Broken links",broken.length+badRel.length]]
+   .forEach(([k,v])=>stat.append(el("div",{},
+     el("b",{class:(k==="Broken links"&&v)?"warn":""},String(v)),el("span",{},k))));
+  cw.append(stat);
+
+  const doms=[...new Set(DB.nodes.map(n=>n.domain))].sort();
+  const tb=el("tbody");
+  for(const d of doms){
+    const ns=DB.nodes.filter(n=>n.domain===d);
+    const w=ns.filter(written).length, u=ns.filter(n=>n.confidence==="uncertain").length;
+    tb.append(el("tr",{},el("td",{},d),el("td",{},String(ns.length)),el("td",{},String(w)),
+      el("td",{},String(u)),
+      el("td",{},el("div",{class:"bar"},el("i",{style:"width:"+Math.round(w/ns.length*100)+"%"})))));
+  }
+  cw.append(el("section",{class:"blk"},el("h3",{},"Coverage by domain"),
+    el("table",{class:"grid"},el("thead",{},el("tr",{},el("th",{},"Domain"),el("th",{},"Terms"),
+      el("th",{},"Written up"),el("th",{},"Uncertain"),el("th",{},"Progress"))),tb)));
+
+  const prob=(title,rows,note)=>{
+    const s=el("section",{class:"blk"},el("h3",{},title+" ("+rows.length+")"));
+    if(!rows.length) s.append(el("p",{style:"font-size:13.5px;color:var(--ok)"},"Clear."));
+    else{
+      if(note) s.append(el("p",{style:"font-size:13px;color:var(--ink-2);margin:0 0 10px"},note));
+      s.append(el("table",{class:"grid"},el("tbody",{},rows.slice(0,60).map(n=>el("tr",{},
+        el("td",{style:"width:46%"},el("button",{onclick:()=>{UI.sel=n.id;UI.view="browse";render();}},n.term)),
+        el("td",{},n.domain),el("td",{},n.type))))));
+      if(rows.length>60) s.append(el("p",{style:"font-size:12.5px;color:var(--ink-3)"},"Showing 60."));
+    }
+    cw.append(s);
+  };
+  const specs=["mirra","cmp","general"];
+  const sb=el("tbody");
+  for(const s of specs){
+    const ns=DB.nodes.filter(n=>n.specificity===s);
+    if(!ns.length) continue;
+    sb.append(el("tr",{},el("td",{},{mirra:"Mirra specific",cmp:"CMP general",
+      general:"General principle"}[s]),el("td",{},String(ns.length)),
+      el("td",{},String(ns.filter(written).length)),
+      el("td",{},el("div",{class:"bar"},
+        el("i",{style:"width:"+Math.round(ns.length/DB.nodes.length*100)+"%"})))));
+  }
+  cw.append(el("section",{class:"blk"},el("h3",{},"How much of this is actually about the tool"),
+    el("table",{class:"grid"},el("thead",{},el("tr",{},el("th",{},"Scope"),el("th",{},"Terms"),
+      el("th",{},"Written up"),el("th",{},"Share"))),sb)));
+
+  prob("Orphan terms",orphans,"Nothing links to or from these. They are not part of the web yet.");
+  prob("Uncited terms",uncited,"No source logged. Treat everything in these entries as unverified.");
+  prob("Resting on tier 4 or 5 only",weak,"The only sources behind these are vendor material or worse.");
+  prob("Contested",DB.nodes.filter(n=>n.contested&&String(n.contested).trim()),
+    "Credible sources disagree here. This is a research result, not a defect.");
+  prob("Mirra claims with no Mirra section",
+    DB.nodes.filter(n=>n.specificity==="mirra"&&!(n.mirra_application||"").trim()),
+    "Marked as tool specific but nothing written about the tool.");
+  prob("Head nodes with no generation tagged",
+    DB.nodes.filter(n=>!n.head_gen&&
+      /head|membrane|ring|zone|profiler|carrier/i.test(n.term+" "+n.id)&&
+      n.domain==="hardware"),
+    "Head behaviour differs between Titan and Titan Profiler. Untagged means the claim cannot be checked against a real tool.");
+  prob("Custom configuration notes",DB.nodes.filter(n=>n.head_gen==="custom"),
+    "These describe a modified tool. No public source documents them, so they rest on observation alone.");
+  const maxTier=new Map();
+  DB.citations.forEach(c=>{const s=DB.srcById[c.source_id]; if(!s)return;
+    maxTier.set(c.node_id, Math.max(maxTier.get(c.node_id)??-1, +s.tier));});
+  prob("Backed only by first-hand observation",
+    DB.nodes.filter(n=>maxTier.get(n.id)===0),
+    "True of the tool you looked at. Not evidence about the platform. Keep confidence at the general level honest, and set head_gen.");
+  prob("Gaps not yet routed",
+    DB.nodes.filter(n=>(n.value_status==="unknown"||n.confidence==="uncertain")&&!n.verify),
+    "Decide whether each is answerable on the tool, still worth searching, or closed.");
+
+  const causal=DB.edges.filter(e=>["causes","mitigates"].includes(e.relation)&&!e.source_id);
+  if(causal.length){
+    const s=el("section",{class:"blk"},el("h3",{},"Unsourced causal claims ("+causal.length+")"));
+    s.append(el("p",{style:"font-size:13px;color:var(--ink-2);margin:0 0 10px"},
+      "A causes or mitigates edge asserts a mechanism. These have no source behind them."));
+    s.append(el("table",{class:"grid"},el("tbody",{},causal.slice(0,40).map(e=>el("tr",{},
+      el("td",{},(DB.byId[e.from_id]||{}).term||e.from_id),el("td",{},e.relation),
+      el("td",{},(DB.byId[e.to_id]||{}).term||e.to_id),el("td",{},e.note||""))))));
+    cw.append(s);
+  }
+
+  if(broken.length||badRel.length){
+    const s=el("section",{class:"blk"},el("h3",{class:"warn"},"Broken links ("+(broken.length+badRel.length)+")"));
+    s.append(el("p",{style:"font-size:13.5px"},"These edges point at ids that do not exist, or use a relation name outside the agreed set."));
+    s.append(el("table",{class:"grid"},el("tbody",{},[...broken,...badRel].slice(0,40).map(e=>
+      el("tr",{},el("td",{},e.from_id),el("td",{class:REL_LABEL[e.relation]?"":"warn"},e.relation),
+        el("td",{class:DB.byId[e.to_id]?"":"warn"},e.to_id))))));
+    cw.append(s);
+  }
+}
+
+function renderSources(){
+  const cw=$("#cw"); cw.innerHTML="";
+  cw.append(el("h2",{class:"view"},"Source register"),
+    el("p",{class:"lede"},"Ranked by tier. Anything resting only on tier 4 or 5 is a lead, not a fact."));
+  const counts={}; DB.citations.forEach(c=>counts[c.source_id]=(counts[c.source_id]||0)+1);
+  const rows=[...DB.sources].sort((a,b)=>(+a.tier-+b.tier)||((counts[b.id]||0)-(counts[a.id]||0)));
+  if(!rows.length){cw.append(el("p",{},"No sources logged yet."));return;}
+  const tb=el("tbody");
+  for(const s of rows) tb.append(el("tr",{},
+    el("td",{style:"width:1%"},el("span",{class:"tier t"+s.tier},"T"+s.tier)),
+    el("td",{},el("div",{},s.title),el("small",{style:"color:var(--ink-3);font-size:12px"},
+      [s.author_or_assignee,s.year,s.source_type].filter(Boolean).join(" · "))),
+    el("td",{style:"width:1%;white-space:nowrap"},el("span",{class:s.access==="paywalled"?"warn":""},s.access)),
+    el("td",{style:"width:1%;white-space:nowrap;font-family:var(--mono);font-size:12px"},(counts[s.id]||0)+" uses"),
+    el("td",{style:"width:1%"},s.url?el("a",{href:s.url,target:"_blank",rel:"noopener"},"open"):null)));
+  cw.append(el("table",{class:"grid"},el("thead",{},el("tr",{},el("th",{},"Tier"),el("th",{},"Source"),
+    el("th",{},"Access"),el("th",{},"Cited"),el("th",{},""))),tb));
+}
+
+function renderGaps(){
+  const cw=$("#cw"); cw.innerHTML="";
+  cw.append(el("h2",{class:"view"},"Gaps"),
+    el("p",{class:"lede"},"Terms with unknown values or low confidence, sorted by what would actually close them. With hands-on access, most of this list is a to-do rather than a dead end."));
+  const rows=DB.nodes.filter(n=>n.value_status==="unknown"||n.confidence==="uncertain"
+    ||(n.confidence_mirra&&n.confidence_mirra!=="established"));
+  if(!rows.length){cw.append(el("p",{},"Nothing flagged."));return;}
+
+  const GROUPS=[
+    ["on-tool","Go look at the tool","Answerable by inspection, measurement, or a service screen. These are not research gaps."],
+    ["research","Keep searching","A public source probably exists. Not found yet."],
+    ["unknowable","Closed, not findable","Confirmed unavailable publicly and not observable. Stop spending time here."],
+    ["","Unrouted","No verify value set. Decide which of the three above these are."]
+  ];
+  for(const [key,title,note] of GROUPS){
+    const grp=rows.filter(n=>(n.verify||"")===key)
+      .sort((a,b)=>a.domain.localeCompare(b.domain)||a.term.localeCompare(b.term));
+    if(!grp.length) continue;
+    const s=el("section",{class:"blk"},el("h3",{},title+" ("+grp.length+")"),
+      el("p",{style:"font-size:13px;color:var(--ink-2);margin:0 0 10px"},note));
+    const tb=el("tbody");
+    for(const n of grp){
+      const first=String(n.open_questions||"").split("\n").map(l=>l.trim())
+        .find(l=>l&&!/^#/.test(l))||"";
+      tb.append(el("tr",{},
+        el("td",{style:"width:24%"},el("button",{onclick:()=>{UI.sel=n.id;UI.view="browse";render();}},n.term)),
+        el("td",{style:"width:12%"},n.domain),
+        el("td",{style:"width:13%"},el("span",{},el("i",{class:"dot c-"+n.confidence}),n.confidence)),
+        el("td",{style:"color:var(--ink-2)"},first.replace(/^[-*\d.)\s]+/,""))));
+    }
+    s.append(el("table",{class:"grid"},el("thead",{},el("tr",{},el("th",{},"Term"),
+      el("th",{},"Domain"),el("th",{},"Confidence"),el("th",{},"First open question"))),tb));
+    cw.append(s);
+  }
+}
+
+const PRESETS=[
+["Uncited terms",`SELECT id, term, domain FROM node
+WHERE id NOT IN (SELECT node_id FROM citation) ORDER BY domain, term;`],
+["Weak sourcing only",`SELECT n.id, n.term, MIN(s.tier) AS best_tier
+FROM node n JOIN citation c ON c.node_id=n.id JOIN source s ON s.id=c.source_id
+GROUP BY n.id HAVING best_tier >= 4;`],
+["Orphan terms",`SELECT id, term, domain FROM node
+WHERE id NOT IN (SELECT from_id FROM edge) AND id NOT IN (SELECT to_id FROM edge);`],
+["Coverage by domain",`SELECT domain, COUNT(*) AS terms,
+  SUM(definition IS NOT NULL AND definition <> '') AS written,
+  SUM(confidence='uncertain') AS uncertain
+FROM node GROUP BY domain ORDER BY domain;`],
+["Gap list",`SELECT id, term, domain, open_questions FROM node
+WHERE value_status='unknown' AND confidence='uncertain' ORDER BY domain, term;`],
+["Paywalled sources",`SELECT id, title, url FROM source WHERE access='paywalled';`],
+["Go look at the tool",`SELECT id, term, domain, open_questions FROM node
+WHERE verify = 'on-tool' ORDER BY domain, term;`],
+["Observation only",`SELECT n.id, n.term, MAX(s.tier) AS best
+FROM node n JOIN citation c ON c.node_id=n.id JOIN source s ON s.id=c.source_id
+GROUP BY n.id HAVING best = 0;`],
+["Relation usage",`SELECT relation, COUNT(*) AS n FROM edge GROUP BY relation ORDER BY n DESC;`],
+["Two hops from Preston",`WITH RECURSIVE reach(id, depth) AS (
+  SELECT 'preston-equation', 0
+  UNION
+  SELECT CASE WHEN e.from_id=r.id THEN e.to_id ELSE e.from_id END, r.depth+1
+  FROM edge e JOIN reach r ON r.id IN (e.from_id, e.to_id)
+  WHERE r.depth < 2
+)
+SELECT n.term, MIN(reach.depth) AS hops FROM reach JOIN node n ON n.id=reach.id
+GROUP BY n.id ORDER BY hops, n.term;`]
+];
+function runSQL(){
+  UI.err=null;UI.res=null;
+  const sql=UI.sql.trim(); if(!sql) return;
+  const body=sql.split("\n").filter(l=>!/^\s*--/.test(l)).join("\n").trim();
+  const writes=/^\s*(insert|update|delete|create|drop|alter|replace)/i.test(body);
+  try{
+    const res=sqldb.exec(sql);
+    UI.res=res.length?res[res.length-1]:{columns:[],values:[]};
+    if(writes){markDirty();reloadSqlite();}
+  }catch(e){UI.err=e.message;}
+  render();
+}
+function renderQuery(){
+  const cw=$("#cw"); cw.innerHTML="";
+  cw.append(el("h2",{class:"view"},"Query"),
+    el("p",{class:"lede"},"Runs against the database in memory. Reads are free. Writes change only this copy in the browser, so save afterwards or you lose them."));
+  const pres=el("div",{class:"presets"});
+  for(const [name,sql] of PRESETS)
+    pres.append(el("button",{onclick:()=>{UI.sql=sql;UI.res=null;UI.err=null;render();}},name));
+  cw.append(pres);
+  const ta=el("textarea",{id:"sql",spellcheck:"false"}); ta.value=UI.sql;
+  ta.addEventListener("input",e=>UI.sql=e.target.value);
+  ta.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){e.preventDefault();UI.sql=ta.value;runSQL();}});
+  cw.append(ta);
+  cw.append(el("div",{class:"qbar"},
+    el("button",{class:"btn",onclick:()=>{UI.sql=ta.value;runSQL();}},"Run"),
+    el("button",{class:"btn ghost",onclick:()=>{UI.sql="";UI.res=null;UI.err=null;render();}},"Clear"),
+    el("small",{},"Ctrl or Cmd + Enter runs")));
+  if(UI.err){cw.append(el("div",{class:"err"},UI.err));return;}
+  if(!UI.res) return;
+  const {columns,values}=UI.res;
+  if(!values.length){cw.append(el("p",{style:"color:var(--ink-3);font-size:13.5px"},"Statement ran. No rows returned."));return;}
+  const tb=el("tbody");
+  for(const row of values.slice(0,400)){
+    const tr=el("tr");
+    row.forEach((v,i)=>{
+      const isId=["id","node_id","from_id","to_id"].includes(columns[i]);
+      if(isId&&DB.byId[v]) tr.append(el("td",{},el("button",{onclick:()=>{UI.sel=v;UI.view="browse";render();}},String(v))));
+      else tr.append(el("td",{title:String(v??"")},v===null?"":String(v)));
+    });
+    tb.append(tr);
+  }
+  cw.append(el("div",{class:"res"},el("table",{},
+    el("thead",{},el("tr",{},columns.map(c=>el("th",{},c)))),tb)));
+  cw.append(el("p",{style:"font-size:12.5px;color:var(--ink-3);margin-top:8px"},
+    values.length+" rows"+(values.length>400?", showing 400":"")));
+}
+
+function renderEmpty(){
+  const cw=$("#cw"); cw.innerHTML="";
+  const e=el("div",{class:"empty"},el("h2",{},"Nothing loaded"));
+  e.append(el("p",{},"This page reads either shape of the knowledge base. Give it a SQLite file or a folder of CSVs and it works out which is which. Nothing is uploaded and nothing is written to your files."));
+
+  const fpick=el("input",{type:"file",accept:".db,.sqlite,.sqlite3",style:"display:none"});
+  fpick.addEventListener("change",ev=>ingest(ev.target.files));
+  const dpick=el("input",{type:"file",multiple:true,style:"display:none"});
+  dpick.webkitdirectory=true;
+  dpick.addEventListener("change",ev=>ingest(ev.target.files));
+
+  e.append(el("div",{class:"load"},el("h3",{},"Open your knowledge base"),
+    el("div",{},"Drag a .db file or the whole folder onto this page. Or use a button.",
+      el("div",{style:"margin-top:11px;display:flex;gap:8px;flex-wrap:wrap"},
+        el("button",{class:"btn",onclick:()=>dpick.click()},"Choose folder"),
+        el("button",{class:"btn ghost",onclick:()=>fpick.click()},"Choose .db file"),
+        dpick,fpick))));
+
+  e.append(el("div",{class:"load"},el("h3",{},"Start a SQLite database from scratch"),
+    el("div",{},"Creates an empty database with the full schema and constraints. Save it and you have your starting file.",
+      el("div",{style:"margin-top:11px"},el("button",{class:"btn ghost",onclick:newDatabase},"Create empty database")))));
+
+  e.append(el("div",{class:"load"},el("h3",{},"Look around first"),
+    el("div",{},"Sample content so you can judge the layout. It is a structural mock-up, not researched material.",
+      el("div",{style:"margin-top:11px;display:flex;gap:8px;flex-wrap:wrap"},
+        el("button",{class:"btn ghost",onclick:()=>loadDemo("csv")},"Sample, CSV mode"),
+        el("button",{class:"btn ghost",onclick:()=>loadDemo("sqlite")},"Sample, SQLite mode")))));
+
+  e.append(el("p",{style:"font-size:13px;color:var(--ink-3)",html:
+    "Served over http it also tries <code>mirra_kb.db</code> and then <code>nodes.csv</code> in the same folder on load. SQLite mode fetches an engine from the network the first time. CSV mode never needs the network."}));
+  cw.append(e);
+}
+
+function render(){
+  document.querySelectorAll("nav button[data-view]").forEach(b=>
+    b.setAttribute("aria-current",String(b.dataset.view===UI.view)));
+  $("[data-view='query']").hidden = MODE!=="sqlite";
+  if(MODE!=="sqlite"&&UI.view==="query") UI.view="browse";
+  const m=$("#mode");
+  m.hidden=!DB.loaded; m.textContent = MODE==="sqlite"?"SQLite":"CSV";
+  $("#counts").textContent=DB.loaded
+    ? DB.nodes.length+" terms · "+DB.edges.length+" links · "+DB.sources.length+" sources"+(DEMO?" · sample":"")
+    : "";
+  $("#side").style.display=DB.loaded?"":"none";
+  if(!DB.loaded){renderEmpty();return;}
+  renderFilters(); renderList();
+  ({browse:renderNode,query:renderQuery,health:renderHealth,
+    sources:renderSources,gaps:renderGaps}[UI.view]||renderNode)();
+}
+
+/* =====================================================================
+   7. Events
+   ===================================================================== */
+document.querySelectorAll("nav button[data-view]").forEach(b=>
+  b.addEventListener("click",()=>{UI.view=b.dataset.view;render();$("#content").scrollTop=0;}));
+$("#save").addEventListener("click",download);
+$("#search").addEventListener("input",e=>{UI.q=e.target.value;renderList();});
+document.addEventListener("keydown",e=>{
+  if(e.key==="/"&&DB.loaded&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){
+    e.preventDefault();$("#search").focus();$("#search").select();}
+});
+window.addEventListener("beforeunload",e=>{if(DIRTY&&!DEMO){e.preventDefault();e.returnValue="";}});
+["dragenter","dragover"].forEach(t=>document.addEventListener(t,e=>{e.preventDefault();$("#drop").classList.add("on");}));
+["dragleave","drop"].forEach(t=>document.addEventListener(t,e=>{
+  if(t==="dragleave"&&e.relatedTarget)return; $("#drop").classList.remove("on");}));
+document.addEventListener("drop",async e=>{
+  e.preventDefault();
+  const files=[];
+  const walk=async(entry,path="")=>{
+    if(entry.isFile){
+      const f=await new Promise(r=>entry.file(r));
+      try{Object.defineProperty(f,"webkitRelativePath",{value:path+f.name});}catch(x){}
+      files.push(f);
+    } else if(entry.isDirectory){
+      const rd=entry.createReader();
+      let ents; do{ ents=await new Promise(r=>rd.readEntries(r));
+        for(const en of ents) await walk(en,path+entry.name+"/"); } while(ents.length);
+    }
+  };
+  for(const item of e.dataTransfer.items){
+    const en=item.webkitGetAsEntry&&item.webkitGetAsEntry();
+    if(en) await walk(en);
+  }
+  if(!files.length && e.dataTransfer.files.length) files.push(...e.dataTransfer.files);
+  if(files.length) ingest(files);
+});
+
+/* =====================================================================
+   8. Schema and sample data
+   ===================================================================== */
+const DDL=`
+PRAGMA foreign_keys = ON;
+CREATE TABLE IF NOT EXISTS source (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, author_or_assignee TEXT, year INTEGER,
+  source_type TEXT NOT NULL CHECK (source_type IN ('patent','standard','journal','book','thesis','conference','appnote','report','web','observation')),
+  url TEXT, access TEXT NOT NULL DEFAULT 'open' CHECK (access IN ('open','paywalled','partial','offline')),
+  tier INTEGER NOT NULL CHECK (tier BETWEEN 0 AND 5),
+  observed_on TEXT, notes TEXT);
+CREATE TABLE IF NOT EXISTS node (
+  id TEXT PRIMARY KEY, term TEXT NOT NULL UNIQUE, aliases TEXT,
+  type TEXT NOT NULL CHECK (type IN ('concept','subsystem','component','consumable','principle','equation','parameter','signal','failure_mode','metric','procedure','standard')),
+  domain TEXT NOT NULL CHECK (domain IN ('hardware','consumables','process','controls','clean')),
+  specificity TEXT NOT NULL DEFAULT 'cmp' CHECK (specificity IN ('mirra','cmp','general')),
+  applies_to TEXT NOT NULL DEFAULT 'polisher' CHECK (applies_to IN ('polisher','mesa','both')),
+  head_gen TEXT CHECK (head_gen IN ('titan','titan-profiler','either','custom','unknown')),
+  applications TEXT,
+  verify TEXT CHECK (verify IN ('on-tool','research','unknowable')),
+  gloss TEXT NOT NULL, definition TEXT, mirra_application TEXT, physics TEXT, typical_values TEXT,
+  value_status TEXT DEFAULT 'unknown' CHECK (value_status IN ('published','inferred','unknown')),
+  wafer_size_note TEXT,
+  confidence TEXT NOT NULL DEFAULT 'uncertain' CHECK (confidence IN ('established','probable','uncertain')),
+  confidence_mirra TEXT CHECK (confidence_mirra IN ('established','probable','uncertain')),
+  contested TEXT,
+  open_questions TEXT, notes TEXT, created_session INTEGER, updated_session INTEGER);
+CREATE TABLE IF NOT EXISTS edge (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  from_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,
+  to_id   TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,
+  relation TEXT NOT NULL CHECK (relation IN ('part_of','governed_by','measured_by','controlled_by','causes','mitigates','trades_off_with','prerequisite_for','alias_of','contrasted_with')),
+  note TEXT, source_id TEXT REFERENCES source(id), UNIQUE (from_id,to_id,relation));
+CREATE TABLE IF NOT EXISTS citation (
+  node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,
+  source_id TEXT NOT NULL REFERENCES source(id),
+  field TEXT CHECK (field IN ('definition','mirra_application','physics','typical_values','general')),
+  note TEXT, PRIMARY KEY (node_id,source_id,field));
+CREATE TABLE IF NOT EXISTS session (id INTEGER PRIMARY KEY, date TEXT, focus TEXT, summary TEXT);
+CREATE TABLE IF NOT EXISTS search_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, query TEXT NOT NULL,
+  where_run TEXT, outcome TEXT CHECK (outcome IN ('hit','thin','empty')), note TEXT);
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+INSERT OR REPLACE INTO meta (key,value) VALUES ('schema_version','3.3');
+INSERT OR IGNORE INTO meta (key,value) VALUES ('created','');
+`;
+
+async function newDatabase(){
+  try{ await initSql(); }
+  catch(e){ setBanner("Could not fetch the SQLite engine. Put sql-wasm.js and sql-wasm.wasm next to this file, or work in CSV mode.",true); return; }
+  sqldb=new SQL.Database(); sqldb.run(DDL);
+  MODE="sqlite"; FILENAME="mirra_kb.db"; DEMO=false;
+  reloadSqlite(); markDirty();
+  setBanner("Empty database created with the full schema. Save it, then start adding rows from the Query tab.");
+  UI.view="query";
+  UI.sql="-- Paste the INSERT statements from a session here, then Run.";
+  render();
+}
+
+const SAMPLE_SOURCES=[
+ ["pre-1927","The theory and design of plate glass polishing machines","F. W. Preston",1927,"journal","","partial",2],
+ ["stg-1997","Chemical Mechanical Planarization of Microelectronic Materials","Steigerwald, Murarka, Gutmann",1997,"book","","paywalled",2],
+ ["zan-2004","Chemical mechanical planarization for microelectronics applications","Zantye, Kumar, Sikder",2004,"journal","","paywalled",2],
+ ["pat-todo-01","PLACEHOLDER, fill from assignee search","Applied Materials",null,"patent","","open",1],
+ ["obs-tool-a","First-hand inspection, tool A","self",2026,"observation","","offline",0]
+];
+const SAMPLE_NODES=[
+ {id:"preston-equation",term:"Preston Equation",type:"equation",domain:"process",conf:"established",
+  gloss:"Baseline model tying removal rate to pressure and relative velocity.",
+  definition:"The oldest working model of material removal in polishing [pre-1927]. It says the rate you take material off scales with how hard you press and how fast the surfaces slide past each other. Everything else gets folded into one fitted constant [stg-1997].",
+  app:"Every recipe knob that matters for rate maps to either P or v in this equation. That is why it is the first thing to learn.",
+  physics:`MRR = k_p × P × v
+
+where:
+
+MRR = material removal rate, nm/min
+k_p = Preston coefficient, fitted rather than derived
+P = applied pressure at the wafer surface, kPa
+v = relative velocity between wafer and pad, m/s
+
+The coefficient absorbs slurry chemistry, pad condition, temperature and abrasive loading. Two runs with different pads have different k_p values. That is why the equation predicts trends well and absolute numbers badly.`,
+  values:"k_p is process specific and must be fitted from your own data. Any published figure applies to that author's stack, not yours.",
+  oq:"1. Which Mirra pressure setpoint maps to P at the wafer, given the membrane and retaining ring share the load?\n2. Over what pressure range does the linear form hold?"},
+ {id:"removal-rate",term:"Removal Rate",type:"metric",domain:"process",conf:"established",alias:"MRR;RR",
+  gloss:"Thickness of film taken off per unit time.",
+  definition:"How much material comes off per minute. The headline output of the process."},
+ {id:"down-force",term:"Down Force",type:"parameter",domain:"process",conf:"established",alias:"polish pressure",
+  gloss:"Load the head presses the wafer into the pad with.",
+  definition:"The recipe setting for how hard the wafer is pushed onto the pad."},
+ {id:"platen-speed",term:"Platen Speed",type:"parameter",domain:"process",conf:"established",
+  gloss:"Rotation rate of the platen carrying the pad."},
+ {id:"carrier-speed",term:"Carrier Speed",type:"parameter",domain:"process",conf:"established",
+  gloss:"Rotation rate of the head holding the wafer."},
+ {id:"wiwnu",term:"Within-Wafer Non-Uniformity",type:"metric",domain:"process",conf:"established",alias:"WIWNU",
+  gloss:"Spread of removal across a single wafer.",
+  definition:"How much the removal rate varies from centre to edge on one wafer. Usually quoted as a percentage."},
+ {id:"lubrication-regime",term:"Lubrication Regime",type:"principle",domain:"process",conf:"established",alias:"Stribeck regime",
+  gloss:"Whether pad and wafer ride on fluid, touch directly, or sit between the two.",
+  definition:"Polishing can happen with the wafer floating on a slurry film, in direct contact with pad asperities, or in a mix of both. Which one you are in changes how the process responds to every other setting.",
+  physics:`The Stribeck number groups the three variables that decide the regime.
+
+S = (η × v) / P
+
+S = Stribeck number, dimensionless
+η = slurry viscosity, Pa·s
+v = relative velocity, m/s
+P = applied pressure, Pa
+
+| Regime | Contact | Rate | Defect risk |
+| --- | --- | --- | --- |
+| Hydrodynamic | none, fluid film | low | low |
+| Mixed | partial | moderate | moderate |
+| Boundary | asperity contact | high | high |`,
+  oq:"- Which regime does a standard Mirra oxide recipe operate in?"},
+ {id:"planarization-length",term:"Planarization Length",type:"principle",domain:"process",conf:"probable",
+  gloss:"Lateral distance over which the pad bridges topography.",
+  definition:"How far across the surface the pad can span without dipping into a recess. Long means good planarisation. Short means the pad follows every step.",
+  oq:"- What pad stack gives what planarization length?"},
+ {id:"dishing",term:"Dishing",type:"failure_mode",domain:"process",conf:"established",
+  gloss:"Recess in the middle of a wide soft feature after polish.",
+  definition:"A wide soft region polishes faster in its middle than at its edges. You end up with a dish instead of a flat."},
+ {id:"erosion",term:"Erosion",type:"failure_mode",domain:"process",conf:"established",
+  gloss:"Loss of height across a dense array relative to open field.",
+  definition:"A dense pattern of features polishes down as a group, sitting lower than the open area beside it."},
+ {id:"carrier-head",term:"Carrier Head",type:"subsystem",domain:"hardware",conf:"established",alias:"polish head",
+  gloss:"Assembly that holds the wafer and applies load during polish.",
+  definition:"The part that grips the wafer, presses it into the pad, and spins it.",
+  app:"Head design is where most of the tool's uniformity control lives.",
+  oq:"- Which head revisions were fitted to standalone Mirra systems?"},
+ {id:"membrane",term:"Flexible Membrane",type:"component",domain:"hardware",conf:"probable",alias:"bladder",
+  gloss:"Pressurised diaphragm behind the wafer that sets the load profile.",
+  definition:"A flexible sheet behind the wafer. Air pressure behind it pushes the wafer onto the pad."},
+ {id:"zone-control",term:"Multi-Zone Pressure Control",type:"concept",domain:"hardware",conf:"probable",alias:"zone pressure",
+  gloss:"Independent pressures across concentric regions of the wafer.",
+  wafer:"Zone geometry is sized to wafer diameter. A 150 mm setup uses a different membrane and ring than 200 mm.",
+  definition:"Splitting the load behind the wafer into concentric rings, each with its own pressure. Lets you push harder in the middle and lighter at the edge, or the reverse.",
+  app:"The main handle for fixing a centre-fast or edge-fast removal profile.",
+  physics:`MRR(r) = k_p × P(r) × v(r)
+
+MRR(r) = local removal rate at radius r, nm/min
+k_p = Preston coefficient, fitted
+P(r) = local pressure at radius r, kPa
+v(r) = local relative velocity at radius r, m/s
+
+When platen and carrier turn at similar speeds, v(r) is nearly uniform across the wafer. That is what makes pressure the useful handle and not velocity.`,
+  oq:"1. How many zones does the Mirra head have and where do the boundaries sit?\n2. Is zone pressure ramped within a step or held flat?"},
+ {id:"retaining-ring",term:"Retaining Ring",type:"component",domain:"hardware",conf:"established",alias:"retainer ring",
+  gloss:"Ring around the wafer that keeps it in the head and shapes edge pressure.",
+  wafer:"Ring inner diameter is wafer size specific. This is one of the real 150 mm versus 200 mm change parts.",
+  definition:"A ring surrounding the wafer inside the head. It stops the wafer sliding out, and it presses the pad down just outside the wafer edge.",
+  app:"A consumable. It wears in use, and the wear changes the pressure profile near the wafer edge. Check ring height and ring load first when edge uniformity drifts.",
+  physics:"The ring compresses the pad ahead of the wafer edge. Without it the pad relaxes upward at the edge and removal there climbs [stg-1997]. Ring load is usually a separate control from wafer down force [pat-todo-01].",
+  values:"Wear limits and ring load setpoints are tool and process specific. Not established from public sources.",
+  oq:"1. What is the published wear limit for the 200 mm ring?\n2. Is the 150 mm ring a drop-in change or does it need a different head?"},
+ {id:"platen",term:"Platen",type:"subsystem",domain:"hardware",conf:"established",
+  gloss:"Rotating table the polishing pad is mounted on."},
+ {id:"conditioner-arm",term:"Conditioner Arm",type:"subsystem",domain:"hardware",conf:"established",alias:"sweep arm",
+  gloss:"Sweeping arm that presses the diamond disk into the pad."},
+ {id:"slurry-arm",term:"Slurry Delivery Arm",type:"component",domain:"hardware",conf:"probable",
+  gloss:"Delivers slurry onto the pad during polish."},
+ {id:"load-cup",term:"Load Cup",type:"component",domain:"hardware",conf:"probable",
+  gloss:"Station where the wafer is handed between robot and carrier head."},
+ {id:"polishing-pad",term:"Polishing Pad",type:"consumable",domain:"consumables",conf:"established",
+  gloss:"Porous polymer surface that carries slurry and transmits load.",
+  definition:"The pad does two jobs. Its pores hold and carry slurry to the wafer, and its bulk stiffness decides how well it bridges topography."},
+ {id:"pad-conditioning",term:"Pad Conditioning",type:"procedure",domain:"consumables",conf:"established",alias:"pad dressing",
+  gloss:"Abrading the pad to restore its surface texture.",
+  definition:"Dragging a diamond coated disk across the pad to cut a fresh surface. Polishing wears the texture smooth and clogs the pores. Conditioning reopens them.",
+  app:"Done by a sweeping arm on each platen. Sweep pattern and disk load together decide how evenly the pad wears across its radius.",
+  physics:"Removal rate depends on the pad holding slurry in its pores and presenting asperities to the wafer. A glazed pad does neither. Rate falls gradually, which makes it easy to mistake for a slurry problem.",
+  values:"Disk load and sweep profile are recipe settings. No credible public values.",
+  oq:"1. Does the Mirra condition in-situ, ex-situ, or both?\n2. What is the pad life specification and what limits it?"},
+ {id:"diamond-disk",term:"Diamond Conditioner Disk",type:"consumable",domain:"consumables",conf:"established",alias:"conditioner disk",
+  gloss:"Abrasive disk used to cut the pad surface."},
+ {id:"slurry",term:"Slurry",type:"consumable",domain:"consumables",conf:"established",
+  gloss:"Abrasive particles suspended in a reactive chemistry.",
+  definition:"Two things in one bottle. Hard particles that do mechanical work, and a chemistry that softens the surface so the particles can remove it."},
+ {id:"abrasive",term:"Abrasive Particle",type:"consumable",domain:"consumables",conf:"established",
+  gloss:"Hard particle in the slurry that does the mechanical work."},
+ {id:"oxidizer",term:"Oxidizer",type:"consumable",domain:"consumables",conf:"established",
+  gloss:"Chemical that converts the metal surface into a softer removable layer."},
+ {id:"slurry-ph",term:"Slurry pH",type:"parameter",domain:"consumables",conf:"established",
+  gloss:"Acidity of the slurry, which sets chemistry and particle stability.",
+  definition:"pH controls two things at once. How fast the chemistry attacks the surface, and whether the abrasive particles stay separate or clump together.",
+  oq:"- What pH ranges apply to the slurries typically run on this tool?"},
+ {id:"pad-break-in",term:"Pad Break-In",type:"procedure",domain:"consumables",conf:"probable",alias:"pad seasoning",
+  gloss:"Conditioning a new pad until removal rate settles."},
+ {id:"endpoint-detection",term:"Endpoint Detection",type:"concept",domain:"controls",conf:"established",alias:"EPD",
+  gloss:"Deciding in real time when to stop polishing.",
+  definition:"Polishing to a fixed time drifts as the pad and consumables age. Endpoint detection watches a signal and stops when the signal says the layer is cleared."},
+ {id:"motor-current-endpoint",term:"Motor Current Endpoint",type:"signal",domain:"controls",conf:"probable",alias:"friction endpoint",
+  gloss:"Using motor torque shift to detect a layer change.",
+  definition:"Watching how hard the motors work. Polishing through one material into another changes friction, and that shows up as a shift in motor current.",
+  physics:"Friction between wafer and pad depends on what is exposed at the surface. Clearing a metal down to a dielectric changes it. Torque follows friction and current follows torque. Only works when the two materials differ in friction enough to beat the noise. Useless for blanket oxide, where nothing changes.",
+  oq:"1. Which motor does the Mirra monitor, platen or carrier, or both?\n2. What filtering is applied before the trigger fires?"},
+ {id:"optical-endpoint",term:"Optical Endpoint",type:"signal",domain:"controls",conf:"probable",alias:"in-situ rate monitor",
+  gloss:"Using reflected light through a pad window to track thickness.",
+  definition:"Shining light at the wafer through a window in the pad and reading the reflection. Film thickness changes the interference pattern, so you can watch the layer thin in real time.",
+  oq:"- Was an optical endpoint option fitted to standalone Mirra systems, and on which platens?"},
+ {id:"recipe",term:"Polish Recipe",type:"concept",domain:"controls",conf:"established",
+  gloss:"Ordered set of steps and parameters run on one wafer."},
+ {id:"alarm-handling",term:"Alarm Handling",type:"procedure",domain:"controls",conf:"uncertain",
+  gloss:"How the tool reports, latches, and clears faults.",
+  oq:"- The weakest area for public sources. Expect this branch to stay uncertain without insider documentation.\n- Is there any published alarm code list at all?"},
+ {id:"facilities",term:"Facilities Requirements",type:"concept",domain:"controls",conf:"uncertain",alias:"utilities",
+  gloss:"Power, water, drain, exhaust, and CDA the tool needs.",
+  oq:"- Is a facilities spec sheet available anywhere publicly?"},
+ {id:"mesa-cleaner",term:"Mesa Cleaner",type:"subsystem",domain:"clean",conf:"probable",
+  gloss:"Integrated post-CMP cleaner that makes the Mirra dry-in, dry-out.",
+  definition:"A cleaning module bolted onto the polisher. Without it the tool is dry-in, wet-out and the wafer leaves wet and dirty. With it the wafer comes out clean and dry.",
+  app:"Present only on Mirra Mesa. A standalone Mirra has no Mesa cleaner, so every node in this domain is out of scope for that configuration.",
+  oq:"1. What is the wafer path through the cleaner, station by station?\n2. Which faults are cleaner faults rather than polisher faults?"},
+ {id:"megasonic-clean",term:"Megasonic Cleaning",type:"procedure",domain:"clean",conf:"established",
+  gloss:"Removing particles with high frequency acoustic energy in liquid.",
+  definition:"Sound at roughly a megahertz drives pressure waves through the cleaning liquid. The waves lift particles off the surface without a brush touching it."},
+ {id:"brush-scrub",term:"Double-Sided Brush Scrub",type:"procedure",domain:"clean",conf:"established",alias:"PVA scrub;brush box",
+  gloss:"Mechanically wiping both wafer faces with soft polymer brushes.",
+  definition:"Soft porous brushes contact both sides of the wafer at once while chemistry flows through them. The brush does not scrape. It carries chemistry into contact and sweeps loosened material away."},
+ {id:"post-cmp-defect",term:"Post-CMP Defectivity",type:"metric",domain:"clean",conf:"established",
+  gloss:"Particles, residue, and watermarks left on the wafer after cleaning.",
+  definition:"What survives the cleaner. Slurry residue, redeposited particles, and drying marks are all counted here, and each has a different root cause."}
+];
+const SAMPLE_EDGES=[
+ ["removal-rate","preston-equation","governed_by",""],["down-force","preston-equation","governed_by",""],
+ ["platen-speed","preston-equation","governed_by",""],["carrier-speed","preston-equation","governed_by",""],
+ ["preston-equation","lubrication-regime","contrasted_with","Preston assumes a regime it does not describe"],
+ ["membrane","carrier-head","part_of",""],["retaining-ring","carrier-head","part_of",""],
+ ["zone-control","membrane","controlled_by",""],["wiwnu","zone-control","controlled_by",""],
+ ["retaining-ring","wiwnu","causes","Edge roll-off when worn"],
+ ["polishing-pad","platen","part_of",""],["polishing-pad","pad-conditioning","governed_by",""],
+ ["diamond-disk","conditioner-arm","part_of",""],["pad-conditioning","diamond-disk","prerequisite_for",""],
+ ["pad-conditioning","removal-rate","causes","Under-conditioned pad glazes and rate drops"],
+ ["pad-break-in","polishing-pad","prerequisite_for",""],
+ ["abrasive","slurry","part_of",""],["oxidizer","slurry","part_of",""],
+ ["slurry","slurry-ph","governed_by",""],["slurry","slurry-arm","controlled_by",""],
+ ["slurry","removal-rate","causes",""],["dishing","removal-rate","governed_by",""],
+ ["erosion","dishing","contrasted_with","Erosion is array scale, dishing is feature scale"],
+ ["planarization-length","polishing-pad","governed_by","Pad stiffness sets it"],
+ ["dishing","planarization-length","governed_by",""],
+ ["endpoint-detection","motor-current-endpoint","measured_by",""],
+ ["endpoint-detection","optical-endpoint","measured_by",""],
+ ["motor-current-endpoint","lubrication-regime","governed_by",""],
+ ["recipe","down-force","controlled_by",""],["recipe","endpoint-detection","part_of",""],
+ ["load-cup","carrier-head","prerequisite_for",""],
+ ["zone-control","retaining-ring","trades_off_with","Both shape edge pressure"],
+ ["megasonic-clean","mesa-cleaner","part_of",""],
+ ["brush-scrub","mesa-cleaner","part_of",""],
+ ["post-cmp-defect","mesa-cleaner","measured_by",""],
+ ["slurry","post-cmp-defect","causes","Residue left on the wafer is the cleaner's problem"],
+ ["mesa-cleaner","load-cup","prerequisite_for",""]
+];
+const SAMPLE_CITES=[
+ ["preston-equation","pre-1927","physics"],["preston-equation","stg-1997","definition"],
+ ["removal-rate","stg-1997","definition"],["lubrication-regime","zan-2004","physics"],
+ ["dishing","zan-2004","definition"],["erosion","zan-2004","definition"],
+ ["polishing-pad","stg-1997","definition"],["slurry","stg-1997","definition"],
+ ["planarization-length","zan-2004","physics"],["carrier-head","pat-todo-01","mirra_application"],
+ ["pad-conditioning","stg-1997","general"],
+ ["zone-control","obs-tool-a","mirra_application"],
+ ["retaining-ring","obs-tool-a","typical_values"]
+];
+
+const SAMPLE_MIRRA=new Set(["carrier-head","membrane","zone-control","retaining-ring","platen",
+  "conditioner-arm","slurry-arm","load-cup","recipe","alarm-handling","facilities",
+  "optical-endpoint","motor-current-endpoint","mesa-cleaner"]);
+const SAMPLE_GENERAL=new Set(["preston-equation","lubrication-regime","planarization-length"]);
+const specOf=id=>SAMPLE_MIRRA.has(id)?"mirra":(SAMPLE_GENERAL.has(id)?"general":"cmp");
+const SAMPLE_MESA=new Set(["mesa-cleaner","megasonic-clean","brush-scrub","post-cmp-defect"]);
+const appliesOf=id=>SAMPLE_MESA.has(id)?"mesa":(id==="load-cup"?"both":"polisher");
+const SAMPLE_HEAD={"carrier-head":"either","membrane":"either","retaining-ring":"either",
+  "zone-control":"titan-profiler"};
+const SAMPLE_APPS={"oxidizer":"tungsten;copper","slurry-ph":"tungsten;copper",
+  "dishing":"copper","erosion":"copper","abrasive":"oxide-sti;silicon-poly",
+  "planarization-length":"oxide-sti","post-cmp-defect":"copper;tungsten",
+  "brush-scrub":"all","megasonic-clean":"all"};
+const SAMPLE_VERIFY={"zone-control":"on-tool","retaining-ring":"on-tool",
+  "carrier-head":"on-tool","pad-conditioning":"on-tool","motor-current-endpoint":"on-tool",
+  "optical-endpoint":"on-tool","mesa-cleaner":"on-tool","alarm-handling":"on-tool",
+  "facilities":"research","planarization-length":"research","slurry-ph":"research",
+  "preston-equation":"research"};
+const SAMPLE_MCONF={"carrier-head":"uncertain","zone-control":"uncertain",
+  "retaining-ring":"probable","pad-conditioning":"uncertain","motor-current-endpoint":"uncertain"};
+const SAMPLE_CONTESTED={
+ "planarization-length":"Published values span roughly an order of magnitude [zan-2004] and depend on how each author defines the measurement. Treat any single number as method dependent until you know which definition it used."};
+
+async function loadDemo(kind){
+  if(kind==="sqlite"){
+    try{ await initSql(); }
+    catch(e){ setBanner("Could not fetch the SQLite engine, showing the sample in CSV mode instead.",true); kind="csv"; }
+  }
+  if(kind==="sqlite"){
+    sqldb=new SQL.Database(); sqldb.run(DDL);
+    for(const s of SAMPLE_SOURCES)
+      sqldb.run("INSERT INTO source (id,title,author_or_assignee,year,source_type,url,access,tier) VALUES (?,?,?,?,?,?,?,?)",s);
+    sqldb.run("UPDATE source SET observed_on='tool A, 2026-04' WHERE id='obs-tool-a'");
+    for(const n of SAMPLE_NODES)
+      sqldb.run(`INSERT INTO node (id,term,aliases,type,domain,specificity,applies_to,head_gen,
+        applications,verify,gloss,definition,mirra_application,physics,typical_values,
+        value_status,wafer_size_note,confidence,confidence_mirra,contested,open_questions,
+        updated_session)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'unknown',?,?,?,?,?,0)`,
+        [n.id,n.term,n.alias||null,n.type,n.domain,specOf(n.id),appliesOf(n.id),
+         SAMPLE_HEAD[n.id]||null,SAMPLE_APPS[n.id]||null,SAMPLE_VERIFY[n.id]||null,
+         n.gloss,n.definition||null,
+         n.app||null,n.physics||null,n.values||null,n.wafer||null,n.conf,
+         SAMPLE_MCONF[n.id]||null,SAMPLE_CONTESTED[n.id]||null,n.oq||null]);
+    for(const [f,t,r,note] of SAMPLE_EDGES)
+      { try{ sqldb.run("INSERT INTO edge (from_id,to_id,relation,note) VALUES (?,?,?,?)",[f,t,r,note||null]); }catch(e){} }
+    for(const c of SAMPLE_CITES)
+      { try{ sqldb.run("INSERT INTO citation (node_id,source_id,field) VALUES (?,?,?)",c); }catch(e){} }
+    MODE="sqlite"; FILENAME="mirra_kb_sample.db"; reloadSqlite();
+    $("#save").hidden=false; $("#save").textContent="Save a copy";
+  } else {
+    DB.nodes=SAMPLE_NODES.map(n=>({id:n.id,term:n.term,aliases:n.alias||"",type:n.type,
+      domain:n.domain,specificity:specOf(n.id),applies_to:appliesOf(n.id),
+      head_gen:SAMPLE_HEAD[n.id]||"",applications:SAMPLE_APPS[n.id]||"",
+      verify:SAMPLE_VERIFY[n.id]||"",gloss:n.gloss,value_status:"unknown",
+      confidence:n.conf,confidence_mirra:SAMPLE_MCONF[n.id]||"",
+      contested:SAMPLE_CONTESTED[n.id]||"",
+      wafer_note:n.wafer||"na",definition:n.definition||"",mirra_application:n.app||"",
+      physics:n.physics||"",typical_values:n.values||"",open_questions:n.oq||"",extra:[]}));
+    DB.edges=SAMPLE_EDGES.map(([f,t,r,note])=>({from_id:f,to_id:t,relation:r,note,source_id:""}));
+    DB.sources=SAMPLE_SOURCES.map(([id,title,a,y,st,url,acc,tier])=>
+      ({id,title,author_or_assignee:a,year:y,source_type:st,url,access:acc,
+        tier:String(tier),observed_on:id==="obs-tool-a"?"tool A, 2026-04":""}));
+    DB.citations=SAMPLE_CITES.map(([node_id,source_id,field])=>({node_id,source_id,field}));
+    MODE="csv"; indexAll(); $("#save").hidden=true;
+  }
+  DEMO=true; DIRTY=false; UI.sel="preston-equation";
+  setBanner("Sample data loaded in "+(MODE==="sqlite"?"SQLite":"CSV")+" mode. Structural mock-up for evaluating the layout, not researched material. Do not study from it.");
+  render();
+}
+
+/* =====================================================================
+   9. Boot
+   ===================================================================== */
+(async ()=>{
+  if(location.protocol.startsWith("http")){
+    try{
+      const r=await fetch("mirra_kb.db",{cache:"no-store"});
+      if(r.ok){
+        const buf=await r.arrayBuffer();
+        const magic=new TextDecoder().decode(new Uint8Array(buf,0,15));
+        if(magic.startsWith("SQLite format")){
+          await openSqliteBuffer(buf,"mirra_kb.db");
+          $("#save").hidden=false; UI.sel=DB.nodes[0]?.id||null; render(); return;
+        }
+      }
+    }catch(e){}
+    try{
+      const get=async p=>{const r=await fetch(p,{cache:"no-store"});return r.ok?await r.text():null;};
+      if(await loadCSVSet(get)){ UI.sel=DB.nodes[0]?.id||null; render(); return; }
+    }catch(e){}
+  }
+  render();
+})();
+</script>
+</body>
+</html>

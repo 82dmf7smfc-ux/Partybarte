@@ -1,0 +1,34 @@
+from_id,to_id,relation,source_id,note
+removal-rate,preston-equation,governed_by,ref-preston-1927,first order model of rate
+removal-rate,lubrication-regime,governed_by,intech-cmp-lubrication,regime sets friction and rate
+removal-rate,slurry-transport,governed_by,sd-groove-width-mrt,fresh slurry supply limits rate
+removal-rate,platen,controlled_by,,platen speed sets pad velocity
+removal-rate,slurry,controlled_by,rev-zantye-2004,chemistry sets the rate constant
+removal-rate,pad-conditioning,controlled_by,springer-diamond-shape,conditioning holds rate steady over pad life
+lubrication-regime,pad-asperity-contact,governed_by,intech-cmp-lubrication,film thickness against asperity height
+pad-asperity-contact,pad-conditioning,controlled_by,sd-diamond-disc-conditioning,diamond cutting regenerates asperities
+pad-conditioning,pad-asperity-contact,causes,sd-diamond-disc-conditioning,cutting the pad restores summit density
+planarization-length,polishing-pad,governed_by,mrs-density-stepheight,pad bending sets the averaging radius
+within-wafer-nonuniformity,zone-pressure-control,controlled_by,ieee-profiler-contour-heads,zone pressures tune the radial profile
+within-wafer-nonuniformity,removal-rate,measured_by,,computed from a radial rate map
+endpoint-detection,isrm,measured_by,pat-us6537133,optical implementation
+endpoint-detection,motor-current-endpoint,measured_by,,friction based implementation
+polishing-pad,isrm,prerequisite_for,pat-us6537133,optical endpoint needs a window in the pad
+motor-current-endpoint,platen,measured_by,,drive current of the platen or head motor
+polishing-pad,platen,part_of,,pad is mounted on the platen
+carrier-head,carousel,part_of,sst-new-cmp-architecture,four heads ride the carousel
+carrier-membrane,carrier-head,part_of,pat-us6244942,membrane defines the pressurizable chambers
+retaining-ring,carrier-head,part_of,pat-us6540594,ring is part of the head assembly
+zone-pressure-control,carrier-membrane,governed_by,pat-us6244942,chambers sit behind the membrane
+titan-head,titan-profiler-head,contrasted_with,ieee-profiler-contour-heads,zone count and edge tuning differ
+titan-head,zone-pressure-control,controlled_by,ieee-profiler-contour-heads,three zone membrane in the source found
+titan-profiler-head,zone-pressure-control,controlled_by,ieee-profiler-contour-heads,four zones tune the profile
+tungsten-slurry-oxidizer,slurry,part_of,,oxidizer is a slurry component
+tungsten-slurry-oxidizer,removal-rate,causes,sd-w-cmp-oxidants,passivation then abrasion sets the tungsten rate
+sti-ceria-slurry,removal-rate,causes,sd-sti-selectivity,ceria chemistry sets oxide to nitride selectivity
+copper-dishing,oxide-erosion,contrasted_with,mit-boning-cu-damascene,feature size driven against density driven
+copper-dishing,planarization-length,governed_by,ieee-dishing-model,pad averaging length sets the recess
+pva-brush-scrubber,mesa-cleaner,part_of,amat-mirra-mesa-200mm,brush stations sit in the cleaner
+megasonic-clean,mesa-cleaner,part_of,amat-mirra-mesa-200mm,megasonic module sits in the cleaner
+spin-rinse-dryer,mesa-cleaner,part_of,amat-mirra-mesa-200mm,dryer is the last station
+pva-brush-scrubber,slurry,mitigates,rg-particle-adhesion,brushes remove residual slurry particles
