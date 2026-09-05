@@ -181,3 +181,10 @@ The same tests run automatically on GitHub for every push and pull request. See
 Packaged versions of both tools are published on the GitHub Releases page. Each
 release has two zip files. One holds the browser tool. One holds the Python
 tool. To build them yourself, run `python tools/build_zips.py`.
+
+## Also in this repository
+
+`mirra-kb/` holds a separate project: a linked knowledge base of Applied
+Materials Mirra CMP terms, stored as flat CSV files plus one Markdown file per
+term, with a single-file browser reader and an integrity checker. It shares
+nothing with the alarm Pareto tools and has its own README.
