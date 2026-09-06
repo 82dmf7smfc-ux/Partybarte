@@ -1,7 +1,7 @@
 # Mirra Knowledge Base: Option B, CSV plus Markdown
 
 Storage: flat CSV index files, one Markdown file per node for prose.
-Reader: `mirra-kb-reader.html` v3.3, kept in the same folder.
+Reader: `mirra-kb-reader.html` v3.3.1, kept in the same folder.
 Editing: any text editor. Excel only with care, see section 10.
 Schema version: 3.3
 
@@ -310,7 +310,7 @@ mirra-kb/
     preston-equation.md
     ...
   validate.py
-  mirra-kb-reader.html        v3.3
+  mirra-kb-reader.html        v3.3.1
   SCOPE.md                    Stage 0 output, schema version
   PROMPT.md                   this file
   STATE.md                    overwritten each session
@@ -523,6 +523,7 @@ a clean exit code for a git hook.
 ```python
 #!/usr/bin/env python3
 """Integrity check for the Mirra CSV knowledge base. Schema 3.3."""
+# Citation regex accepts the patent part qualifier, e.g. [pat-us6244942 spec].
 import csv, os, re, sys, collections
 
 TYPES = {"concept","subsystem","component","consumable","principle",
@@ -543,8 +544,8 @@ FIELDS = {"definition","mirra_application","physics","typical_values","general"}
 TIERS = {"0","1","2","3","4","5"}
 CONF = {"established","probable","uncertain"}
 STATUS = {"published","inferred","unknown"}
-CITE_RE = re.compile(r"\[([a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s*[;,]\s*"
-                     r"[a-z0-9]+(?:[-.][a-z0-9]+)+)*)\]", re.I)
+CITE_RE = re.compile(r"\[([a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s+[a-z]+)?(?:\s*[;,]\s*"
+                     r"[a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s+[a-z]+)?)*)\]", re.I)
 
 errs, warns, info = [], [], []
 

@@ -31,6 +31,10 @@ Tooling changes:
 - mirra-kb-reader.html got the same regex change so a qualified citation renders
   as a chip instead of literal text, and the chip resolves on the id with the
   qualifier shown after it. Reader marked v3.3.1.
+- PROMPT.md section 7 carried the pre-fix regex in its embedded copy of
+  validate.py, so a cold restart from the contract would have regenerated the
+  bug. The embedded block now matches the shipped validate.py character for
+  character, and the two lines that still said reader v3.3 now say v3.3.1.
 - No column changed. Schema stays 3.3.
 Research constraint: the session network policy blocked direct fetches of
 appliedmaterials.com, patents.google.com, uspto.gov, freepatentsonline.com and
