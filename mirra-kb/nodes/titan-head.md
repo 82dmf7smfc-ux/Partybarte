@@ -20,7 +20,7 @@ Inferred, no source: three zones gives centre, middle and edge control only.
 Anything shaped like a narrow ring of fast or slow removal between those zones
 cannot be tuned out by pressure alone on this head.
 
-## Contested
+## Weak sourcing
 The zone counts above were read from a search summary of a paywalled conference
 paper, not from the paper itself. No Applied Materials document reached in this
 session states a Titan zone count. Treat three zones as probable and not

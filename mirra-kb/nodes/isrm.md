@@ -27,8 +27,8 @@ Interference between light reflected from the top and bottom of a transparent
 film gives an intensity that cycles as the film thins [amat-pr-optical-endpoint].
 Counting cycles gives thickness removed, and the cycle rate gives removal rate.
 
-## Contested
-Not contested between sources, but the naming is loose. Public text uses in-situ
+## Weak sourcing
+No source disagrees, but the naming is loose. Public text uses in-situ
 rate monitor and in-situ removal monitor for the same abbreviation
 [amat-mirra-200mm]. No source reached here fixes the expansion, so treat the
 long form as unconfirmed.

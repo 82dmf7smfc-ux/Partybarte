@@ -32,3 +32,8 @@ pva-brush-scrubber,mesa-cleaner,part_of,amat-mirra-mesa-200mm,brush stations sit
 megasonic-clean,mesa-cleaner,part_of,amat-mirra-mesa-200mm,megasonic module sits in the cleaner
 spin-rinse-dryer,mesa-cleaner,part_of,amat-mirra-mesa-200mm,dryer is the last station
 pva-brush-scrubber,slurry,mitigates,rg-particle-adhesion,brushes remove residual slurry particles
+titan-head,carrier-head,variant_of,amat-mirra-200mm,the Mirra head family named by AMAT
+titan-profiler-head,carrier-head,variant_of,ieee-profiler-contour-heads,multi-zone member of the same family
+sti-ceria-slurry,slurry,variant_of,iop-sti-cmp-review,ceria based slurry for the STI step
+isrm,endpoint-detection,variant_of,amat-pr-optical-endpoint,the AMAT optical implementation
+motor-current-endpoint,endpoint-detection,variant_of,rev-zantye-2004,the friction based implementation

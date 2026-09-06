@@ -175,7 +175,7 @@ p.lede{color:var(--ink-2);margin:0 0 22px;max-width:64ch;font-size:14px}
 <body>
 <div id="app">
   <header>
-    <h1>Mirra Knowledge Base <span>/ reader v3.3.1</span></h1>
+    <h1>Mirra Knowledge Base <span>/ reader v3.3.2</span></h1>
     <span id="mode" hidden></span>
     <div id="counts"></div>
     <nav>
@@ -406,14 +406,15 @@ const UI={view:"browse",sel:null,q:"",
              applications:new Set(),confidence:new Set()},
           sql:"",res:null,err:null};
 
+const UNREAD_ACCESS=new Set(["snippet-only","not-retrieved","unrecorded"]);
 const REL_LABEL={part_of:"part of",governed_by:"governed by",measured_by:"measured by",
   controlled_by:"controlled by",causes:"causes",mitigates:"mitigates",
   trades_off_with:"trades off with",prerequisite_for:"prerequisite for",
-  alias_of:"alias of",contrasted_with:"contrasted with"};
+  alias_of:"alias of",contrasted_with:"contrasted with",variant_of:"a variant of"};
 const REL_INVERSE={part_of:"contains",governed_by:"governs",measured_by:"measures",
   controlled_by:"controls",causes:"caused by",mitigates:"mitigated by",
   trades_off_with:"trades off with",prerequisite_for:"requires",
-  alias_of:"alias of",contrasted_with:"contrasted with"};
+  alias_of:"alias of",contrasted_with:"contrasted with",variant_of:"variants"};
 
 const $=s=>document.querySelector(s);
 const el=(t,a={},...kids)=>{
@@ -495,7 +496,7 @@ function normSource(r){
   return {id:pick(r,"id","source_id"), title:title||pick(r,"id"),
     author_or_assignee:pick(r,"author_or_assignee","author","assignee"),
     year:pick(r,"year"), source_type:pick(r,"source_type","type"),
-    url:pick(r,"url","link"), access:pick(r,"access")||"open",
+    url:pick(r,"url","link"), access:pick(r,"access")||"unrecorded",
     observed_on:pick(r,"observed_on","observed","when"),
     tier:String(pick(r,"tier")??"5")};
 }
@@ -796,11 +797,18 @@ function renderHealth(){
   DB.citations.forEach(c=>{const s=DB.srcById[c.source_id]; if(!s)return;
     tier.set(c.node_id, Math.min(tier.get(c.node_id)??9, +s.tier));});
   const weak=DB.nodes.filter(n=>cited.has(n.id)&&(tier.get(n.id)??9)>=4);
+  const unread=DB.sources.filter(s=>UNREAD_ACCESS.has(s.access));
+  const srcOf=new Map();
+  DB.citations.forEach(c=>{ if(!srcOf.has(c.node_id)) srcOf.set(c.node_id,new Set());
+    srcOf.get(c.node_id).add(c.source_id); });
+  const unreadOnly=DB.nodes.filter(n=>{ const ss=srcOf.get(n.id); if(!ss||!ss.size) return false;
+    return [...ss].every(id=>{ const s=DB.srcById[id]; return s&&UNREAD_ACCESS.has(s.access); }); });
 
   const stat=el("div",{class:"stat"});
   [["Terms",DB.nodes.length],["Connections",DB.edges.length],["Sources",DB.sources.length],
    ["Written up",DB.nodes.filter(written).length],["Uncited",uncited.length],
-   ["Orphans",orphans.length],["Broken links",broken.length+badRel.length]]
+   ["Orphans",orphans.length],["Broken links",broken.length+badRel.length],
+   ["Unread sources",unread.length]]
    .forEach(([k,v])=>stat.append(el("div",{},
      el("b",{class:(k==="Broken links"&&v)?"warn":""},String(v)),el("span",{},k))));
   cw.append(stat);
@@ -848,6 +856,8 @@ function renderHealth(){
   prob("Orphan terms",orphans,"Nothing links to or from these. They are not part of the web yet.");
   prob("Uncited terms",uncited,"No source logged. Treat everything in these entries as unverified.");
   prob("Resting on tier 4 or 5 only",weak,"The only sources behind these are vendor material or worse.");
+  prob("Resting only on sources nobody has read",unreadOnly,
+    "Every source behind these was reached through a search summary, a paywall or not at all. Confirm the pages before raising confidence.");
   prob("Contested",DB.nodes.filter(n=>n.contested&&String(n.contested).trim()),
     "Credible sources disagree here. This is a research result, not a defect.");
   prob("Mirra claims with no Mirra section",
@@ -855,8 +865,7 @@ function renderHealth(){
     "Marked as tool specific but nothing written about the tool.");
   prob("Head nodes with no generation tagged",
     DB.nodes.filter(n=>!n.head_gen&&
-      /head|membrane|ring|zone|profiler|carrier/i.test(n.term+" "+n.id)&&
-      n.domain==="hardware"),
+      /head|membrane|ring|zone|profil|carrier/i.test(n.term+" "+n.id)),
     "Head behaviour differs between Titan and Titan Profiler. Untagged means the claim cannot be checked against a real tool.");
   prob("Custom configuration notes",DB.nodes.filter(n=>n.head_gen==="custom"),
     "These describe a modified tool. No public source documents them, so they rest on observation alone.");
@@ -894,7 +903,7 @@ function renderHealth(){
 function renderSources(){
   const cw=$("#cw"); cw.innerHTML="";
   cw.append(el("h2",{class:"view"},"Source register"),
-    el("p",{class:"lede"},"Ranked by tier. Anything resting only on tier 4 or 5 is a lead, not a fact."));
+    el("p",{class:"lede"},"Ranked by tier. Anything resting only on tier 4 or 5 is a lead, not a fact. An access value in red means nobody has read the page."));
   const counts={}; DB.citations.forEach(c=>counts[c.source_id]=(counts[c.source_id]||0)+1);
   const rows=[...DB.sources].sort((a,b)=>(+a.tier-+b.tier)||((counts[b.id]||0)-(counts[a.id]||0)));
   if(!rows.length){cw.append(el("p",{},"No sources logged yet."));return;}
@@ -903,7 +912,7 @@ function renderSources(){
     el("td",{style:"width:1%"},el("span",{class:"tier t"+s.tier},"T"+s.tier)),
     el("td",{},el("div",{},s.title),el("small",{style:"color:var(--ink-3);font-size:12px"},
       [s.author_or_assignee,s.year,s.source_type].filter(Boolean).join(" · "))),
-    el("td",{style:"width:1%;white-space:nowrap"},el("span",{class:s.access==="paywalled"?"warn":""},s.access)),
+    el("td",{style:"width:1%;white-space:nowrap"},el("span",{class:UNREAD_ACCESS.has(s.access)?"warn":""},s.access)),
     el("td",{style:"width:1%;white-space:nowrap;font-family:var(--mono);font-size:12px"},(counts[s.id]||0)+" uses"),
     el("td",{style:"width:1%"},s.url?el("a",{href:s.url,target:"_blank",rel:"noopener"},"open"):null)));
   cw.append(el("table",{class:"grid"},el("thead",{},el("tr",{},el("th",{},"Tier"),el("th",{},"Source"),
@@ -1120,7 +1129,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS source (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, author_or_assignee TEXT, year INTEGER,
   source_type TEXT NOT NULL CHECK (source_type IN ('patent','standard','journal','book','thesis','conference','appnote','report','web','observation')),
-  url TEXT, access TEXT NOT NULL DEFAULT 'open' CHECK (access IN ('open','paywalled','partial','offline')),
+  url TEXT, access TEXT NOT NULL DEFAULT 'unrecorded' CHECK (access IN ('read','snippet-only','paywalled','not-retrieved','unrecorded')),
   tier INTEGER NOT NULL CHECK (tier BETWEEN 0 AND 5),
   observed_on TEXT, notes TEXT);
 CREATE TABLE IF NOT EXISTS node (
@@ -1143,7 +1152,7 @@ CREATE TABLE IF NOT EXISTS edge (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   from_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,
   to_id   TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,
-  relation TEXT NOT NULL CHECK (relation IN ('part_of','governed_by','measured_by','controlled_by','causes','mitigates','trades_off_with','prerequisite_for','alias_of','contrasted_with')),
+  relation TEXT NOT NULL CHECK (relation IN ('part_of','governed_by','measured_by','controlled_by','causes','mitigates','trades_off_with','prerequisite_for','alias_of','contrasted_with','variant_of')),
   note TEXT, source_id TEXT REFERENCES source(id), UNIQUE (from_id,to_id,relation));
 CREATE TABLE IF NOT EXISTS citation (
   node_id TEXT NOT NULL REFERENCES node(id) ON DELETE CASCADE,
@@ -1155,7 +1164,7 @@ CREATE TABLE IF NOT EXISTS search_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, query TEXT NOT NULL,
   where_run TEXT, outcome TEXT CHECK (outcome IN ('hit','thin','empty')), note TEXT);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
-INSERT OR REPLACE INTO meta (key,value) VALUES ('schema_version','3.3');
+INSERT OR REPLACE INTO meta (key,value) VALUES ('schema_version','3.4');
 INSERT OR IGNORE INTO meta (key,value) VALUES ('created','');
 `;
 

@@ -52,11 +52,12 @@ PY
 
 ---
 
-## Part 2. Proposals that need your decision
+## Part 2. Proposals, all since decided and applied in schema 3.4
 
-`PROMPT.md` says to ask before adding a node type or a relation type, so none of
-these are implemented. Each is a friction that showed up while writing real
-nodes, not a theoretical improvement.
+Each was a friction that showed up while writing real nodes. All six were put to
+the owner and all six were accepted, so the descriptions below now read as the
+rationale for what the schema does, not as open questions. `SESSION_LOG.md`
+carries the change list.
 
 ### 1. There is no "is a kind of" relation
 
@@ -74,8 +75,8 @@ is true but sidesteps the link to the parent concept, and
 renders `part_of` in reverse as "contains", and "Carrier Head contains Titan
 Head" reads backwards.
 
-**Proposal:** add `variant_of` to the relation list, with the reader reverse
-label "variants". Then `titan-head variant_of carrier-head` reads correctly in
+**Applied.** `variant_of` is in the relation list with the reader reverse label
+"variants". Then `titan-head variant_of carrier-head` reads correctly in
 both directions, and every head generation hangs off the general concept.
 
 This will matter more, not less. Every consumable with an application-specific
@@ -87,7 +88,7 @@ Everything in this batch is `snippet-only`. That single word is what stops the
 base from being over-claimed. But `access` is free text, so a typo silently turns
 a caveat into nothing, and there is no rule connecting it to confidence.
 
-**Proposal, in two steps:**
+**Applied, in two steps:**
 
 - Controlled vocabulary: `read`, `snippet-only`, `paywalled`, `not-retrieved`,
   validated the same way `tier` is.
@@ -99,7 +100,9 @@ a caveat into nothing, and there is no rule connecting it to confidence.
 ### 3. `searches.csv` records the session but not the date
 
 An empty result is only worth re-running after enough time has passed for the web
-to change. Session number does not carry that. `session,date,query,...` would.
+to change. Session number does not carry that. **Applied:** the column order is
+now `session,date,query,where_run,outcome,note`, and the 21 existing rows are
+dated 2026-09-05.
 
 ### 4. The `head_gen` warning has a hole
 
@@ -113,19 +116,20 @@ A node about zone recipes in `controls`, or about edge profile in `process`,
 matches `HEAD_WORDS` but escapes the warning. `zone-pressure-control` happens to
 be tagged `hardware`, so it was caught. The next one may not be.
 
-**Proposal:** drop the domain condition. The rule you wrote in section 2 is about
-the claim, not about the domain: "Never write a head claim without head_gen."
+**Applied.** The domain condition is gone from both the validator and the reader.
+The rule in section 2 is about the claim, not about the domain: "Never write a
+head claim without head_gen."
 
-### 5. Two fields are never checked at all
+### 5. Two fields are never checked at all, now they are
 
-`applications` is not checked for being empty, and `updated_session` is not
-checked at all. Both are easy to forget in a hand-edited row, and an empty
+**Applied as warnings.** `applications` was not checked for being empty, and
+`updated_session` was not checked at all. Both are easy to forget in a hand-edited row, and an empty
 `applications` value silently drops the node out of every application filter in
 the reader.
 
 ### 6. Batch size
 
-29 nodes in one batch was too many. The last few node files are noticeably
+**Applied to the contract as a cap.** 29 nodes in one batch was too many. The last few node files are noticeably
 thinner than the first few, and that is a quality difference a future reader
 cannot see from the CSV. Your own instruction of about 20 was right. The clean
 domain being under-represented is not a good enough reason to stretch a batch,
@@ -133,19 +137,22 @@ because a thin clean node is not parity either.
 
 ### 7. Two structural observations, offered without a proposal
 
-- **The empty `general` bucket.** Every node in this batch is `cmp` or `mirra`.
+- **The empty `general` bucket.** Decided: split the pure physics out into
+  general nodes in session 2, objective 4. Every node in this batch is `cmp` or `mirra`.
   Pure physics such as contact mechanics, fluid films and friction was folded into
   `cmp` nodes rather than given its own `general` nodes. That is defensible, but it
   means the specificity split currently understates how much of the base is
   ordinary engineering. Worth a deliberate decision rather than drift.
 
-- **Contested is doing more work than its name suggests.** Section 2 defines it as
+- **Contested was doing more work than its name suggests.** Resolved: all five
+  sections were renamed and `## Weak sourcing` is now a mapped heading, so the
+  contested count is 0 and means what section 2 says it means. Section 2 defines it as
   two credible sources disagreeing. Four of the five `## Contested` sections in
   this batch are not disagreements between sources. They are single-source claims
   where the source is weak or where a summary may have merged documents. That is a
-  useful thing to record and there is nowhere else to put it, but it is a different
-  category. A `## Weak sourcing` heading would separate the two, and unmapped
-  headings are kept by the reader anyway.
+  useful thing to record, but it is a different category, and counting it as
+  contested hid the fact that nothing in this base has been challenged by a
+  second source at all.
 
 ---
 

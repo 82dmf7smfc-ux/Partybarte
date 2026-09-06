@@ -20,7 +20,7 @@ Inferred, no source: an extra zone is only useful if the metrology sample plan
 has points inside the zone it controls. A four zone head measured on a nine point
 radial plan is being tuned partly blind.
 
-## Contested
+## Weak sourcing
 The one source found ties the Profiler to 150 mm and the Contour to 200 mm
 [ieee-profiler-contour-heads]. That is a statement about the study, not
 necessarily a statement about what was offered. Do not read it as proof that no

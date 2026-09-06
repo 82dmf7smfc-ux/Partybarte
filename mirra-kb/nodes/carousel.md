@@ -22,9 +22,9 @@ Inferred, no source: four heads against three platens means one head is always
 at load or unload. Throughput is therefore set by the slowest platen step plus
 the index time, not by the sum of the steps.
 
-## Contested
+## Weak sourcing
 No source reached in this session disagrees on the three platen and four head
-count, but the strongest statements found are trade press and used tool listings
+count. But the strongest statements found are trade press and used tool listings
 rather than an Applied Materials specification [sst-new-cmp-architecture;
 entrepix-mirra]. Confidence is probable rather than established for that reason.
 

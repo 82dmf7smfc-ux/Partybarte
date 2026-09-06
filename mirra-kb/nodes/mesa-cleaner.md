@@ -21,8 +21,8 @@ Inferred, no source: vertical immersion with edge grip means there is no chuck
 face touching the wafer back in the cleaner. Back side defects found after clean
 therefore point upstream at the polisher or the handoff.
 
-## Contested
-Not contested between sources. But note that the module list above is the
+## Weak sourcing
+No source disagrees. But note that the module list above is the
 configurable maximum, not a statement that a given tool has all four. A tool with
 one brush station is still a Mesa.
 

@@ -1,14 +1,19 @@
 # Mirra Knowledge Base: Option B, CSV plus Markdown
 
 Storage: flat CSV index files, one Markdown file per node for prose.
-Reader: `mirra-kb-reader.html` v3.3.1, kept in the same folder.
+Reader: `mirra-kb-reader.html` v3.3.2, kept in the same folder.
 Editing: any text editor. Excel only with care, see section 10.
-Schema version: 3.3
+Schema version: 3.4
 
 Version 5. Adds claim-level citations, scope tagging, split confidence,
 contested claims, a patent reading rule, a search log, and Stage 0.
 Also adds the clean domain, applies_to, head_gen, and an exclusion list.
 Every rule here matches Option A. Only the storage differs.
+
+Version 6, schema 3.4. Adds the `variant_of` relation, a controlled and
+checked vocabulary for `access`, a date column on `searches.csv`, and the
+`## Weak sourcing` heading. Makes one rule blocking: a tool claim cannot be
+`established` on sources nobody has read.
 
 ---
 
@@ -209,6 +214,12 @@ When two credible sources disagree, do not pick a winner silently. Add a
 "## Contested" section to the node file with both positions and their
 source ids. Recording a disagreement is a research result.
 
+Do not use Contested for a claim that is merely weakly sourced. One thin source
+with nothing against it is not a disagreement. That goes in a "## Weak sourcing"
+section, which says what the claim rests on and why that is not enough. Keeping
+the two apart matters, because a contested count that is really a weak-sourcing
+count hides how much of the base has never been challenged at all.
+
 SOURCE TIERS
 T0  First-hand observation of a real tool. Scoped to that tool only.
 T1  AMAT patents and published applications, SEMI standards, AMAT public specs
@@ -231,7 +242,10 @@ RULES
 - No em dashes. Short sentences.
 
 WORKING STYLE
-- Batches of about 20 nodes.
+- Batches of 20 nodes. Treat it as a cap, not a target. A 29-node batch was
+  tried once and the last node files were visibly thinner than the first. That
+  difference does not show up in the CSV or in the validator, which is exactly
+  why the cap has to hold.
 - Never renumber or reuse an id.
 - Ask before adding a new node type or relation type.
 - Suggest what to do next, but I decide the order. Do not gate anything.
@@ -290,7 +304,7 @@ python3 validate.py && git add -A && git commit -m "session N: <topic>"
 If you are not using git, keep dated copies of the whole folder instead.
 A single bad find-and-replace across `nodes/` is otherwise unrecoverable.
 
-**Schema version.** 3.3, recorded at the top of this file and in
+**Schema version.** 3.4, recorded at the top of this file and in
 `SCOPE.md`. If you change a column, bump it, note it in SESSION_LOG.md,
 and check whether the reader still matches.
 
@@ -310,7 +324,7 @@ mirra-kb/
     preston-equation.md
     ...
   validate.py
-  mirra-kb-reader.html        v3.3.1
+  mirra-kb-reader.html        v3.3.2
   SCOPE.md                    Stage 0 output, schema version
   PROMPT.md                   this file
   STATE.md                    overwritten each session
@@ -357,7 +371,7 @@ from_id,to_id,relation,source_id,note
 
 `relation` is one of: part_of, governed_by, measured_by, controlled_by,
 causes, mitigates, trades_off_with, prerequisite_for, alias_of,
-contrasted_with
+contrasted_with, variant_of
 
 **Direction matters.** `from_id` is the subject.
 
@@ -372,6 +386,12 @@ backwards.
 A `causes` or `mitigates` edge asserts a mechanism. Fill `source_id`. The
 reader lists the ones you did not.
 
+`variant_of` means "is a kind of". `titan-head,carrier-head,variant_of` reads
+"Titan head is a variant of carrier head", and the reader shows "variants" on
+the parent. Use it for head generations and for application-specific versions of
+a consumable. Do not use `part_of` for these. A Titan head is not a component of
+a carrier head, it is one.
+
 ### sources.csv
 
 ```
@@ -384,6 +404,25 @@ tier 0 and must fill `observed_on` with the tool and date.
 `title_slug` uses hyphens instead of spaces to keep commas out. The reader
 turns hyphens back into spaces when a value has no spaces of its own. A
 plain `title` column with real spaces also works.
+
+`access` records what you actually consumed, not what is available. It is
+checked against a fixed list:
+
+| Value | Means |
+|---|---|
+| `read` | You opened the document and read the part you are citing. |
+| `snippet-only` | You saw a search summary or abstract, never the document. |
+| `paywalled` | You hit a paywall. Use `read` if you got through it and read it. |
+| `not-retrieved` | You never saw the content at all, in any form. |
+| `unrecorded` | Nobody wrote it down. Treat as unread. |
+
+`snippet-only`, `not-retrieved` and `unrecorded` all mean nobody has read the
+page. A node whose tool claims rest only on those cannot carry
+`confidence_mirra=established`. That is an error, not a warning.
+
+Attributing a standard fact to a standard source you have not opened is
+`not-retrieved`, not `read`. It is an attribution by reputation and the next
+reader deserves to know that.
 
 ### citations.csv
 
@@ -398,8 +437,11 @@ prose are the fine one. Both matter.
 ### searches.csv
 
 ```
-session,query,where_run,outcome,note
+session,date,query,where_run,outcome,note
 ```
+
+`date` is the day the search ran, as YYYY-MM-DD. Session number alone does not
+tell you when an empty result is stale enough to be worth re-running.
 
 `outcome` is hit, thin, or empty. The empty rows are the valuable ones.
 Without them you will re-run the same fruitless patent query three
@@ -416,6 +458,7 @@ The reader splits on headings and matches them to slots:
 | Physics, Theory, How it works | Physics |
 | Typical values, Values, Ranges | Typical values |
 | Contested, Sources disagree, Dispute | Contested banner |
+| Weak sourcing | Kept as its own section |
 | Custom configurations | Kept as its own section, unmapped by design |
 | Observed | Kept as its own section. Use for first-hand findings. |
 | Open questions, Questions, Unknowns | Open questions |
@@ -445,6 +488,10 @@ The ring compresses the pad ahead of the wafer edge [stg-1997].
 ## Contested
 Two sources give different ring load ranges [zan-2004; some-appnote].
 Neither states the head generation, so they may not be comparable.
+
+## Weak sourcing
+The wear limit above rests on one vendor page that was never opened. No source
+contradicts it. Nothing confirms it either.
 
 ## Custom configurations
 Observed, not sourced: some tools run a non-OEM ring profile. Record what
@@ -522,7 +569,7 @@ a clean exit code for a git hook.
 
 ```python
 #!/usr/bin/env python3
-"""Integrity check for the Mirra CSV knowledge base. Schema 3.3."""
+"""Integrity check for the Mirra CSV knowledge base. Schema 3.4."""
 # Citation regex accepts the patent part qualifier, e.g. [pat-us6244942 spec].
 import csv, os, re, sys, collections
 
@@ -538,10 +585,14 @@ HEADS = {"titan","titan-profiler","either","custom","unknown"}
 HEAD_WORDS = re.compile(r"head|membrane|ring|zone|profil|carrier", re.I)
 RELATIONS = {"part_of","governed_by","measured_by","controlled_by","causes",
              "mitigates","trades_off_with","prerequisite_for","alias_of",
-             "contrasted_with"}
+             "contrasted_with","variant_of"}
 CAUSAL = {"causes","mitigates"}
 FIELDS = {"definition","mirra_application","physics","typical_values","general"}
 TIERS = {"0","1","2","3","4","5"}
+ACCESS = {"read","snippet-only","paywalled","not-retrieved","unrecorded"}
+# paywalled is not listed as unread. A paywalled source you actually read is
+# read. Mark it not-retrieved if you never got to the text.
+UNREAD_ACCESS = {"snippet-only","not-retrieved","unrecorded"}
 CONF = {"established","probable","uncertain"}
 STATUS = {"published","inferred","unknown"}
 CITE_RE = re.compile(r"\[([a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s+[a-z]+)?(?:\s*[;,]\s*"
@@ -570,8 +621,12 @@ for n in nodes:
     hg = n.get("head_gen","")
     if hg and hg not in HEADS:
         errs.append(f"{n['id']}: bad head_gen '{hg}'")
-    if not hg and n.get("domain") == "hardware" and HEAD_WORDS.search(n["term"]):
+    if not hg and HEAD_WORDS.search(n["term"]):
         warns.append(f"{n['id']}: head related but head_gen is blank")
+    if not n.get("applications","").strip():
+        warns.append(f"{n['id']}: no applications tagged, it will vanish from every application filter")
+    if not n.get("updated_session","").strip():
+        warns.append(f"{n['id']}: updated_session is blank")
     if n.get("domain") == "clean" and n.get("applies_to") != "mesa":
         warns.append(f"{n['id']}: clean domain but applies_to is not mesa")
     v = n.get("verify","")
@@ -595,6 +650,8 @@ for n in nodes:
 for s in sources:
     src_ids.add(s["id"])
     if s["tier"] not in TIERS: errs.append(f"{s['id']}: bad tier '{s['tier']}'")
+    if s.get("access","") not in ACCESS:
+        errs.append(f"{s['id']}: bad access '{s.get('access','')}'")
 
 linked = set()
 for e in edges:
@@ -619,9 +676,28 @@ for c in cites:
         errs.append(f"bad citation field '{c['field']}' on {c['node_id']}")
     cited.add(c["node_id"])
 
+# A tool claim cannot be established on sources nobody has read. This is the
+# checkable form of the rule that wanting it to be Mirra specific is not evidence.
+unread_ids = {s["id"] for s in sources if s.get("access","") in UNREAD_ACCESS}
+mirra_cites, all_cites = collections.defaultdict(set), collections.defaultdict(set)
+for c in cites:
+    all_cites[c["node_id"]].add(c["source_id"])
+    if c.get("field") == "mirra_application":
+        mirra_cites[c["node_id"]].add(c["source_id"])
+for n in nodes:
+    if n.get("confidence_mirra") != "established":
+        continue
+    behind = mirra_cites.get(n["id"]) or all_cites.get(n["id"]) or set()
+    if not behind:
+        errs.append(f"{n['id']}: confidence_mirra established with no citation behind it")
+    elif behind <= unread_ids:
+        errs.append(f"{n['id']}: confidence_mirra established but every source "
+                    f"behind it is unread")
+
 MAPPED = {"definition","mirra application","on the mirra","application",
           "physics","theory","how it works","typical values","values","ranges",
-          "contested","sources disagree","dispute","custom configurations","observed",
+          "contested","sources disagree","dispute","weak sourcing",
+          "custom configurations","observed",
           "open questions","questions","unknowns","relations","sources"}
 custom = collections.Counter()
 inline_used = set()
@@ -703,7 +779,7 @@ field rather than leaving it loose.
 
 ```markdown
 # State as of session N, YYYY-MM-DD
-Schema version: 3.3   Reader version: 3.3
+Schema version: 3.4   Reader version: 3.3.2
 
 ## Tool identity, from Stage 0
 See SCOPE.md. Summary: ...

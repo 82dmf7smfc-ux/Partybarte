@@ -32,6 +32,11 @@ Exit code 0 means no errors. Run it before every commit.
 | `citations.csv` | Coarse node to source index by field |
 | `searches.csv` | Every search run, including the empty ones |
 | `nodes/<id>.md` | The prose for one term |
+| `COLD_START.md` | Paste this into a fresh session to resume |
+| `HANDOFF.md` | What is verified, what is not, what to do next |
+| `LESSONS.md` | What the tooling caught and why the schema looks like this |
+| `RESEARCH_NOTES.md` | The search summaries every citation actually rests on |
+| `RESEARCH_PLAYBOOK.md` | How to find stronger sources, starting with an egress test |
 | `SCOPE.md` | Stage 0 output, the boundary of the project |
 | `STATE.md` | Overwritten each session |
 | `SESSION_LOG.md` | Append only |
@@ -41,5 +46,9 @@ Exit code 0 means no errors. Run it before every commit.
 
 `confidence` is about the general concept. `confidence_mirra` is about whether
 it applies to this tool. They routinely differ, and a strong general confidence
-never carries a weak tool claim. `access=snippet-only` in `sources.csv` means
-the source was reached through a search summary and has not been read.
+never carries a weak tool claim. `access` in `sources.csv` records what was actually
+consumed: `read`, `snippet-only`, `paywalled`, `not-retrieved` or `unrecorded`.
+Everything except `read` means nobody has opened the page, and a node cannot
+carry `confidence_mirra=established` when every source behind its tool claims is
+unread. Right now all 31 sources are unread, so read `RESEARCH_NOTES.md` before
+trusting anything.

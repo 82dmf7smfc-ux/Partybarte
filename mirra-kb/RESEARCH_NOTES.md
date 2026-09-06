@@ -14,6 +14,14 @@ the URLs the search returned. It is evidence of what a summary said, not
 evidence of what a page says. A summary can paraphrase, compress, merge two
 sources into one sentence, or attribute a claim to the wrong document.
 
+Five sources are worse than that, and they are marked `not-retrieved` rather
+than `snippet-only`: `ref-preston-1927`, `book-steigerwald-1997`,
+`rev-zantye-2004`, `thesis-lai-mit` and `nccavs-feeney-2012`. No summary of their
+content was ever seen. The claims citing them are standard CMP knowledge, written
+from general understanding and then attributed to the standard source for that
+knowledge. That is an attribution by reputation, not evidence. Confirm those
+claims against the documents or replace the citations.
+
 Treat every quotation below as a lead to verify, not as a citation. Objective 1
 of the next session is to open these URLs and either confirm the claim or
 correct the node.

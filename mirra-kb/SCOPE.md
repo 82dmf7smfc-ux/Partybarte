@@ -1,7 +1,7 @@
 # SCOPE.md, Stage 0 output
 
-Schema version: 3.3
-Reader version: 3.3.1
+Schema version: 3.4
+Reader version: 3.3.2
 Written: session 1
 
 ## How this was researched

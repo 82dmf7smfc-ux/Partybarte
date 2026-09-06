@@ -42,3 +42,48 @@ every other site tried. Only web search worked, so all sources are recorded with
 access=snippet-only or as free PDFs that were also not opened. This is the main
 thing to fix in session 2.
 Commit: see git log for this branch
+
+## Session 1 addendum, 2026-09-06, focus: handoff package and schema 3.4
+Added: 5 edges, 0 nodes, 0 sources, 0 searches logged
+Key changes:
+- Schema bumped 3.3 to 3.4. Reader to v3.3.2. Contract, validator and reader all
+  updated together and verified in sync.
+- New relation `variant_of`, meaning "is a kind of". Five links that previously
+  had nowhere to go are now written: titan-head and titan-profiler-head to
+  carrier-head, sti-ceria-slurry to slurry, isrm and motor-current-endpoint to
+  endpoint-detection. Before this, part_of was the only near fit and the reader
+  renders it in reverse as "contains", so "Carrier Head contains Titan Head"
+  would have read backwards on the page.
+- `access` in sources.csv is now a checked vocabulary: read, snippet-only,
+  paywalled, not-retrieved, unrecorded. New blocking rule: a node cannot carry
+  confidence_mirra=established when every source behind its tool claims is
+  unread. Error, not warning.
+- searches.csv gains a date column. All 21 existing rows dated 2026-09-05.
+- New `## Weak sourcing` heading, mapped in both the validator and the contract.
+- validate.py also now warns on a blank applications field, a blank
+  updated_session, and drops the domain==hardware condition from the head_gen
+  check, since the contract rule is about the claim and not about the domain.
+  The reader head_gen check was changed to match.
+Corrections:
+- All five `## Contested` sections were renamed to `## Weak sourcing`. None of
+  them was two credible sources disagreeing. They were single-source claims with
+  nothing against them, which is a different thing, and counting them as
+  contested hid the fact that nothing in this base has been challenged yet.
+  Contested count is now 0 and that is the honest number.
+- Five sources were re-marked from free-pdf or paywalled to not-retrieved:
+  ref-preston-1927, book-steigerwald-1997, rev-zantye-2004, thesis-lai-mit and
+  nccavs-feeney-2012. The old values described availability. The new field
+  describes what was actually consumed, and for these five that was nothing.
+  Claims citing them are standard CMP knowledge attributed to a standard source
+  that was never opened. They need confirming or replacing.
+  Affected nodes: carrier-head, retaining-ring, motor-current-endpoint,
+  tungsten-slurry-oxidizer, removal-rate, polishing-pad, slurry,
+  endpoint-detection, preston-equation, within-wafer-nonuniformity.
+- The remaining 26 sources are snippet-only, which is what they always were.
+Contested found: none. See the correction above.
+Validator issues: the new access check found the five rows above immediately,
+which is the check earning its place on the first run.
+Tooling changes: as listed above. Four new documents shipped with the base:
+HANDOFF.md, COLD_START.md, LESSONS.md, RESEARCH_NOTES.md, plus
+RESEARCH_PLAYBOOK.md for finding better sources next time.
+Commit: see git log for this branch

@@ -9,7 +9,7 @@ A knowledge base of Applied Materials Mirra CMP terms, built to the Option B
 contract in `PROMPT.md`. Flat CSV index files, one Markdown file per node for
 prose, a single-file browser reader, and `validate.py` for bulk integrity checks.
 
-Schema version 3.3. Reader version 3.3.1.
+Schema version 3.4. Reader version 3.3.2.
 
 ## State in numbers
 
@@ -18,16 +18,23 @@ From the reader Health tab, confirmed by loading the reader against these files:
 | | |
 |---|---|
 | Terms | 29 |
-| Connections | 33 |
+| Connections | 38 |
 | Sources | 31 |
 | Written up | 29 |
 | Uncited | 0 |
 | Orphans | 0 |
 | Broken links | 0 |
-| Contested | 5 |
+| Contested | 0 |
 | Resting on tier 4 or 5 only | 1 |
+| Unread sources | 31 of 31 |
+| Terms resting only on unread sources | 29 of 29 |
 
 `validate.py` exits 0 with 0 errors and 0 warnings.
+
+Contested is 0 because the five sections originally written as contested were
+not two credible sources disagreeing. They were single weak sources with nothing
+against them, and they now sit under `## Weak sourcing`. Nothing here has been
+challenged by a second source yet.
 
 Scope split: 6 tagged `mirra`, 23 tagged `cmp`, 0 tagged `general`.
 Config split: 25 `polisher`, 4 `mesa`, 0 `both`.
@@ -58,9 +65,25 @@ Every source was reached through web search summaries. The session's network
 policy blocked direct fetches to appliedmaterials.com, patents.google.com,
 uspto.gov, freepatentsonline.com and every other site tried, all 403 at the proxy.
 
-So no page behind any citation in this base has been read. That is recorded per
-source in `sources.csv` as `access=snippet-only`, and nothing resting on a
-snippet is tagged `established` for the tool.
+So no page behind any citation in this base has been read. `access` in
+`sources.csv` records exactly what was consumed, and the validator now enforces
+the vocabulary: 26 sources are `snippet-only`, meaning a search summary was seen,
+and 5 are `not-retrieved`, meaning nothing was seen at all.
+
+Those five deserve naming, because they are the weakest kind of citation there
+is. `ref-preston-1927`, `book-steigerwald-1997`, `rev-zantye-2004`,
+`thesis-lai-mit` and `nccavs-feeney-2012` are cited for claims that are standard
+CMP knowledge, written from general understanding and then attributed to the
+standard source for that knowledge. The claims are very likely right. The
+citations are attributions by reputation, not evidence, and they should be
+confirmed against the documents or replaced. They are cited across
+`preston-equation`, `removal-rate`, `carrier-head`, `retaining-ring`,
+`polishing-pad`, `slurry`, `endpoint-detection`, `motor-current-endpoint`,
+`tungsten-slurry-oxidizer` and `within-wafer-nonuniformity`.
+
+The validator now blocks `confidence_mirra=established` on any node whose tool
+claims rest only on unread sources. Nothing currently trips it, because nothing
+is claimed as established for the tool.
 
 `RESEARCH_NOTES.md` holds the actual summary text, verbatim, keyed to the source
 ids and to the nodes that use them. Without it those citations cannot be checked
@@ -90,14 +113,35 @@ behaviour for that reason. The `spec` and `claims` qualifiers on those citations
 were assigned from summary wording, not from reading the patent parts, so verify
 the qualifier along with the claim.
 
+## How to do the research better next time
+
+`RESEARCH_PLAYBOOK.md` is the answer to why session 1 was so source-poor, and it
+is the first thing to read after this file. In short: re-test outbound network
+access before planning anything, because the block was a property of that
+sandbox and not of the project. Then go for the Wayback Machine copies of the
+Applied Materials Mirra pages, which are the most likely tier 1 source that still
+exists, and for papers whose experimental sections say they polished on a Mirra,
+which is the cheapest way to get a real tier 2 or 3 claim about this tool rather
+than about CMP in general.
+
 ## What was changed in the tooling
 
-Two bugs found and fixed, both logged in `SESSION_LOG.md` and explained in
-`LESSONS.md`. In short: the inline citation regex in `validate.py` and in the
+Two bugs found and fixed: the inline citation regex in `validate.py` and in the
 reader could not match the qualified patent citation form that `PROMPT.md`
 section 2 requires, and `PROMPT.md` section 7 carried a stale copy of
 `validate.py` that would have reintroduced the bug on a cold restart. All three
-now agree. No column changed and the schema is still 3.3.
+now agree, and there is a two-line check in `LESSONS.md` to confirm that.
+
+Then schema 3.4, all of it logged in `SESSION_LOG.md`:
+
+- `variant_of`, a relation meaning "is a kind of". Five links that had nowhere to
+  go are now written, including Titan Head to Carrier Head.
+- `access` is a checked vocabulary and a tool claim cannot be `established` on
+  sources nobody has read. That is an error now, not a warning.
+- `searches.csv` has a `date` column, so an empty result can be aged.
+- `## Weak sourcing` is a mapped heading, separate from `## Contested`.
+- The validator warns on a blank `applications` or `updated_session`, and the
+  `head_gen` warning no longer skips non-hardware domains.
 
 ## What to do next
 

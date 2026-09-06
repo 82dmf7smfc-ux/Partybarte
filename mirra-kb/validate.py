@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Integrity check for the Mirra CSV knowledge base. Schema 3.3."""
+"""Integrity check for the Mirra CSV knowledge base. Schema 3.4."""
 # Citation regex accepts the patent part qualifier, e.g. [pat-us6244942 spec].
 import csv, os, re, sys, collections
 
@@ -15,10 +15,14 @@ HEADS = {"titan","titan-profiler","either","custom","unknown"}
 HEAD_WORDS = re.compile(r"head|membrane|ring|zone|profil|carrier", re.I)
 RELATIONS = {"part_of","governed_by","measured_by","controlled_by","causes",
              "mitigates","trades_off_with","prerequisite_for","alias_of",
-             "contrasted_with"}
+             "contrasted_with","variant_of"}
 CAUSAL = {"causes","mitigates"}
 FIELDS = {"definition","mirra_application","physics","typical_values","general"}
 TIERS = {"0","1","2","3","4","5"}
+ACCESS = {"read","snippet-only","paywalled","not-retrieved","unrecorded"}
+# paywalled is not listed as unread. A paywalled source you actually read is
+# read. Mark it not-retrieved if you never got to the text.
+UNREAD_ACCESS = {"snippet-only","not-retrieved","unrecorded"}
 CONF = {"established","probable","uncertain"}
 STATUS = {"published","inferred","unknown"}
 CITE_RE = re.compile(r"\[([a-z0-9]+(?:[-.][a-z0-9]+)+(?:\s+[a-z]+)?(?:\s*[;,]\s*"
@@ -47,8 +51,12 @@ for n in nodes:
     hg = n.get("head_gen","")
     if hg and hg not in HEADS:
         errs.append(f"{n['id']}: bad head_gen '{hg}'")
-    if not hg and n.get("domain") == "hardware" and HEAD_WORDS.search(n["term"]):
+    if not hg and HEAD_WORDS.search(n["term"]):
         warns.append(f"{n['id']}: head related but head_gen is blank")
+    if not n.get("applications","").strip():
+        warns.append(f"{n['id']}: no applications tagged, it will vanish from every application filter")
+    if not n.get("updated_session","").strip():
+        warns.append(f"{n['id']}: updated_session is blank")
     if n.get("domain") == "clean" and n.get("applies_to") != "mesa":
         warns.append(f"{n['id']}: clean domain but applies_to is not mesa")
     v = n.get("verify","")
@@ -72,6 +80,8 @@ for n in nodes:
 for s in sources:
     src_ids.add(s["id"])
     if s["tier"] not in TIERS: errs.append(f"{s['id']}: bad tier '{s['tier']}'")
+    if s.get("access","") not in ACCESS:
+        errs.append(f"{s['id']}: bad access '{s.get('access','')}'")
 
 linked = set()
 for e in edges:
@@ -96,9 +106,28 @@ for c in cites:
         errs.append(f"bad citation field '{c['field']}' on {c['node_id']}")
     cited.add(c["node_id"])
 
+# A tool claim cannot be established on sources nobody has read. This is the
+# checkable form of the rule that wanting it to be Mirra specific is not evidence.
+unread_ids = {s["id"] for s in sources if s.get("access","") in UNREAD_ACCESS}
+mirra_cites, all_cites = collections.defaultdict(set), collections.defaultdict(set)
+for c in cites:
+    all_cites[c["node_id"]].add(c["source_id"])
+    if c.get("field") == "mirra_application":
+        mirra_cites[c["node_id"]].add(c["source_id"])
+for n in nodes:
+    if n.get("confidence_mirra") != "established":
+        continue
+    behind = mirra_cites.get(n["id"]) or all_cites.get(n["id"]) or set()
+    if not behind:
+        errs.append(f"{n['id']}: confidence_mirra established with no citation behind it")
+    elif behind <= unread_ids:
+        errs.append(f"{n['id']}: confidence_mirra established but every source "
+                    f"behind it is unread")
+
 MAPPED = {"definition","mirra application","on the mirra","application",
           "physics","theory","how it works","typical values","values","ranges",
-          "contested","sources disagree","dispute","custom configurations","observed",
+          "contested","sources disagree","dispute","weak sourcing",
+          "custom configurations","observed",
           "open questions","questions","unknowns","relations","sources"}
 custom = collections.Counter()
 inline_used = set()
