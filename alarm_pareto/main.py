@@ -4,6 +4,10 @@ Run it like this from the project folder:
 
     python -m alarm_pareto.main --input tests/data/sample_alarm_log.csv --vendor amat
 
+Add --start-time and --end-time to narrow the report to one shift:
+
+    python -m alarm_pareto.main --input log.csv --start-time 22:00 --end-time 06:00
+
 This reads the log, filters to the trailing window, builds the rankings, and
 writes an Excel workbook and a PowerPoint deck into the output folder.
 """
@@ -34,11 +38,24 @@ def build_arg_parser():
                    help="Path to the vendor column config JSON.")
     p.add_argument("--window-days", type=int, default=30,
                    help="Length of the trailing window in days. Default: 30.")
+    p.add_argument("--start-time", default=None,
+                   help="Keep only alarms that start at or after this clock time, "
+                        "as HH:MM. Use with --end-time to report on one shift. "
+                        "Default: no time-of-day filter.")
+    p.add_argument("--end-time", default=None,
+                   help="Keep only alarms that start before this clock time, as "
+                        "HH:MM. A start later than the end wraps past midnight, "
+                        "so 22:00 to 06:00 is the night shift.")
     p.add_argument("--top-n", type=int, default=15,
                    help="How many rows before the rest become 'Other'. Default: 15.")
-    p.add_argument("--downtime-method", choices=[agg.METHOD_ATTRIBUTED, agg.METHOD_WALLCLOCK],
+    p.add_argument("--downtime-method",
+                   choices=[agg.METHOD_ATTRIBUTED, agg.METHOD_WALLCLOCK, agg.METHOD_IN_RANGE],
                    default=agg.METHOD_ATTRIBUTED,
-                   help="Which downtime number drives the downtime ranking. Default: attributed.")
+                   help="Which downtime number drives the downtime ranking. "
+                        "'attributed' credits each fault its full duration. "
+                        "'wallclock' merges overlaps. 'in_range' merges overlaps and "
+                        "also cuts each fault down to the hours the report covers, "
+                        "which is the one to use with a shift. Default: attributed.")
     p.add_argument("--output-dir", default="output",
                    help="Folder for the output files. Default: output.")
     return p
@@ -59,11 +76,32 @@ def run(args):
             % args.window_days
         )
 
+    # Step 3b: narrow those days to a range of clock hours, if one was asked
+    # for. This runs after the trailing window so the window start and end
+    # stay tied to the file, not to whichever shift was picked.
+    tod_start = window_mod.parse_time_of_day(args.start_time)
+    tod_end = window_mod.parse_time_of_day(args.end_time)
+    if (tod_start is None) != (tod_end is None):
+        raise ValueError(
+            "--start-time and --end-time go together. Give both, or neither."
+        )
+    windowed = window_mod.apply_time_of_day(windowed, tod_start, tod_end)
+    if windowed.empty:
+        raise ValueError(
+            "No rows start between %s and %s inside the %d day window."
+            % (args.start_time, args.end_time, args.window_days)
+        )
+
     # Step 4: build the rankings and headline numbers.
     result = agg.aggregate(
         windowed, mode, vendor_config, window_start, window_end,
         window_days=args.window_days, top_n=args.top_n,
         downtime_method=args.downtime_method,
+        tod_start=tod_start, tod_end=tod_end,
+        # The whole file, not the filtered rows. The in-range number follows the
+        # clock rather than the onset, so it needs the alarms that started
+        # before the window or before the shift and ran into the report.
+        full_table=table,
     )
 
     # Make sure the output folder exists.
@@ -96,9 +134,13 @@ def main(argv=None):
     print("Done.")
     print("  Window: %s to %s (%s days)" % (
         grand["window_start"], grand["window_end"], grand["window_days"]))
+    print("  Time of day: %s" % grand["time_of_day_label"])
     print("  Total faults: %d" % grand["total_faults"])
     print("  Attributed downtime: %.2f hours" % grand["attributed_downtime_hours"])
     print("  True wall-clock downtime: %.2f hours" % grand["wallclock_downtime_hours"])
+    print("  In-range downtime: %.2f hours of %.2f hours covered (%.1f%%)" % (
+        grand["in_range_downtime_hours"], grand["range_hours"],
+        grand["in_range_downtime_pct"]))
     print("  Workbook: %s" % out["xlsx"])
     print("  Deck:     %s" % out["pptx"])
     return 0
