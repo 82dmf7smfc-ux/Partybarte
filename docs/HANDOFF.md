@@ -62,14 +62,22 @@ firewall. A whole session was lost to that once.
 
 ## 3. Set your git identity
 
-Decide this deliberately before the first commit. `main`'s history is authored
-under a private relay address; a fresh machine will use whatever global config it
+Do this before the first commit. A fresh machine uses whatever global config it
 has, which may be a real name and address you did not mean to publish.
 
-    git config user.name  "..."
-    git config user.email "..."
+    git config user.name  "82dmf7smfc-ux"
+    git config user.email "82dmf7smfc@privaterelay.appleid.com"
 
-Set it per-repository, as above, not globally.
+Set it per-repository, as above, not globally, so other projects on the machine
+are unaffected.
+
+Check it took before you commit anything:
+
+    git config user.email
+
+If you get this wrong and notice before the branch is merged, it is fixable:
+rewrite the branch and force-push with `--force-with-lease`. After a merge it is
+not, short of rewriting `main`.
 
 ---
 

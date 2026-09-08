@@ -161,6 +161,24 @@ file produced by the code it checks agrees with that code's bugs by construction
 When a number genuinely must change, change it by hand and say in the commit why
 the old one was wrong.
 
+**Commits are authored under the Apple private relay identity,
+`82dmf7smfc-ux <82dmf7smfc@privaterelay.appleid.com>`.** That is what the 31
+squash-merged commits on `main` use. Set it per-repository on every new machine,
+not globally:
+
+    git config user.name  "82dmf7smfc-ux"
+    git config user.email "82dmf7smfc@privaterelay.appleid.com"
+
+Do this before the first commit. Four commits on this branch were written under
+a personal name and address before the identity was settled, and had to be
+rewritten and force-pushed to correct them. That is cheap on an unmerged branch
+with no pull request and expensive afterwards, because rewriting a merged commit
+means rewriting `main`.
+
+Note the older commits on `main` itself still carry the personal address. They
+are merged history and rewriting them would change every SHA on the trunk, so
+they are deliberately left alone.
+
 **`.claude/settings.json` was written by a session, against `ROADMAP.md`'s rule.**
 That rule says the permission allowlist is an owner job, because a session
 writing it is a tool widening its own permissions. The owner was shown the rule
@@ -173,19 +191,16 @@ visible rather than looking like the rule was missed.
 
 None of these block the work above.
 
-1. Which git identity should commits use? This machine's local git config
-   attaches a real name and address; `main`'s history is authored under an Apple
-   private relay. Set it deliberately before the first commit on a new machine.
-2. Should `claude/pareto-debugging-ajyqf1` be deleted now that its work is on
+1. Should `claude/pareto-debugging-ajyqf1` be deleted now that its work is on
    `claude/pareto-final-wave`, or kept as a record of the fork?
-3. Is "Applied Materials" in `alarm_pareto/config/vendor_columns.json`
+2. Is "Applied Materials" in `alarm_pareto/config/vendor_columns.json`
    acceptable, or should vendor names be genericised? It is a tool vendor, not a
    customer or fab, so the current reading is that it is fine.
-4. Both vendor blocks in that config are self-declared placeholders. Is there a
+3. Both vendor blocks in that config are self-declared placeholders. Is there a
    real column mapping to add? First real use on a new machine will need one.
-5. Should Python 3.13 be added to the CI matrix? It cannot be until numpy and
+4. Should Python 3.13 be added to the CI matrix? It cannot be until numpy and
    pandas are unpinned, and the pins are deliberate.
-6. Should PR #32, the Mirra CMP knowledge base, land before or after this wave?
+5. Should PR #32, the Mirra CMP knowledge base, land before or after this wave?
    It targets a stale base and will need rebasing onto `main` either way.
 
 ---
