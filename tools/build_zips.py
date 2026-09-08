@@ -70,8 +70,33 @@ def build_python_zip():
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
         _add_tree(zf, ROOT / "alarm_pareto", f"{top}/alarm_pareto")
         _add_tree(zf, ROOT / "tests", f"{top}/tests")
-        for name in ["requirements.txt", "setup_venv.bat", "conftest.py", "README.md", "LICENSE"]:
+        # A recipient of this zip used to get no changelog and no contributing
+        # guide, so they could not tell what version they had or how to work on
+        # it. pyproject.toml and the dev requirements go in for the same reason:
+        # the package cannot be installed or tested without them.
+        for name in [
+            "requirements.txt",
+            "requirements-dev.txt",
+            "pyproject.toml",
+            "setup_venv.bat",
+            "setup_venv.sh",
+            "conftest.py",
+            "README.md",
+            "LICENSE",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+        ]:
             _add_file(zf, ROOT / name, f"{top}/{name}")
+        # The handoff notes ship with the code, not beside it, so a copy of the
+        # zip is enough to pick the project back up.
+        for name in ["HANDOFF.md", "STATE.md", "WHEELS.md", "EGRESS.md", "LESSONS.md"]:
+            doc = ROOT / "docs" / name
+            if doc.exists():
+                _add_file(zf, doc, f"{top}/docs/{name}")
+        for name in ["check_version.py", "check_egress.py"]:
+            tool = ROOT / "tools" / name
+            if tool.exists():
+                _add_file(zf, tool, f"{top}/tools/{name}")
     return target
 
 

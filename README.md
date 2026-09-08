@@ -317,6 +317,13 @@ The same tests run automatically on GitHub for every push and pull request. See
 | `CHANGELOG.md` | A dated record of what changed in each version. |
 | `tools/build_zips.py` | Rebuilds the two download packages the same way every time. |
 
+- `docs/STATE.md` - where the work stands, what is next, and why the
+  decisions were made. Read this first when picking the project back up.
+- `docs/HANDOFF.md` - setting the project up on a new machine.
+- `docs/WHEELS.md` - the offline wheel list for IT.
+- `docs/EGRESS.md` - what the network has to allow.
+- `docs/LESSONS.md` - what has gone wrong before, so it does not again.
+
 ## Downloads
 
 Packaged versions of both tools are published on the GitHub Releases page. Each

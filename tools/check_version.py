@@ -1,9 +1,10 @@
 """Check that the version number matches everywhere it is written down.
 
-The version lives in two places in the repository and a third place in git:
+The version lives in three places in the repository and a fourth place in git:
 
     alarm_pareto/__init__.py   __version__ = "1.4.0"
     CHANGELOG.md               ## [1.4.0] - 2026-08-17
+    pyproject.toml             version = "1.4.0"
     the git tag                v1.4.0
 
 They are one fact, so they must agree. They drifted once already: the package
@@ -14,8 +15,7 @@ Run it by hand:
 
     python tools/check_version.py
 
-It exits 0 when the two files agree and 1 when they do not, so CI can gate on
-it. It also backs the release-on-stamp workflow, which asks it which version
+It exits 0 when the files agree and 1 when they do not, so CI can gate on it. It also backs the release-on-stamp workflow, which asks it which version
 the changelog is claiming:
 
     python tools/check_version.py --print-changelog-version
@@ -32,11 +32,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CHANGELOG = ROOT / "CHANGELOG.md"
 INIT = ROOT / "alarm_pareto" / "__init__.py"
+PYPROJECT = ROOT / "pyproject.toml"
 
 # "## [1.4.0] - 2026-08-17". The Unreleased heading has no version number, so
 # this pattern skips over it and finds the newest real release below it.
 VERSION_HEADING = re.compile(r"^##\s*\[(\d+\.\d+\.\d+)\]")
 VERSION_ASSIGN = re.compile(r"""^__version__\s*=\s*['\"](\d+\.\d+\.\d+)['\"]""", re.M)
+# 'version = "1.4.0"' under [project]. Read with a regex rather than a TOML
+# parser so this keeps working on a Python without tomllib and stays dependency
+# free, which is the whole point of this script.
+PYPROJECT_VERSION = re.compile(r"""^version\s*=\s*['\"](\d+\.\d+\.\d+)['\"]""", re.M)
 
 
 def changelog_version():
@@ -54,6 +59,14 @@ def package_version():
     return found.group(1) if found else None
 
 
+def pyproject_version():
+    """The version declared in pyproject.toml, or None if it is not there."""
+    if not PYPROJECT.exists():
+        return None
+    found = PYPROJECT_VERSION.search(PYPROJECT.read_text(encoding="utf-8"))
+    return found.group(1) if found else None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -65,6 +78,7 @@ def main():
 
     changelog = changelog_version()
     package = package_version()
+    project = pyproject_version()
 
     if args.print_changelog_version:
         if changelog is None:
@@ -84,15 +98,32 @@ def main():
             "alarm_pareto/__init__.py has no __version__. Expected a line "
             'like \'__version__ = "1.4.0"\'.'
         )
-    if changelog and package and changelog != package:
+    # pyproject.toml is only checked when it exists, so this script keeps
+    # working on an older checkout that predates it.
+    if PYPROJECT.exists() and project is None:
         problems.append(
-            "The version numbers disagree.\n"
-            "  CHANGELOG.md newest release: {}\n"
-            "  alarm_pareto/__init__.py:    {}\n"
-            "Stamping a release means moving both, and then tagging v{}.".format(
-                changelog, package, changelog
-            )
+            "pyproject.toml has no version. Expected a line under [project] "
+            'like \'version = "1.4.0"\'.'
         )
+
+    declared = {
+        "CHANGELOG.md newest release": changelog,
+        "alarm_pareto/__init__.py": package,
+    }
+    if PYPROJECT.exists():
+        declared["pyproject.toml"] = project
+
+    known = [v for v in declared.values() if v is not None]
+    if len(set(known)) > 1:
+        lines = ["The version numbers disagree."]
+        width = max(len(name) for name in declared)
+        for name, value in declared.items():
+            lines.append("  {:<{w}}  {}".format(name + ":", value, w=width + 1))
+        lines.append(
+            "Stamping a release means moving every one of them, and then "
+            "tagging v{}.".format(changelog or package)
+        )
+        problems.append("\n".join(lines))
 
     if problems:
         print("Version check failed.\n", file=sys.stderr)
@@ -101,7 +132,9 @@ def main():
             print(file=sys.stderr)
         return 1
 
-    print("Version check passed: {} in both the changelog and the package.".format(changelog))
+    where = "the changelog, the package and pyproject.toml" if PYPROJECT.exists() \
+        else "both the changelog and the package"
+    print("Version check passed: {} in {}.".format(changelog, where))
     return 0
 
 

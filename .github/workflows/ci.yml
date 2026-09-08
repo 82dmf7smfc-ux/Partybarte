@@ -9,6 +9,13 @@ on:
     branches: ["**"]
   pull_request:
 
+# A push to a branch with an open pull request used to start two identical runs,
+# and a second push started two more while the first two were still going. This
+# keeps the newest run per branch and cancels the ones it superseded.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Cheap and dependency-free, so it runs first and fails fast. It catches the
   # version number drifting apart between the changelog and the package, which
@@ -41,11 +48,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install pinned dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run the tests
         run: pytest -q

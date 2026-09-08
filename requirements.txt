@@ -10,4 +10,6 @@ numpy==1.26.4
 openpyxl==3.1.5
 python-pptx==1.0.2
 matplotlib==3.9.2
-pytest==8.3.2
+
+# pytest moved to requirements-dev.txt. This file is what ships to a bench
+# machine and what IT approves, and the tool does not need a test runner to run.

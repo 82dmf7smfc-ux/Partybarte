@@ -13,3 +13,19 @@ dist/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Real equipment logs must never be committed. The bench machine's logs reach
+# this project as pictures, deliberately: they are customer data and there is no
+# approved path out for the text. These patterns are a guard rail, not a policy.
+# The policy is in docs/HANDOFF.md. tests/data holds hand-built samples only.
+*.elog
+*.evt
+elog*.txt
+*_elog.*
+/logs/
+/real_logs/
+*.xlsx
+*.xls
+# The sample and fixture files are the deliberate exceptions.
+!tests/data/*.csv
+!tests/browser/fixtures/*

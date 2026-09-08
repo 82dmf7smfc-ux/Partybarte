@@ -1,0 +1,10 @@
+# Development-only packages. The runtime needs nothing from this file.
+#
+# requirements.txt is what ships to a bench machine and what IT approves. Test
+# tooling does not belong in that list, but it was in it, so an offline install
+# for an operator pulled pytest too.
+#
+#   pip install --no-index --find-links C:\path\to\wheels -r requirements.txt -r requirements-dev.txt
+#
+-r requirements.txt
+pytest==8.3.2

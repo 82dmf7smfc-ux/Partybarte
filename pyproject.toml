@@ -1,0 +1,69 @@
+# Packaging metadata. Two things this buys the project.
+#
+# The package becomes installable, which is what ROADMAP's "packaging as a
+# wheel" item needs: IT approves one file instead of a folder. Nothing here
+# changes how the tool is run today; python -m alarm_pareto.main still works
+# from the repository root exactly as before.
+#
+# And it gives pytest and the linter one place to be configured, instead of
+# conftest.py being the only pytest configuration in the repository.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alarm-pareto"
+version = "1.4.0"
+description = "Pareto analysis of semiconductor tool alarm logs, offline."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { file = "LICENSE" }
+
+# Deliberately pinned, matching requirements.txt exactly. This tool has to build
+# the same way in eighteen months on a machine with no internet. If IT supplies
+# different wheels, change BOTH files together.
+dependencies = [
+  "pandas==2.2.2",
+  "numpy==1.26.4",
+  "openpyxl==3.1.5",
+  "python-pptx==1.0.2",
+  "matplotlib==3.9.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.2"]
+
+[project.scripts]
+alarm-pareto = "alarm_pareto.main:main"
+
+[tool.setuptools]
+packages = ["alarm_pareto"]
+
+[tool.setuptools.package-data]
+alarm_pareto = ["config/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Fail on an unregistered marker rather than silently skipping the test.
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Deliberately modest. ROADMAP asks for a linter "once the team agrees on a
+# style", and a large rule set on an existing codebase produces a wall of noise
+# that gets switched off. These are the rules that catch real mistakes.
+select = ["E", "F", "W", "I"]
+ignore = [
+  # The codebase uses % formatting throughout, on purpose: it stays readable to
+  # someone who does not write Python daily, which is a stated project goal.
+  "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# render_pptx sets the matplotlib backend before importing pyplot. That import
+# order is required, not accidental.
+"alarm_pareto/render_pptx.py" = ["E402"]

@@ -8,6 +8,43 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ### Added
 
+- A time-of-day filter on both tools, so a report can cover one shift.
+  `--start-time` and `--end-time` on the Python tool; two time boxes and a shift
+  preset in the browser tool. The range keeps the "from" minute and stops just
+  before the "to" minute, so two shifts add up to one day with nothing counted
+  twice. A "from" later than a "to" wraps past midnight, which is what makes
+  18:00 to 06:00 the night shift.
+- A third downtime number, "in range". It merges overlapping faults like wall
+  clock, and also cuts every fault down to the parts that fall inside the hours
+  the report covers. It is the only one of the three bounded by the clock, and
+  the only one that splits correctly across shifts, so "the tool was down for X
+  percent of night shift" is a sentence that can now be written. Pick it with
+  `--downtime-method in_range`, or in the ranking method box. On the sample log
+  it is 16.00 hours of the 720 covered, against 16.50 by wall clock: the
+  difference is a fault that starts as the window closes and so never happens
+  inside the report.
+- Reports now say how much clock time they cover and in how many blocks. Thirty
+  days of night shift is thirty blocks, not one span.
+- `tests/data/cross_tool_golden.json`, the referee between the two tools. Both
+  suites measure against it, so a change that moves one tool and not the other
+  fails in whichever suite was not updated. Its numbers came from a script
+  sharing no code with either tool, and it must never be regenerated from
+  either tool's output.
+- `docs/STATE.md`, `docs/HANDOFF.md`, `docs/WHEELS.md`, `docs/EGRESS.md` and
+  `docs/LESSONS.md`: where the work stands, how to set a new machine up, the
+  offline wheel list, what the network must allow, and what has gone wrong
+  before.
+- `tools/check_egress.py`, which reports what a machine can actually reach. It
+  needs no packages, so it runs before the environment exists, which is exactly
+  when you need to know that PyPI is blocked.
+- `pyproject.toml`, making the package installable and giving pytest and ruff
+  one place to be configured. `tools/check_version.py` now guards its version
+  too, so the third copy of the number cannot drift from the other two.
+- `setup_venv.sh`, a POSIX twin of the Windows setup script. CI runs on Linux
+  and there was no scripted setup for it.
+- `.editorconfig`, and a `.gitignore` guard against committing real equipment
+  logs.
+
 - Browser tool: eighteen more faults are recognised by name, from a real
   26,414-row Endura log - a second tool, so these are the faults the first log
   never showed. Newly recognised: a wafer left in the chamber, the elevator
@@ -95,6 +132,17 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
 
 ### Changed
 
+- `requirements.txt` no longer contains pytest. That file is what ships to a
+  bench machine and what IT approves, and the tool does not need a test runner
+  to run. Development packages moved to `requirements-dev.txt`.
+- `setup_venv.bat` now works from its own folder whatever folder it was called
+  from, checks the Python version before doing anything, and no longer reaches
+  the network to upgrade pip when it was asked to install offline.
+- The Python zip now ships the licence, the changelog, the contributing guide
+  and the handoff documents. A recipient of it previously got none of them.
+- CI cancels superseded runs instead of running two of everything, and caches
+  pip downloads.
+
 - Browser tool: the results table in the quick report drops the "Attributed (h)"
   and "Wall clock (h)" columns when the log has no downtime to report, the same
   way the zero tiles and the empty downtime chart were already dropped. The full
@@ -115,6 +163,10 @@ The format follows Keep a Changelog. Versions follow Semantic Versioning.
   where it was.
 
 ### Fixed
+
+- The release workflow tagged whatever `main` was at that moment rather than the
+  commit it had just tested. On the manual dispatch and changelog-stamp routes
+  those can be different trees.
 
 - Browser tool: the "Count %" and "Cum %" columns, and the rising line on the
   Pareto chart, were wrong. Both rankings of the same data - by count and by

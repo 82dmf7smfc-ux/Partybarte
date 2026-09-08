@@ -288,3 +288,10 @@ which is exactly what can drive an endless re-arm loop. Use check runs.
 - `CHANGELOG.md` follows Keep a Changelog. Write entries in plain prose describing
   what a person can now do, not what the code does internally.
 - `docs/DEBUG_CODES.md` is the registry the harness checks against.
+- `docs/STATE.md` says where the work stands, what is next and what is blocked,
+  and why each live decision was made. `CHANGELOG.md` holds what shipped and
+  `ROADMAP.md` holds what is wanted; this is the third thing, what is in
+  flight. Update it as part of the change, the same as the other two.
+- `docs/HANDOFF.md`, `docs/WHEELS.md` and `docs/EGRESS.md` are for setting up a
+  machine. `docs/LESSONS.md` is what has already gone wrong; add to it when
+  something costs a day.

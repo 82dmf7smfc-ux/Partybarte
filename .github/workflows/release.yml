@@ -52,7 +52,7 @@ jobs:
       - name: Run the tests before releasing
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
           pytest -q
 
       - name: Build the zips
@@ -66,6 +66,11 @@ jobs:
           # an input. The inputs context covers both of those, and is empty on a
           # tag push, so this one line handles all three routes.
           VERSION: ${{ inputs.version || github.ref_name }}
+          # Tag the commit that was checked out and tested, not whatever main
+          # happens to be now. --target main was fine on the tag-push route and
+          # wrong on the other two: a dispatch or a stamp could tag a tree the
+          # tests never ran against, if main moved while this job was running.
+          TARGET_SHA: ${{ github.sha }}
         run: |
           # Create the release if it does not exist yet. If it already exists,
           # just upload the zips and overwrite any old copies. This makes a
@@ -77,7 +82,7 @@ jobs:
               --clobber
           else
             gh release create "${VERSION}" \
-              --target main \
+              --target "${TARGET_SHA}" \
               dist/alarm_pareto_browser.zip \
               dist/alarm_pareto_python.zip \
               --title "${VERSION}" \

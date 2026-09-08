@@ -1,0 +1,25 @@
+# The repository is written on Windows and tested on Linux in CI. Nothing else
+# guards line endings, and a file that arrives with CRLF breaks the browser
+# harness in ways that read as a logic fault rather than a whitespace one.
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+indent_style = space
+
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+[*.{js,mjs,html,css,json}]
+indent_size = 2
+
+[*.bat]
+# Windows batch files genuinely need CRLF. cmd.exe mis-parses LF-only labels.
+end_of_line = crlf
+
+[*.md]
+trim_trailing_whitespace = false
