@@ -107,9 +107,25 @@ keep good ideas so they are not lost between sessions.
   they will look lost.
 - **More timestamp formats.** Add any date styles that real tools use but the
   current parser misses. Each new format is a small, safe addition.
-- **Shared golden fixtures.** Put the sample log and its expected numbers in one
-  place that both the Python tests and a browser self-test read. This proves the
-  two tools agree, forever.
+- **Shared golden fixtures.** Shipped. `tests/data/cross_tool_golden.json` holds
+  the numbers both tools must produce from `tests/data/sample_alarm_log.csv`,
+  across six shift configurations, plus the laws that must hold for any split of
+  the day. `tests/test_cross_tool.py` checks the Python tool against it and
+  `tests/browser/run.mjs` drives the real page against the same file, so the two
+  tools are compared through their whole pipelines rather than at the helpers.
+
+  The numbers came from a standalone script sharing no code with either tool,
+  which is the only way the file can referee. Regenerating it from either tool's
+  output would make it agree with that tool's bugs by construction.
+
+  One case earns its place twice over. On second shift, 14:00 to 22:00, the
+  in-range number is LARGER than both other numbers, because a fault that began
+  at 12:00 was still running at 14:00 and only in-range counts that hour. Both
+  suites pin it, so nobody can "tidy up" by asserting that in-range is bounded
+  by wall clock. It is bounded by the clock and by nothing else.
+
+  What is left: the fixture covers the duration downtime mode only. The set/clear
+  and derive modes deserve the same treatment once the Python tool grows derive.
 
 ## Medium term
 

@@ -46,7 +46,7 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `370 passed, 0 failed` before any change, more after. It drives
+It should report `377 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
 
@@ -86,7 +86,14 @@ was covered by CI rather than locally.
   library, no build step, no network calls at runtime. It has to open from a USB
   stick on a locked-down bench machine.
 - The analysis math stays identical between the browser tool and the Python tool.
-  If one grows a mode, the other owes the same mode.
+  If one grows a mode, the other owes the same mode. This is no longer a promise
+  anyone has to remember: `tests/data/cross_tool_golden.json` is the referee.
+  `tests/test_cross_tool.py` measures the Python tool against it and
+  `tests/browser/run.mjs` measures the browser tool against the same file, so a
+  change that moves one tool and not the other goes red in whichever suite was
+  not updated. When a number in that file has to change, change it by hand and
+  say in the commit why the old one was wrong. Never regenerate it from either
+  tool: a golden file produced by the code it checks proves nothing.
 - There are three downtime numbers and they are never mixed. Attributed credits
   each fault its whole duration. Wall clock merges overlaps but still counts a
   fault against the hours it started in. In range merges overlaps and also cuts

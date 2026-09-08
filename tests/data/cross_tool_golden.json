@@ -1,0 +1,183 @@
+{
+  "_note": [
+    "Golden numbers that BOTH tools must produce from tests/data/sample_alarm_log.csv.",
+    "",
+    "The browser tool and the Python tool implement the same analysis twice, in two",
+    "languages. Fourteen functions are near-literal translations of each other, and",
+    "until this file existed their agreement was enforced by a sentence in",
+    "CONTRIBUTING.md and nothing else. They had already drifted twice.",
+    "",
+    "So this file is the referee. tests/test_cross_tool.py reads it and checks the",
+    "Python tool against it. tests/browser/run.mjs reads the same file and checks the",
+    "browser tool against it. A change that moves one tool and not the other fails in",
+    "whichever suite was not updated, which is the point.",
+    "",
+    "The numbers were worked out from the fourteen rows the 30 day window keeps, by a",
+    "standalone script that shares no code with either tool, then confirmed in both.",
+    "Do not regenerate them from either tool's output: a golden file produced by the",
+    "code it checks proves nothing. If a case here genuinely needs to change, change",
+    "it by hand and say in the commit message why the old number was wrong.",
+    "",
+    "Every duration in the sample is a whole or half hour, so these compare exactly",
+    "and any drift shows up as an obvious number rather than a rounding argument."
+  ],
+
+  "input": "sample_alarm_log.csv",
+  "vendor": "amat",
+  "browser_mapping": {
+    "ts_set": "EventTime",
+    "fault_code": "AlarmID",
+    "description": "AlarmText",
+    "equipment": "ChamberID",
+    "downMode": "duration",
+    "durCol": "DownSeconds",
+    "durScale": 1
+  },
+
+  "window": {
+    "days": 30,
+    "start": "2026-01-22 20:00:00",
+    "end": "2026-02-21 20:00:00",
+    "rows_in_file": 15,
+    "rows_in_window": 14
+  },
+
+  "cases": [
+    {
+      "name": "whole window, all hours",
+      "tod_start": null,
+      "tod_end": null,
+      "rows": 14,
+      "attributed_hours": 18.5,
+      "wallclock_hours": 16.5,
+      "in_range_hours": 16.0,
+      "covered_hours": 720.0,
+      "range_blocks": 1,
+      "why": [
+        "Fourteen rows totalling 18.5 hours of duration. Two overlap, 10:00-14:00",
+        "and 12:00-15:00 on the 10th, so wall clock drops to 16.5. In range loses",
+        "another half hour: the last row starts at 20:00 on the 21st, the exact",
+        "moment the window closes, so none of its duration is inside the report."
+      ]
+    },
+    {
+      "name": "day shift, 06:00 to 18:00",
+      "tod_start": "06:00",
+      "tod_end": "18:00",
+      "rows": 11,
+      "attributed_hours": 15.5,
+      "wallclock_hours": 13.5,
+      "in_range_hours": 13.5,
+      "covered_hours": 360.0,
+      "range_blocks": 30,
+      "why": [
+        "Eleven rows start between 06:00 and 18:00, including the overlapping",
+        "pair, so wall clock is 2 hours under attributed. In range happens to",
+        "match wall clock here. That is the ordinary case, not a rule."
+      ]
+    },
+    {
+      "name": "night shift, 18:00 to 06:00",
+      "tod_start": "18:00",
+      "tod_end": "06:00",
+      "rows": 3,
+      "attributed_hours": 3.0,
+      "wallclock_hours": 3.0,
+      "in_range_hours": 2.5,
+      "covered_hours": 360.0,
+      "range_blocks": 31,
+      "why": [
+        "Three rows: 22:00 on the 20th, 03:00 on the 21st, 20:00 on the 21st.",
+        "The first two are the same night on two different dates, which is the",
+        "whole reason the filter wraps. No overlaps, so wall clock equals",
+        "attributed. In range is half an hour less: the 20:00 row starts as the",
+        "window closes. Thirty-one blocks rather than thirty because the night",
+        "in progress when the window opened counts its tail."
+      ]
+    },
+    {
+      "name": "first shift, 06:00 to 14:00",
+      "tod_start": "06:00",
+      "tod_end": "14:00",
+      "rows": 9,
+      "attributed_hours": 14.0,
+      "wallclock_hours": 12.0,
+      "in_range_hours": 11.0,
+      "covered_hours": 240.0,
+      "range_blocks": 30
+    },
+    {
+      "name": "second shift, 14:00 to 22:00",
+      "tod_start": "14:00",
+      "tod_end": "22:00",
+      "rows": 3,
+      "attributed_hours": 2.0,
+      "wallclock_hours": 2.0,
+      "in_range_hours": 2.5,
+      "covered_hours": 240.0,
+      "range_blocks": 31,
+      "why": [
+        "Keep this case. It is the only one where in-range downtime is LARGER",
+        "than both other numbers, and it is the clearest demonstration of what",
+        "the third number is for.",
+        "",
+        "Only three faults start on second shift, worth 2.0 hours, and half an",
+        "hour of that is lost because the 20:00 row runs past the window's end.",
+        "So 1.5 hours comes from rows on this shift. The other hour comes from a",
+        "fault that started at 12:00 on the 10th, on FIRST shift, and was still",
+        "running at 14:00. It put the tool on the floor for an hour of second",
+        "shift, and only the in-range number counts it.",
+        "",
+        "This is why no test may assert that in-range is bounded above by wall",
+        "clock or by attributed. It is bounded by the clock, and by nothing else."
+      ]
+    },
+    {
+      "name": "third shift, 22:00 to 06:00",
+      "tod_start": "22:00",
+      "tod_end": "06:00",
+      "rows": 2,
+      "attributed_hours": 2.5,
+      "wallclock_hours": 2.5,
+      "in_range_hours": 2.5,
+      "covered_hours": 240.0,
+      "range_blocks": 30
+    }
+  ],
+
+  "laws": {
+    "_note": [
+      "Properties that must hold for ANY split of the day, not only the cases",
+      "above. Both suites assert these as well as the fixed numbers, because a law",
+      "catches a class of bug that a table of numbers can miss."
+    ],
+    "shifts_partition_rows": {
+      "description": "Rows land in exactly one shift, so the parts add up to the windowed rows.",
+      "parts": [["06:00", "18:00"], ["18:00", "06:00"]],
+      "equals_rows": 14
+    },
+    "three_shifts_partition_rows": {
+      "description": "The same over three eight-hour shifts, one of which wraps past midnight.",
+      "parts": [["06:00", "14:00"], ["14:00", "22:00"], ["22:00", "06:00"]],
+      "equals_rows": 14
+    },
+    "shifts_partition_in_range": {
+      "description": "In-range downtime splits across shifts and adds back up to the whole window. Neither of the other two downtime numbers does this, which is the reason the third one exists.",
+      "parts": [["06:00", "18:00"], ["18:00", "06:00"]],
+      "equals_hours": 16.0
+    },
+    "three_shifts_partition_in_range": {
+      "description": "The same law over three shifts.",
+      "parts": [["06:00", "14:00"], ["14:00", "22:00"], ["22:00", "06:00"]],
+      "equals_hours": 16.0
+    },
+    "shifts_partition_covered_time": {
+      "description": "The covered hours split the same way the downtime does.",
+      "parts": [["06:00", "18:00"], ["18:00", "06:00"]],
+      "equals_hours": 720.0
+    },
+    "in_range_never_exceeds_covered": {
+      "description": "The tool cannot be down for longer than the report is long. True of in-range alone; attributed and wall clock are not bounded by the clock, and neither bounds in-range. See the second-shift case."
+    }
+  }
+}

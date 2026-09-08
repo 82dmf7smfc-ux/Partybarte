@@ -25,6 +25,12 @@ const PORT_NUM = 9401;
 const p5000 = readFileSync(join(FIX, "p5000_sample.txt"), "utf8");
 const csv = readFileSync(join(FIX, "delimited_sample.csv"), "utf8");
 
+// The cross-tool referee. tests/test_cross_tool.py checks the Python tool
+// against this same file, so a change that moves one tool and not the other
+// fails in whichever suite was not updated. See the note inside the JSON.
+const GOLDEN = JSON.parse(readFileSync(resolve(REPO, "tests", "data", "cross_tool_golden.json"), "utf8"));
+const GOLDEN_LOG = readFileSync(resolve(REPO, "tests", "data", GOLDEN.input), "utf8");
+
 // Three shapes the downtime guess has to tell apart. None of them has a
 // Duration column or a set/clear column, so the only thing separating them is
 // whether the default phrase lists actually pair up in the text.
@@ -159,7 +165,9 @@ async function main() {
     + "; window.__derive = " + JSON.stringify(deriveLog)
     + "; window.__downsOnly = " + JSON.stringify(deriveDownsOnly)
     + "; window.__noWording = " + JSON.stringify(deriveNoWording)
-    + "; window.__window = " + JSON.stringify(windowLog) + "; true");
+    + "; window.__window = " + JSON.stringify(windowLog)
+    + "; window.__golden = " + JSON.stringify(GOLDEN)
+    + "; window.__goldenLog = " + JSON.stringify(GOLDEN_LOG) + "; true");
 
   // 1. window.AP exists and is populated.
   var apKeys = await ev("Object.keys(window.AP || {}).length");
@@ -1491,6 +1499,101 @@ async function main() {
   check("clip: day plus night in-range downtime equals the whole window",
     clip.splits && clip.dayPos && clip.nightPos, clip);
   check("clip: three eight hour shifts add up the same way", clip.thirds, clip);
+
+  // 12c. The cross-tool check.
+  //
+  // Both tools are measured against tests/data/cross_tool_golden.json, whose
+  // numbers were worked out by a standalone script sharing no code with either.
+  // This is the mechanism that replaces "remember to change both tools", which
+  // had already failed twice.
+  // Drive the real page: load the shared log, map its columns the way the
+  // fixture says, then run each case through Analyze and read the result off
+  // STATE.lastResult. This exercises the whole browser pipeline, not just the
+  // pure helpers, which is the only way the two tools are really compared.
+  await ev("(function(){var G=window.__golden,M=G.browser_mapping;"
+    + "window.__runGolden=function(todStart,todEnd){"
+    + "  setMode('full');"
+    + "  document.getElementById('formatSel').value='auto';"
+    + "  loadTexts([window.__goldenLog],1);"
+    + "  function setRole(label,role){for(var i=0;i<STATE.columns.length;i++){"
+    + "    if(STATE.columns[i].label===label){var s=document.getElementById('colid_'+STATE.columns[i].key);"
+    + "    if(s)s.value=role;return;}}}"
+    + "  setRole(M.ts_set,'ts_set');setRole(M.fault_code,'fault_code');"
+    + "  setRole(M.description,'description');setRole(M.equipment,'equipment');"
+    + "  setRole(M.durCol,'duration');"
+    + "  document.getElementById('downMode').value=M.downMode;"
+    + "  document.getElementById('downMode').dispatchEvent(new Event('change'));"
+    + "  document.getElementById('durUnit').value=String(M.durScale);"
+    + "  document.getElementById('windowDays').value=String(G.window.days);"
+    + "  if(typeof syncWindowChips==='function')syncWindowChips();"
+    + "  document.getElementById('todStart').value=todStart||'';"
+    + "  document.getElementById('todEnd').value=todEnd||'';"
+    + "  document.getElementById('runBtn').click();"
+    + "  var R=STATE.lastResult;"
+    + "  return R?{rows:R.totalFaults,attributed:R.grandAttrib/3600,wall:R.grandWall/3600,"
+    + "    inRange:R.grandInRange/3600,covered:R.coveredSec/3600,blocks:R.rangeBlocks}:null;};"
+    + "return true;})()");
+
+  var goldenOk = true, goldenDetail = [];
+  for (var gi = 0; gi < GOLDEN.cases.length; gi++) {
+    var gc = GOLDEN.cases[gi];
+    var got = await ev("window.__runGolden(" + JSON.stringify(gc.tod_start) + ","
+      + JSON.stringify(gc.tod_end) + ")");
+    if (!got) { goldenOk = false; goldenDetail.push({ name: gc.name, got: null }); continue; }
+    var near = function (a, b) { return Math.abs(a - b) < 1e-6; };
+    var pairs = [
+      ["rows", got.rows, gc.rows],
+      ["attributed_hours", got.attributed, gc.attributed_hours],
+      ["wallclock_hours", got.wall, gc.wallclock_hours],
+      ["in_range_hours", got.inRange, gc.in_range_hours],
+      ["covered_hours", got.covered, gc.covered_hours],
+      ["range_blocks", got.blocks, gc.range_blocks]
+    ];
+    for (var pi = 0; pi < pairs.length; pi++) {
+      var field = pairs[pi][0], mine = pairs[pi][1], want = pairs[pi][2];
+      if (want === undefined || want === null) continue;
+      if (!near(mine, want)) {
+        goldenOk = false;
+        goldenDetail.push({ name: gc.name, field: field, got: mine, want: want });
+      }
+    }
+  }
+  check("cross-tool: every golden case matches the Python tool's numbers",
+    goldenOk, goldenDetail.slice(0, 6));
+
+  // The laws, run through the same page rather than the pure helpers, so a
+  // wiring mistake in runAnalysis cannot hide behind correct maths.
+  var lawRows = await ev("(function(){var L=window.__golden.laws.shifts_partition_rows;"
+    + "var t=0;L.parts.forEach(function(p){t+=window.__runGolden(p[0],p[1]).rows;});return t;})()");
+  eq("cross-tool law: two shifts hold every windowed row between them",
+    lawRows, GOLDEN.laws.shifts_partition_rows.equals_rows);
+
+  var lawRows3 = await ev("(function(){var L=window.__golden.laws.three_shifts_partition_rows;"
+    + "var t=0;L.parts.forEach(function(p){t+=window.__runGolden(p[0],p[1]).rows;});return t;})()");
+  eq("cross-tool law: three shifts do too, including the one that wraps",
+    lawRows3, GOLDEN.laws.three_shifts_partition_rows.equals_rows);
+
+  var lawIn = await ev("(function(){var L=window.__golden.laws.shifts_partition_in_range;"
+    + "var t=0;L.parts.forEach(function(p){t+=window.__runGolden(p[0],p[1]).inRange/1;});return t;})()");
+  check("cross-tool law: in-range downtime splits across two shifts and adds back up",
+    Math.abs(lawIn - GOLDEN.laws.shifts_partition_in_range.equals_hours) < 1e-6,
+    { got: lawIn, want: GOLDEN.laws.shifts_partition_in_range.equals_hours });
+
+  var lawIn3 = await ev("(function(){var L=window.__golden.laws.three_shifts_partition_in_range;"
+    + "var t=0;L.parts.forEach(function(p){t+=window.__runGolden(p[0],p[1]).inRange;});return t;})()");
+  check("cross-tool law: and across three shifts",
+    Math.abs(lawIn3 - GOLDEN.laws.three_shifts_partition_in_range.equals_hours) < 1e-6,
+    { got: lawIn3, want: GOLDEN.laws.three_shifts_partition_in_range.equals_hours });
+
+  // The counterexample. Second shift is the case where in-range is LARGER than
+  // both other numbers, because a fault that began on first shift was still
+  // running at 14:00. Pinned here so nobody "tidies up" by asserting the wrong
+  // bound; the Python suite pins the same case for the same reason.
+  var second = await ev("window.__runGolden('14:00','22:00')");
+  check("cross-tool: in-range may exceed wall clock, and does on second shift",
+    second.inRange > second.wall && second.inRange > second.attributed, second);
+  check("cross-tool: in-range never exceeds the time covered",
+    second.inRange <= second.covered + 1e-9, second);
 
   // 13. What the quick report puts on paper. The hand-out is the summary, the
   // ranked table and the Pareto; anything whose job is to change the report
