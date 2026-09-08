@@ -46,7 +46,7 @@ The browser harness is the fast gate and it runs anywhere:
 
     node tests/browser/run.mjs
 
-It should report `342 passed, 0 failed` before any change, more after. It drives
+It should report `370 passed, 0 failed` before any change, more after. It drives
 real headless Chromium against `alarm_pareto.html` and uses only Node built-ins,
 so there is nothing to install.
 
@@ -87,6 +87,19 @@ was covered by CI rather than locally.
   stick on a locked-down bench machine.
 - The analysis math stays identical between the browser tool and the Python tool.
   If one grows a mode, the other owes the same mode.
+- There are three downtime numbers and they are never mixed. Attributed credits
+  each fault its whole duration. Wall clock merges overlaps but still counts a
+  fault against the hours it started in. In range merges overlaps and also cuts
+  each fault down to the hours the report covers. Only the third is bounded by
+  the clock, and only the third splits correctly across shifts, so it is the one
+  a percentage may ever be taken of. If a fourth is ever added, say on the page
+  and in the docs what question it answers that the others do not.
+- The in-range number is measured from the rows before the window and the shift
+  were applied, because it follows the clock rather than the fault onset: a
+  fault that began before a shift started still had the tool down during it. It
+  is measured after the severity and category filters, because those are the
+  reader's intent rather than the reporting range. Do not "simplify" it to use
+  the windowed rows; that silently loses every fault that straddles a boundary.
 - The code stays plain enough for a non-programmer to follow. Clever is worse
   than obvious here.
 - Anything changed in the browser tool earns coverage in `tests/browser/run.mjs`.

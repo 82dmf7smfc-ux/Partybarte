@@ -1338,6 +1338,160 @@ async function main() {
     + "})()");
   eq("derive: a Duration column still wins over the message text", d4, "duration");
 
+  // 12b. Time of day, and the reporting range.
+  //
+  // Two features share this section because they are two halves of one idea.
+  // The filter picks which hours of the window a report covers; the reporting
+  // range is that same choice expressed as blocks of clock time, which is what
+  // the third downtime number is measured against.
+  //
+  // The night shift is the case worth the effort. Written as clock times, an
+  // 18:00 to 06:00 shift has a start LATER than its end, the kept time is in
+  // two pieces, and those pieces sit on two different dates. So these checks
+  // are exhaustive rather than sampled: every minute of a day, and every
+  // start-hour and length combination, because the cost of a quiet off-by-one
+  // on a shift boundary is a report that silently drops or double counts.
+  var tod = await ev("(function(){"
+    + "var out={};"
+    + "out.parse=[AP.parseTimeOfDay('00:00'),AP.parseTimeOfDay('06:00'),AP.parseTimeOfDay('6'),"
+    + "  AP.parseTimeOfDay('18:30'),AP.parseTimeOfDay('23:59'),AP.parseTimeOfDay('24:00'),AP.parseTimeOfDay('07:15:45')];"
+    + "out.blank=[AP.parseTimeOfDay(''),AP.parseTimeOfDay('   '),AP.parseTimeOfDay(null)];"
+    + "out.bad=[AP.parseTimeOfDay('25:00'),AP.parseTimeOfDay('24:30'),AP.parseTimeOfDay('06:60'),AP.parseTimeOfDay('half past')];"
+    + "out.fmt=[AP.formatTimeOfDay(0),AP.formatTimeOfDay(1439)];"
+    + "out.labels=[AP.timeOfDayLabel(null,null),AP.timeOfDayLabel(360,1080),AP.timeOfDayLabel(1080,360)];"
+    + "out.notFiltered=[AP.isTimeOfDayFiltered(null,null),AP.isTimeOfDayFiltered(360,null),"
+    + "  AP.isTimeOfDayFiltered(360,360),AP.isTimeOfDayFiltered(0,1440)];"
+    + "return out;})()");
+  check("tod: HH:MM, bare hours, seconds and 24:00 all parse",
+    JSON.stringify(tod.parse) === JSON.stringify([0, 360, 360, 1110, 1439, 1440, 435]), tod.parse);
+  check("tod: blank means no bound", tod.blank.every(function (v) { return v === null; }), tod.blank);
+  check("tod: unreadable times are rejected rather than guessed at",
+    tod.bad.every(function (v) { return v === null; }), tod.bad);
+  check("tod: minutes format back to HH:MM",
+    JSON.stringify(tod.fmt) === JSON.stringify(["00:00", "23:59"]), tod.fmt);
+  eq("tod: no filter is labelled all hours", tod.labels[0], "All hours");
+  eq("tod: a plain range reads as written", tod.labels[1], "06:00 to 18:00");
+  eq("tod: a wrapping range says it crosses midnight", tod.labels[2], "18:00 to 06:00 (crosses midnight)");
+  check("tod: a missing bound, equal bounds and the whole day are not filters",
+    tod.notFiltered.every(function (v) { return v === false; }), tod.notFiltered);
+
+  // Every one of the 1440 minutes in a day, checked against a hand-written
+  // statement of the definition rather than against the implementation.
+  var wrap = await ev("(function(){"
+    + "var occ=[];for(var m=0;m<1440;m++){occ.push({start:new Date(2026,2,10,Math.floor(m/60),m%60,0)});}"
+    + "function keptSet(s,e){var o={};AP.applyTimeOfDay(occ,s,e).forEach(function(x){"
+    + "  o[x.start.getHours()*60+x.start.getMinutes()]=1;});return o;}"
+    + "var night=keptSet(1080,360),day=keptSet(360,1080);"
+    + "var wantNight=true,nightCount=0,dayCount=0;"
+    + "for(var i=0;i<1440;i++){var should=(i>=1080||i<360);if(!!night[i]!==should)wantNight=false;"
+    + "  if(night[i])nightCount++;if(day[i])dayCount++;}"
+    + "var overlap=0,covered=0;"
+    + "for(var j=0;j<1440;j++){if(night[j]&&day[j])overlap++;if(night[j]||day[j])covered++;}"
+    + "// Every start hour against six lengths: 144 combinations, half of which wrap.\n"
+    + "var partitionOk=true,lengths=[1,4,8,12,16,23];"
+    + "for(var h=0;h<24;h++){for(var li=0;li<lengths.length;li++){"
+    + "  var st=h*60,en=(st+lengths[li]*60)%1440;"
+    + "  var a=keptSet(st,en),b=keptSet(en,st),n=0,both=0,any=0;"
+    + "  for(var k=0;k<1440;k++){if(a[k])n++;if(a[k]&&b[k])both++;if(a[k]||b[k])any++;}"
+    + "  if(n!==lengths[li]*60||both!==0||any!==1440)partitionOk=false;}}"
+    + "return {wantNight:wantNight,nightCount:nightCount,dayCount:dayCount,overlap:overlap,"
+    + "  covered:covered,partitionOk:partitionOk,"
+    + "  boundaries:[!!night[1080],!!night[1079],!!night[359],!!night[360],!!night[0],!!night[1439],!!night[720]]};"
+    + "})()");
+  check("tod: the night shift keeps exactly the minutes the definition names", wrap.wantNight, wrap);
+  check("tod: a twelve hour shift is 720 minutes, both ways",
+    wrap.nightCount === 720 && wrap.dayCount === 720, wrap);
+  check("tod: day and night share no minute and lose none",
+    wrap.overlap === 0 && wrap.covered === 1440, wrap);
+  check("tod: 18:00 is in and 17:59 is out; 05:59 is in and 06:00 is out",
+    JSON.stringify(wrap.boundaries.slice(0, 4)) === JSON.stringify([true, false, true, false]), wrap.boundaries);
+  check("tod: midnight and the minute before it are both night shift",
+    wrap.boundaries[4] && wrap.boundaries[5] && !wrap.boundaries[6], wrap.boundaries);
+  check("tod: any range and its complement partition the day (144 combinations)",
+    wrap.partitionOk, wrap);
+
+  // One night is two dates. This is the whole point of the feature.
+  var dates = await ev("(function(){"
+    + "var occ=[{start:new Date(2026,2,10,22,0)},{start:new Date(2026,2,11,3,0)},{start:new Date(2026,2,11,12,0)}];"
+    + "var kept=AP.applyTimeOfDay(occ,1080,360);"
+    + "var monthEnd=AP.applyTimeOfDay([{start:new Date(2026,2,31,23,30)},{start:new Date(2026,3,1,1,30)}],1080,360);"
+    + "var leap=AP.applyTimeOfDay([{start:new Date(2028,1,28,23,30)},{start:new Date(2028,1,29,1,30)}],1080,360);"
+    + "return {kept:kept.length,hours:kept.map(function(o){return o.start.getHours();}),"
+    + "  monthEnd:monthEnd.length,leap:leap.length};})()");
+  check("tod: 22:00 one day and 03:00 the next are the same night",
+    dates.kept === 2 && JSON.stringify(dates.hours) === JSON.stringify([22, 3]), dates);
+  check("tod: a night across a month end or a leap day is not special",
+    dates.monthEnd === 2 && dates.leap === 2, dates);
+
+  // The reporting range: the same choice as blocks of clock time.
+  var rng = await ev("(function(){"
+    + "var W0=new Date(2026,2,1),W1=new Date(2026,2,4);"
+    + "function iso(d){return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+' '+d.getHours()+':'+(d.getMinutes()<10?'0':'')+d.getMinutes();}"
+    + "var plain=AP.buildRanges(W0,W1,null,null);"
+    + "var day=AP.buildRanges(W0,W1,360,1080);"
+    + "var night=AP.buildRanges(W0,W1,1080,360);"
+    + "var W2=new Date(2026,2,1,9,13),W3=new Date(2026,3,5,21,47);"
+    + "var big=AP.buildRanges(W2,W3,1080,360),sorted=true,inside=true;"
+    + "for(var i=0;i<big.length;i++){if(big[i][1]<=big[i][0])sorted=false;"
+    + "  if(i&&(big[i][0]<big[i-1][0]||big[i-1][1]>big[i][0]))sorted=false;"
+    + "  if(big[i][0]<W2||big[i][1]>W3)inside=false;}"
+    + "// A window opening mid-night keeps that night's tail.\n"
+    + "var tail=AP.buildRanges(new Date(2026,2,2,2,0),new Date(2026,2,2,12,0),1080,360);"
+    + "return {plainLen:plain.length,plainHours:AP.rangeSeconds(plain)/3600,"
+    + "  dayLen:day.length,dayHours:AP.rangeSeconds(day)/3600,"
+    + "  nightLen:night.length,nightHours:AP.rangeSeconds(night)/3600,"
+    + "  nightBlocks:night.map(function(b){return iso(b[0])+' -> '+iso(b[1]);}),"
+    + "  sorted:sorted,inside:inside,"
+    + "  tail:tail.length===1?iso(tail[0][0])+' -> '+iso(tail[0][1]):'('+tail.length+')'};})()");
+  check("range: no shift is one block covering the window",
+    rng.plainLen === 1 && rng.plainHours === 72, rng);
+  check("range: a day shift is one block per day", rng.dayLen === 3 && rng.dayHours === 36, rng);
+  check("range: a night shift block spans two dates",
+    rng.nightBlocks[1] === "2026-3-1 18:00 -> 2026-3-2 6:00", rng.nightBlocks);
+  check("range: the nights either side are trimmed to the window, not dropped",
+    rng.nightLen === 4 && rng.nightHours === 36, rng);
+  check("range: blocks are sorted, disjoint and inside the window",
+    rng.sorted && rng.inside, rng);
+  check("range: a window opening mid-shift keeps that shift's tail",
+    rng.tail === "2026-3-2 2:00 -> 2026-3-2 6:00", rng.tail);
+
+  // Clipping, and the property that makes the third number worth having.
+  var clip = await ev("(function(){"
+    + "var W0=new Date(2026,2,1),W1=new Date(2026,2,8);"
+    + "var night=AP.buildRanges(W0,W1,1080,360);"
+    + "function hrs(p){return AP.mergedSeconds(p)/3600;}"
+    + "// 17:50 plus four hours: ten minutes of day, the rest night.\n"
+    + "var straddle=AP.clipIntervals([[new Date(2026,2,1,17,50),new Date(2026,2,1,21,50)]],night);"
+    + "// A two and a half day fault touches three separate nights.\n"
+    + "var long=AP.clipIntervals([[new Date(2026,2,1,12,0),new Date(2026,2,4,0,0)]],night);"
+    + "var outside=AP.clipIntervals([[new Date(2026,2,1,12,0),new Date(2026,2,1,13,0)]],night);"
+    + "// However much downtime is thrown at it, it cannot exceed the clock.\n"
+    + "var huge=[];for(var i=0;i<5;i++)huge.push([new Date(2026,1,1),new Date(2026,3,1)]);"
+    + "var capped=AP.mergedSeconds(AP.clipIntervals(huge,night))===AP.rangeSeconds(night);"
+    + "var alarms=[[new Date(2026,2,1,17,50),new Date(2026,2,1,21,50)],"
+    + "  [new Date(2026,2,2,5,0),new Date(2026,2,2,8,0)],"
+    + "  [new Date(2026,2,3,12,0),new Date(2026,2,3,13,0)],"
+    + "  [new Date(2026,2,4,23,0),new Date(2026,2,5,1,0)],"
+    + "  [new Date(2026,2,5,12,0),new Date(2026,2,7,12,0)]];"
+    + "function measured(a,b){return AP.mergedSeconds(AP.clipIntervals(alarms,AP.buildRanges(W0,W1,a,b)));}"
+    + "var whole=measured(null,null),d=measured(360,1080),n=measured(1080,360);"
+    + "var thirds=measured(360,840)+measured(840,1320)+measured(1320,360);"
+    + "return {straddleHours:hrs(straddle),longPieces:long.length,longHours:hrs(long),"
+    + "  outside:outside.length,capped:capped,"
+    + "  splits:Math.abs(d+n-whole)<1e-6,thirds:Math.abs(thirds-whole)<1e-6,"
+    + "  dayPos:d>0,nightPos:n>0};})()");
+  check("clip: a fault straddling 18:00 gives the night only its own side of it",
+    Math.abs(clip.straddleHours - (3 + 50 / 60)) < 1e-6, clip);
+  check("clip: one long fault is cut into a piece per night",
+    clip.longPieces === 3 && clip.longHours === 30, clip);
+  check("clip: a fault wholly outside the shift contributes nothing", clip.outside === 0, clip);
+  check("clip: in-range downtime can never exceed the time covered", clip.capped, clip);
+  // This is the property neither of the other two downtime numbers has. Split
+  // the window into shifts and the in-range figures add back up to the whole.
+  check("clip: day plus night in-range downtime equals the whole window",
+    clip.splits && clip.dayPos && clip.nightPos, clip);
+  check("clip: three eight hour shifts add up the same way", clip.thirds, clip);
+
   // 13. What the quick report puts on paper. The hand-out is the summary, the
   // ranked table and the Pareto; anything whose job is to change the report
   // rather than to say what it found comes off the page.
